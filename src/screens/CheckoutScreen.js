@@ -1,0 +1,314 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Modal,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, spacing, radius } from '../theme/colors';
+import { supabase } from '../lib/supabase';
+import { getDeviceUserId } from '../lib/deviceUser';
+
+const CRENEAUX = ['Matin (8h-12h)', 'Après-midi (12h-16h)', 'Soir (16h-19h)'];
+
+const TERMS_TEXT = `1. Achat définitif
+Une fois la commande validée et la livraison lancée, l'achat est considéré comme définitif. Zuno ne propose pas de remboursement automatique.
+
+2. Rôle de Zuno
+Zuno agit uniquement comme plateforme de mise en relation entre acheteurs et vendeurs. Chaque vendeur reste seul responsable de l'article vendu, de son état et de sa description.
+
+3. Remboursement par accord commun
+Un remboursement ou un échange reste possible si l'acheteur et le vendeur trouvent un accord commun (article non conforme, non reçu, etc.). Cette démarche se négocie directement entre les deux parties, par exemple via la messagerie intégrée à l'application.
+
+4. Acceptation
+En cochant la case "J'ai lu et j'accepte les conditions", l'acheteur reconnaît avoir pris connaissance de ces conditions et les accepte pour cette commande.`;
+
+export default function CheckoutScreen({ route, navigation }) {
+  const { listing, quantity = 1, deliveryMethod } = route.params;
+  const [nom, setNom] = useState('');
+  const [telephone, setTelephone] = useState('');
+  const [quartier, setQuartier] = useState('');
+  const [heureLivraison, setHeureLivraison] = useState(CRENEAUX[0]);
+  const [accepted, setAccepted] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const sousTotal = listing.price * quantity;
+  const fraisLivraison = deliveryMethod?.price || 0;
+  const total = sousTotal + fraisLivraison;
+
+  const handleConfirm = async () => {
+    if (!nom.trim() || !telephone.trim() || !quartier.trim()) {
+      Alert.alert('Informations manquantes', 'Nom, numéro et quartier sont obligatoires.');
+      return;
+    }
+    if (!accepted) {
+      Alert.alert('Conditions', "Merci d'accepter les conditions avant de continuer.");
+      return;
+    }
+
+    setSaving(true);
+    const myId = await getDeviceUserId();
+
+    // Le vrai paiement MyNITA se branchera ici plus tard. Pour l'instant,
+    // la commande est créée directement pour pouvoir tester tout le
+    // parcours de livraison sans attendre l'accès à l'API MyNITA.
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        listing_id: listing.id,
+        acheteur_id: myId,
+        montant: total,
+        quantite: quantity,
+        frais_livraison: fraisLivraison,
+        mode_livraison: deliveryMethod?.id || null,
+        statut: 'en_attente_paiement',
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error('Erreur création commande:', orderError);
+      setSaving(false);
+      Alert.alert('Erreur', `Détail technique : ${orderError.message}`);
+      return;
+    }
+
+    const { error: deliveryError } = await supabase.from('deliveries').insert({
+      order_id: order.id,
+      adresse: quartier.trim(),
+      quartier: quartier.trim(),
+      nom_contact: nom.trim(),
+      telephone_contact: telephone.trim(),
+      heure_livraison: heureLivraison,
+      statut_livraison: 'a_traiter',
+    });
+
+    setSaving(false);
+
+    if (deliveryError) {
+      console.error('Erreur création livraison:', deliveryError);
+      Alert.alert('Erreur', `Détail technique : ${deliveryError.message}`);
+      return;
+    }
+
+    Alert.alert(
+      'Commande enregistrée',
+      "Le vendeur va organiser la livraison. Suis son avancement dans l'onglet Profil > Mes achats.",
+      [{ text: 'OK', onPress: () => navigation.popToTop() }]
+    );
+  };
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: spacing.md }}>
+        <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+      </TouchableOpacity>
+
+      <Text style={styles.heading}>Informations de livraison</Text>
+
+      <Text style={styles.label}>Nom complet</Text>
+      <TextInput
+        placeholder="Ton nom"
+        placeholderTextColor={colors.textMuted}
+        value={nom}
+        onChangeText={setNom}
+        style={styles.input}
+      />
+
+      <Text style={styles.label}>Numéro à contacter</Text>
+      <TextInput
+        placeholder="+227 90 00 00 00"
+        placeholderTextColor={colors.textMuted}
+        value={telephone}
+        onChangeText={setTelephone}
+        keyboardType="phone-pad"
+        style={styles.input}
+      />
+
+      <Text style={styles.label}>Quartier</Text>
+      <TextInput
+        placeholder="Ex: Plateau, Niamey"
+        placeholderTextColor={colors.textMuted}
+        value={quartier}
+        onChangeText={setQuartier}
+        style={styles.input}
+      />
+
+      <Text style={styles.label}>Heure de livraison souhaitée</Text>
+      <View style={styles.pillRow}>
+        {CRENEAUX.map((c) => (
+          <TouchableOpacity
+            key={c}
+            onPress={() => setHeureLivraison(c)}
+            style={[styles.pill, heureLivraison === c && styles.pillActive]}
+          >
+            <Text style={[styles.pillText, heureLivraison === c && styles.pillTextActive]}>{c}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>
+            {listing.title} × {quantity}
+          </Text>
+          <Text style={styles.summaryValue}>{sousTotal.toLocaleString('fr-FR')} FCFA</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Livraison ({deliveryMethod?.label})</Text>
+          <Text style={styles.summaryValue}>{fraisLivraison.toLocaleString('fr-FR')} FCFA</Text>
+        </View>
+        <View style={[styles.summaryRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>{total.toLocaleString('fr-FR')} FCFA</Text>
+        </View>
+      </View>
+
+      <View style={styles.checkboxRow}>
+        <TouchableOpacity onPress={() => setAccepted((v) => !v)}>
+          <Ionicons
+            name={accepted ? 'checkbox' : 'square-outline'}
+            size={20}
+            color={accepted ? colors.orange : colors.textMuted}
+          />
+        </TouchableOpacity>
+        <Text style={styles.checkboxText}>
+          J'ai lu et j'accepte les{' '}
+          <Text style={styles.linkText} onPress={() => setShowTerms(true)}>
+            conditions
+          </Text>
+        </Text>
+      </View>
+
+      <Modal visible={showTerms} animationType="slide" onRequestClose={() => setShowTerms(false)}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Conditions de vente</Text>
+            <TouchableOpacity onPress={() => setShowTerms(false)}>
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+            <Text style={styles.termsText}>{TERMS_TEXT}</Text>
+          </ScrollView>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => {
+                setAccepted(true);
+                setShowTerms(false);
+              }}
+            >
+              <Text style={styles.confirmButtonText}>J'ai lu, j'accepte</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <TouchableOpacity
+        style={[styles.confirmButton, !accepted && styles.confirmButtonDisabled]}
+        onPress={handleConfirm}
+        disabled={saving}
+      >
+        {saving ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Text style={styles.confirmButtonText}>Lancer la commande</Text>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  heading: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.xs },
+  input: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    height: 44,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.md,
+  },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.lg },
+  pill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  pillActive: { backgroundColor: colors.orange, borderColor: colors.orange },
+  pillText: { fontSize: 12, color: colors.textPrimary },
+  pillTextActive: { color: colors.white, fontWeight: '600' },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  summaryLabel: { fontSize: 13, color: colors.textSecondary, flex: 1, marginRight: spacing.sm },
+  summaryValue: { fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
+  totalRow: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  totalLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  totalValue: { fontSize: 16, fontWeight: '700', color: colors.orange },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  checkboxText: { fontSize: 13, color: colors.textPrimary, flex: 1 },
+  linkText: { color: colors.orange, fontWeight: '700', textDecorationLine: 'underline' },
+  modalContainer: { flex: 1, backgroundColor: colors.background },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  termsText: { fontSize: 13, color: colors.textSecondary, lineHeight: 22 },
+  modalFooter: {
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  confirmButton: {
+    backgroundColor: colors.orange,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  confirmButtonDisabled: { opacity: 0.5 },
+  confirmButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+});

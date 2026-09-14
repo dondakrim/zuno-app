@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Zuno",
+    "slug": "zuno",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2E0B8C"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zuno.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2E0B8C"
+      },
+      "package": "com.zuno.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Zuno a besoin d'accéder à tes photos pour illustrer tes annonces."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "71cb5d9a-ad9e-4345-89ed-6de0c94fb53c"
+      }
+    }
+  }
+}
