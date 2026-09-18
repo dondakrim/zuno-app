@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, radius } from '../theme/colors';
-import { getDeviceUserId } from '../lib/deviceUser';
+import { getDeviceUserId, deleteAccountAndReset } from '../lib/deviceUser';
+
+const PRIVACY_URL = 'https://claude.ai/artifact/W693o2tq7NtU93GffZanyM';
+const TERMS_URL = 'https://claude.ai/artifact/REfBbZLXoVGSHUzu1FD7DW';
 
 function SettingsRow({ icon, label, onPress }) {
   return (
@@ -35,6 +38,44 @@ export default function SettingsScreen({ navigation }) {
     );
   };
 
+  const handleResetInterests = () => {
+    Alert.alert(
+      "Revoir mes centres d'intérêt",
+      "Tu devras choisir à nouveau au moins 3 centres d'intérêt au prochain lancement de l'appli.",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Réinitialiser',
+          onPress: async () => {
+            await AsyncStorage.removeItem('zuno_onboarding_done');
+            Alert.alert('Fait', "Ferme complètement l'appli et rouvre-la pour refaire ce choix.");
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Supprimer mon compte',
+      "Cette action efface immédiatement ton nom, ta photo, ta pièce d'identité et tes centres d'intérêt. Tes annonces et commandes passées restent visibles pour les autres utilisateurs concernés, mais de façon anonyme. Cette action est irréversible.",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer définitivement',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteAccountAndReset();
+            Alert.alert(
+              'Compte supprimé',
+              "Tes informations personnelles ont été effacées. Ferme complètement l'application et rouvre-la pour repartir de zéro."
+            );
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -54,6 +95,42 @@ export default function SettingsScreen({ navigation }) {
             label="Changer d'identité (test)"
             onPress={handleResetIdentity}
           />
+          <SettingsRow
+            icon="heart-outline"
+            label="Revoir mes centres d'intérêt"
+            onPress={handleResetInterests}
+          />
+        </View>
+
+        <Text style={styles.groupTitle}>Équipe (test)</Text>
+        <View style={styles.group}>
+          <SettingsRow
+            icon="shield-checkmark-outline"
+            label="Modération"
+            onPress={() => navigation.navigate('Moderation')}
+          />
+        </View>
+
+        <Text style={styles.groupTitle}>Légal</Text>
+        <View style={styles.group}>
+          <SettingsRow
+            icon="document-text-outline"
+            label="Politique de confidentialité"
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+          />
+          <SettingsRow
+            icon="document-text-outline"
+            label="Conditions d'utilisation"
+            onPress={() => Linking.openURL(TERMS_URL)}
+          />
+        </View>
+
+        <Text style={styles.groupTitle}>Zone dangereuse</Text>
+        <View style={styles.group}>
+          <TouchableOpacity style={styles.row} onPress={handleDeleteAccount}>
+            <Ionicons name="trash-outline" size={18} color={colors.danger} />
+            <Text style={[styles.rowLabel, { color: colors.danger }]}>Supprimer mon compte</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.groupTitle}>À propos</Text>

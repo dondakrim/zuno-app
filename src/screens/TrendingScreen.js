@@ -25,6 +25,7 @@ export default function TrendingScreen({ navigation }) {
       .from('listings')
       .select('*')
       .eq('status', 'disponible')
+      .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(40);
     if (!error && data) setListings(data);

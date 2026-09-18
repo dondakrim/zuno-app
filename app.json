@@ -37,7 +37,15 @@
         {
           "photosPermission": "Zuno a besoin d'accéder à tes photos pour illustrer tes annonces."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#FF6A00"
+        }
+      ],
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {

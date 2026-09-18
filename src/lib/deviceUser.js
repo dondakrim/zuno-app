@@ -38,3 +38,48 @@ export async function getDeviceUserId() {
 
   return id;
 }
+
+// Supprime le compte : rend les informations personnelles anonymes côté
+// Supabase (nom, photo, ville, pièce d'identité, centres d'intérêt...) et
+// efface l'identité de l'appareil, pour repartir de zéro. Les annonces,
+// messages et commandes déjà liés à cet identifiant restent en base sous
+// forme anonyme (pour la cohérence des commandes passées côté acheteurs),
+// plutôt que d'être supprimés d'un coup, ce qui risquerait de casser des
+// commandes en cours avec d'autres utilisateurs.
+export async function deleteAccountAndReset() {
+  const id = await AsyncStorage.getItem(STORAGE_KEY);
+  if (!id) return;
+
+  // Tente de retirer la pièce d'identité du stockage, si elle existe.
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('id_document_url')
+    .eq('id', id)
+    .maybeSingle();
+  if (userRow?.id_document_url) {
+    await supabase.storage.from('identity-documents').remove([userRow.id_document_url]);
+  }
+
+  await supabase
+    .from('users')
+    .update({
+      nom: 'Compte supprimé',
+      telephone: `deleted-${id.slice(0, 8)}`,
+      ville: null,
+      photo_url: null,
+      boutique_nom: null,
+      id_document_url: null,
+      identity_status: 'non_soumise',
+      interets: null,
+    })
+    .eq('id', id);
+
+  await supabase.from('push_tokens').delete().eq('user_id', id);
+
+  await AsyncStorage.multiRemove([
+    STORAGE_KEY,
+    'zuno_onboarding_done',
+    'zuno_user_mode',
+    'zuno_merchant_suggestion_dismissed',
+  ]);
+}

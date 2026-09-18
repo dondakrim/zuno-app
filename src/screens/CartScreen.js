@@ -14,6 +14,11 @@ import { getDeviceUserId } from '../lib/deviceUser';
 
 const DELIVERY_OPTIONS = [
   {
+    id: 'pickup',
+    label: 'Retrait en main propre (Pick up)',
+    price: 0,
+  },
+  {
     id: 'meme_ville',
     label: 'Livraison dans la même ville',
     price: 1000,
@@ -66,6 +71,12 @@ export default function CartScreen({ route, navigation }) {
       Alert.alert(
         'À savoir',
         "Les frais de livraison peuvent changer selon la taille de l'article."
+      );
+    }
+    if (option.id === 'pickup') {
+      Alert.alert(
+        'Retrait en main propre',
+        "Aucun frais de livraison. Après validation de la commande, mets-toi d'accord avec le vendeur sur le lieu et l'heure via la messagerie."
       );
     }
   };

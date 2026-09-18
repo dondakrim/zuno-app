@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
+import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -16,6 +18,7 @@ import PostListingScreen from '../screens/PostListingScreen';
 import MessagesListScreen from '../screens/MessagesListScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import EditProfileScreen from '../screens/EditProfileScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CartScreen from '../screens/CartScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
@@ -23,6 +26,11 @@ import MyCartScreen from '../screens/MyCartScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import MyOrdersScreen from '../screens/MyOrdersScreen';
+import ModerationScreen from '../screens/ModerationScreen';
+import MerchantDashboardScreen from '../screens/merchant/DashboardScreen';
+import IdentityVerificationScreen from '../screens/merchant/IdentityVerificationScreen';
+import MerchantListingsScreen from '../screens/merchant/MerchantListingsScreen';
+import MerchantOrdersScreen from '../screens/merchant/MerchantOrdersScreen';
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen';
 import OtpVerifyScreen from '../screens/auth/OtpVerifyScreen';
 
@@ -33,6 +41,11 @@ const TrendingStack = createNativeStackNavigator();
 const PanierStack = createNativeStackNavigator();
 const MoiStack = createNativeStackNavigator();
 const MessagesStack = createNativeStackNavigator();
+const MerchantTab = createBottomTabNavigator();
+const MerchantDashboardStack = createNativeStackNavigator();
+const MerchantListingsStack = createNativeStackNavigator();
+const MerchantOrdersStack = createNativeStackNavigator();
+const MerchantMoiStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
 
 // Tant que personne n'est connecté, seul ce parcours est accessible.
@@ -59,6 +72,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="MessagesList" component={MessagesListScreen} />
       <HomeStack.Screen name="Notifications" component={NotificationsScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
+      <HomeStack.Screen name="Moderation" component={ModerationScreen} />
       <HomeStack.Screen name="PostListing" component={PostListingScreen} />
     </HomeStack.Navigator>
   );
@@ -112,6 +126,7 @@ function MoiStackNavigator() {
   return (
     <MoiStack.Navigator screenOptions={{ headerShown: false }}>
       <MoiStack.Screen name="ProfileHome" component={ProfileScreen} />
+      <MoiStack.Screen name="EditProfile" component={EditProfileScreen} />
       <MoiStack.Screen name="MyOrders" component={MyOrdersScreen} />
       <MoiStack.Screen name="CategoryListing" component={CategoryListingScreen} />
       <MoiStack.Screen name="ProductDetail" component={ProductDetailScreen} />
@@ -141,7 +156,103 @@ const icons = {
   Moi: 'person-outline',
 };
 
+// --- Navigation du mode Marchand ---
+
+function MerchantDashboardStackNavigator() {
+  return (
+    <MerchantDashboardStack.Navigator screenOptions={{ headerShown: false }}>
+      <MerchantDashboardStack.Screen name="DashboardHome" component={MerchantDashboardScreen} />
+      <MerchantDashboardStack.Screen name="IdentityVerification" component={IdentityVerificationScreen} />
+      <MerchantDashboardStack.Screen name="MerchantOrders" component={MerchantOrdersScreen} />
+      <MerchantDashboardStack.Screen name="PostListing" component={PostListingScreen} />
+      <MerchantDashboardStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantDashboardStack.Screen name="Chat" component={ChatScreen} />
+    </MerchantDashboardStack.Navigator>
+  );
+}
+
+function MerchantListingsStackNavigator() {
+  return (
+    <MerchantListingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <MerchantListingsStack.Screen name="MerchantListingsHome" component={MerchantListingsScreen} />
+      <MerchantListingsStack.Screen name="PostListing" component={PostListingScreen} />
+      <MerchantListingsStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantListingsStack.Screen name="Chat" component={ChatScreen} />
+    </MerchantListingsStack.Navigator>
+  );
+}
+
+function MerchantOrdersStackNavigator() {
+  return (
+    <MerchantOrdersStack.Navigator screenOptions={{ headerShown: false }}>
+      <MerchantOrdersStack.Screen name="MerchantOrdersHome" component={MerchantOrdersScreen} />
+      <MerchantOrdersStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantOrdersStack.Screen name="Chat" component={ChatScreen} />
+    </MerchantOrdersStack.Navigator>
+  );
+}
+
+// Le profil est partagé entre les deux modes — seul l'endroit d'où on y
+// accède change.
+function MerchantMoiStackNavigator() {
+  return (
+    <MerchantMoiStack.Navigator screenOptions={{ headerShown: false }}>
+      <MerchantMoiStack.Screen name="ProfileHome" component={ProfileScreen} />
+      <MerchantMoiStack.Screen name="EditProfile" component={EditProfileScreen} />
+      <MerchantMoiStack.Screen name="MyOrders" component={MyOrdersScreen} />
+      <MerchantMoiStack.Screen name="CategoryListing" component={CategoryListingScreen} />
+      <MerchantMoiStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantMoiStack.Screen name="Cart" component={CartScreen} />
+      <MerchantMoiStack.Screen name="Checkout" component={CheckoutScreen} />
+      <MerchantMoiStack.Screen name="Chat" component={ChatScreen} />
+    </MerchantMoiStack.Navigator>
+  );
+}
+
+const merchantIcons = {
+  Tableau: 'grid-outline',
+  Commandes: 'receipt-outline',
+  MoiMarchand: 'person-outline',
+};
+
+function MerchantTabs() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 58 + insets.bottom;
+
+  return (
+    <MerchantTab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: colors.orange,
+        tabBarInactiveTintColor: colors.white,
+        tabBarStyle: {
+          backgroundColor: colors.purple,
+          borderTopWidth: 0,
+          height: tabBarHeight,
+          paddingTop: 8,
+          paddingBottom: insets.bottom,
+        },
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name={merchantIcons[route.name]} size={size} color={color} />
+        ),
+      })}
+    >
+      <MerchantTab.Screen name="Tableau" component={MerchantDashboardStackNavigator} />
+      <MerchantTab.Screen name="Commandes" component={MerchantOrdersStackNavigator} />
+      <MerchantTab.Screen name="MoiMarchand" component={MerchantMoiStackNavigator} />
+    </MerchantTab.Navigator>
+  );
+}
+
 function MainTabs() {
+  // Sur un vrai téléphone (contrairement à Expo Go), la barre de gestes ou
+  // les boutons Android occupent un espace variable selon les modèles —
+  // sans cet ajustement, les icônes du bas peuvent être coupées ou
+  // masquées derrière ces boutons système.
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = 58 + insets.bottom;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -149,7 +260,13 @@ function MainTabs() {
         tabBarShowLabel: false,
         tabBarActiveTintColor: colors.orange,
         tabBarInactiveTintColor: colors.white,
-        tabBarStyle: { backgroundColor: colors.purple, borderTopWidth: 0, height: 58, paddingTop: 8 },
+        tabBarStyle: {
+          backgroundColor: colors.purple,
+          borderTopWidth: 0,
+          height: tabBarHeight,
+          paddingTop: 8,
+          paddingBottom: insets.bottom,
+        },
         tabBarIcon: ({ color, size }) => (
           <Ionicons name={icons[route.name]} size={size} color={color} />
         ),
@@ -166,15 +283,23 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const { session, loading } = useAuth();
+  const { mode, loading: modeLoading } = useMode();
 
   // Tant que la connexion par téléphone est désactivée (voir src/config.js),
   // on saute directement à l'application principale, sans jamais bloquer
   // sur l'écran de connexion — pratique pour continuer à construire le
   // reste de l'appli sans dépendre de Twilio pour l'instant.
   if (!PHONE_AUTH_ENABLED) {
+    if (modeLoading) {
+      return (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple }}>
+          <ActivityIndicator color={colors.white} size="large" />
+        </View>
+      );
+    }
     return (
       <NavigationContainer>
-        <MainTabs />
+        {mode === 'marchand' ? <MerchantTabs /> : <MainTabs />}
       </NavigationContainer>
     );
   }
@@ -189,7 +314,7 @@ export default function AppNavigator() {
 
   return (
     <NavigationContainer>
-      {session ? <MainTabs /> : <AuthStackNavigator />}
+      {session ? (mode === 'marchand' ? <MerchantTabs /> : <MainTabs />) : <AuthStackNavigator />}
     </NavigationContainer>
   );
 }

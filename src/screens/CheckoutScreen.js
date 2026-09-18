@@ -43,9 +43,14 @@ export default function CheckoutScreen({ route, navigation }) {
   const fraisLivraison = deliveryMethod?.price || 0;
   const total = sousTotal + fraisLivraison;
 
+  const isPickup = deliveryMethod?.id === 'pickup';
+
   const handleConfirm = async () => {
-    if (!nom.trim() || !telephone.trim() || !quartier.trim()) {
-      Alert.alert('Informations manquantes', 'Nom, numéro et quartier sont obligatoires.');
+    if (!nom.trim() || !telephone.trim() || (!isPickup && !quartier.trim())) {
+      Alert.alert(
+        'Informations manquantes',
+        isPickup ? 'Nom et numéro sont obligatoires.' : 'Nom, numéro et quartier sont obligatoires.'
+      );
       return;
     }
     if (!accepted) {
@@ -82,11 +87,11 @@ export default function CheckoutScreen({ route, navigation }) {
 
     const { error: deliveryError } = await supabase.from('deliveries').insert({
       order_id: order.id,
-      adresse: quartier.trim(),
-      quartier: quartier.trim(),
+      adresse: isPickup ? 'Retrait en main propre' : quartier.trim(),
+      quartier: isPickup ? null : quartier.trim(),
       nom_contact: nom.trim(),
       telephone_contact: telephone.trim(),
-      heure_livraison: heureLivraison,
+      heure_livraison: isPickup ? 'À convenir avec le vendeur' : heureLivraison,
       statut_livraison: 'a_traiter',
     });
 
@@ -98,10 +103,43 @@ export default function CheckoutScreen({ route, navigation }) {
       return;
     }
 
+    // L'article n'est plus disponible pour d'autres acheteurs une fois
+    // qu'une commande a été passée dessus.
+    await supabase.from('listings').update({ status: 'vendu' }).eq('id', listing.id);
+
+    // Un premier message est envoyé automatiquement au vendeur, pour que la
+    // conversation démarre avec tout le contexte de la commande déjà dedans.
+    const recap = isPickup
+      ? `Bonjour, je viens de commander « ${listing.title} » (x${quantity}) en retrait en main propre. On se met d'accord sur le lieu et l'heure ?`
+      : `Bonjour, je viens de commander « ${listing.title} » (x${quantity}). Livraison : ${deliveryMethod?.label}, quartier ${quartier.trim()}, créneau ${heureLivraison}.`;
+
+    if (listing.vendeur_id) {
+      await supabase.from('messages').insert({
+        listing_id: listing.id,
+        expediteur_id: myId,
+        destinataire_id: listing.vendeur_id,
+        contenu: recap,
+      });
+    }
+
     Alert.alert(
       'Commande enregistrée',
-      "Le vendeur va organiser la livraison. Suis son avancement dans l'onglet Profil > Mes achats.",
-      [{ text: 'OK', onPress: () => navigation.popToTop() }]
+      isPickup
+        ? "Direction la messagerie pour te mettre d'accord avec le vendeur sur le lieu et l'heure."
+        : 'Direction la messagerie pour suivre la suite avec le vendeur.',
+      [
+        {
+          text: 'OK',
+          onPress: () =>
+            listing.vendeur_id
+              ? navigation.replace('Chat', {
+                  listingId: listing.id,
+                  listingTitle: listing.title,
+                  otherUserId: listing.vendeur_id,
+                })
+              : navigation.popToTop(),
+        },
+      ]
     );
   };
 
@@ -132,27 +170,39 @@ export default function CheckoutScreen({ route, navigation }) {
         style={styles.input}
       />
 
-      <Text style={styles.label}>Quartier</Text>
-      <TextInput
-        placeholder="Ex: Plateau, Niamey"
-        placeholderTextColor={colors.textMuted}
-        value={quartier}
-        onChangeText={setQuartier}
-        style={styles.input}
-      />
+      {isPickup ? (
+        <View style={styles.pickupNote}>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.purple} />
+          <Text style={styles.pickupNoteText}>
+            Pas d'adresse à donner : une fois la commande validée, mets-toi d'accord avec le
+            vendeur sur le lieu et l'heure du retrait via la messagerie.
+          </Text>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.label}>Quartier</Text>
+          <TextInput
+            placeholder="Ex: Plateau, Niamey"
+            placeholderTextColor={colors.textMuted}
+            value={quartier}
+            onChangeText={setQuartier}
+            style={styles.input}
+          />
 
-      <Text style={styles.label}>Heure de livraison souhaitée</Text>
-      <View style={styles.pillRow}>
-        {CRENEAUX.map((c) => (
-          <TouchableOpacity
-            key={c}
-            onPress={() => setHeureLivraison(c)}
-            style={[styles.pill, heureLivraison === c && styles.pillActive]}
-          >
-            <Text style={[styles.pillText, heureLivraison === c && styles.pillTextActive]}>{c}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+          <Text style={styles.label}>Heure de livraison souhaitée</Text>
+          <View style={styles.pillRow}>
+            {CRENEAUX.map((c) => (
+              <TouchableOpacity
+                key={c}
+                onPress={() => setHeureLivraison(c)}
+                style={[styles.pill, heureLivraison === c && styles.pillActive]}
+              >
+                <Text style={[styles.pillText, heureLivraison === c && styles.pillTextActive]}>{c}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
@@ -162,7 +212,9 @@ export default function CheckoutScreen({ route, navigation }) {
           <Text style={styles.summaryValue}>{sousTotal.toLocaleString('fr-FR')} FCFA</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Livraison ({deliveryMethod?.label})</Text>
+          <Text style={styles.summaryLabel}>
+            {isPickup ? 'Retrait en main propre' : `Livraison (${deliveryMethod?.label})`}
+          </Text>
           <Text style={styles.summaryValue}>{fraisLivraison.toLocaleString('fr-FR')} FCFA</Text>
         </View>
         <View style={[styles.summaryRow, styles.totalRow]}>
@@ -252,6 +304,18 @@ const styles = StyleSheet.create({
   pillActive: { backgroundColor: colors.orange, borderColor: colors.orange },
   pillText: { fontSize: 12, color: colors.textPrimary },
   pillTextActive: { color: colors.white, fontWeight: '600' },
+  pickupNote: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    alignItems: 'flex-start',
+  },
+  pickupNoteText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   summaryCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,

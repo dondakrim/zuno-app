@@ -10,22 +10,25 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { colors, spacing, radius } from '../theme/colors';
-import { supabase } from '../lib/supabase';
+import { colors, spacing, radius } from '../../theme/colors';
+import { supabase } from '../../lib/supabase';
+import { getDeviceUserId } from '../../lib/deviceUser';
 
-export default function CategoryListingScreen({ route, navigation }) {
-  const { category, vendeurId, title } = route.params;
+export default function MerchantListingsScreen({ navigation }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadListings = useCallback(async () => {
     setLoading(true);
-    let query = supabase.from('listings').select('*').eq('status', 'disponible').eq('moderation_status', 'approved');
-    query = vendeurId ? query.eq('vendeur_id', vendeurId) : query.eq('category', category);
-    const { data, error } = await query.order('created_at', { ascending: false });
-    if (!error && data) setListings(data);
+    const myId = await getDeviceUserId();
+    const { data } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('vendeur_id', myId)
+      .order('created_at', { ascending: false });
+    setListings(data || []);
     setLoading(false);
-  }, [category, vendeurId]);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -36,11 +39,10 @@ export default function CategoryListingScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.white} />
+        <Text style={styles.headerTitle}>Mes annonces</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('PostListing')}>
+          <Ionicons name="add-circle" size={26} color={colors.orange} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>{title || category}</Text>
-        <View style={{ width: 22 }} />
       </View>
 
       {loading ? (
@@ -49,12 +51,10 @@ export default function CategoryListingScreen({ route, navigation }) {
         <FlatList
           data={listings}
           keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: spacing.sm }}
-          contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
+          contentContainerStyle={{ padding: spacing.lg }}
           ListEmptyComponent={
             <Text style={styles.emptyText}>
-              Aucun article dans cette catégorie pour l'instant.
+              Tu n'as pas encore publié d'annonce. Appuie sur le + en haut pour commencer.
             </Text>
           }
           renderItem={({ item }) => (
@@ -66,14 +66,20 @@ export default function CategoryListingScreen({ route, navigation }) {
                 {item.photo_url ? (
                   <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
                 ) : (
-                  <Ionicons name="image-outline" size={26} color={colors.textMuted} />
+                  <Ionicons name="image-outline" size={20} color={colors.textMuted} />
                 )}
               </View>
-              <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.cardPrice}>
-                {Number(item.price).toLocaleString('fr-FR')} FCFA
-              </Text>
-              <Text style={styles.cardCity} numberOfLines={1}>{item.city}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                <Text style={styles.cardSubtitle}>
+                  {Number(item.price).toLocaleString('fr-FR')} FCFA
+                </Text>
+              </View>
+              <View style={[styles.statusBadge, item.status !== 'disponible' && styles.statusBadgeSold]}>
+                <Text style={[styles.statusText, item.status !== 'disponible' && styles.statusTextSold]}>
+                  {item.status === 'disponible' ? 'En vente' : 'Vendu'}
+                </Text>
+              </View>
             </TouchableOpacity>
           )}
         />
@@ -92,30 +98,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.sm,
   },
-  headerTitle: { color: colors.white, fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  headerTitle: { color: colors.white, fontSize: 18, fontWeight: '700' },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },
   card: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.sm,
+    marginBottom: spacing.sm,
   },
   thumb: {
-    width: '100%',
-    height: 110,
+    width: 52,
+    height: 52,
     borderRadius: radius.sm,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    marginBottom: spacing.xs,
   },
   thumbImage: { width: '100%', height: '100%' },
-  cardTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  cardPrice: { fontSize: 13, fontWeight: '700', color: colors.orange, marginTop: 2 },
-  cardCity: { fontSize: 11, color: colors.textSecondary, marginTop: 1 },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  cardSubtitle: { fontSize: 13, color: colors.orange, fontWeight: '700', marginTop: 2 },
+  statusBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.successBg,
+  },
+  statusBadgeSold: { backgroundColor: colors.background },
+  statusText: { fontSize: 11, fontWeight: '600', color: colors.success },
+  statusTextSold: { color: colors.textMuted },
 });

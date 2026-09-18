@@ -21,6 +21,7 @@ export default function ChatScreen({ route, navigation }) {
   const [input, setInput] = useState('');
   const [myId, setMyId] = useState(null);
   const [sending, setSending] = useState(false);
+  const [activeOffer, setActiveOffer] = useState(null);
   const listRef = useRef(null);
 
   const loadThread = useCallback(async () => {
@@ -39,7 +40,37 @@ export default function ChatScreen({ route, navigation }) {
     if (!error && data) {
       setMessages(data);
     }
+
+    const { data: offerData } = await supabase
+      .from('offers')
+      .select('*')
+      .eq('listing_id', listingId)
+      .or(
+        `and(buyer_id.eq.${id},seller_id.eq.${otherUserId}),and(buyer_id.eq.${otherUserId},seller_id.eq.${id})`
+      )
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setActiveOffer(offerData || null);
   }, [listingId, otherUserId]);
+
+  const handleOfferResponse = async (status) => {
+    if (!activeOffer) return;
+    const { error } = await supabase.from('offers').update({ status }).eq('id', activeOffer.id);
+    if (error) return;
+
+    const myUserId = myId;
+    await supabase.from('messages').insert({
+      listing_id: listingId,
+      expediteur_id: myUserId,
+      destinataire_id: otherUserId,
+      contenu:
+        status === 'acceptee'
+          ? `✅ Offre acceptée : ${Number(activeOffer.montant).toLocaleString('fr-FR')} FCFA`
+          : `❌ Offre refusée`,
+    });
+    loadThread();
+  };
 
   // Recharge la conversation à chaque fois qu'on revient sur cet écran.
   useFocusEffect(
@@ -82,6 +113,33 @@ export default function ChatScreen({ route, navigation }) {
         </Text>
         <View style={{ width: 22 }} />
       </View>
+
+      {activeOffer && activeOffer.status === 'en_attente' && (
+        <View style={styles.offerBanner}>
+          <Ionicons name="pricetag" size={16} color={colors.white} />
+          <Text style={styles.offerBannerText}>
+            Offre : {Number(activeOffer.montant).toLocaleString('fr-FR')} FCFA
+          </Text>
+          {myId === activeOffer.seller_id ? (
+            <View style={styles.offerBannerButtons}>
+              <TouchableOpacity
+                onPress={() => handleOfferResponse('acceptee')}
+                style={styles.offerAcceptButton}
+              >
+                <Text style={styles.offerAcceptButtonText}>Accepter</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleOfferResponse('refusee')}
+                style={styles.offerRejectButton}
+              >
+                <Text style={styles.offerRejectButtonText}>Refuser</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.offerWaitingText}>En attente de réponse</Text>
+          )}
+        </View>
+      )}
 
       <FlatList
         ref={listRef}
@@ -141,6 +199,32 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerTitle: { color: colors.white, fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'center' },
+  offerBanner: {
+    backgroundColor: colors.purpleDark,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  offerBannerText: { color: colors.white, fontWeight: '700', fontSize: 13, flex: 1 },
+  offerBannerButtons: { flexDirection: 'row', gap: 6 },
+  offerAcceptButton: {
+    backgroundColor: colors.orange,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+  },
+  offerAcceptButtonText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  offerRejectButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+  },
+  offerRejectButtonText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  offerWaitingText: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },
   bubble: {
     maxWidth: '78%',

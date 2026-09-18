@@ -18,6 +18,7 @@ import { colors, spacing, radius } from '../theme/colors';
 import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import { analyzeListing } from '../lib/moderation';
 
 const conditions = ['Neuf', 'Bon état', 'Usé'];
 const delais = ['1-2 jours', '3-5 jours', '1 semaine', 'Plus d\'une semaine'];
@@ -119,20 +120,43 @@ export default function PostListingScreen() {
     }
     setUploadProgress('');
 
-    const myId = await getDeviceUserId();
-    const { error } = await supabase.from('listings').insert({
-      vendeur_id: myId,
+    // Couches 1 et 2 de la modération : règles de mots-clés + score de
+    // risque, calculés avant même d'insérer l'annonce.
+    const analysis = analyzeListing({
       title: title.trim(),
       description: description.trim(),
-      price: Number(price),
-      city: city.trim(),
       category,
-      condition,
-      delai_livraison: delaiLivraison,
-      photo_url: photoUrls[0],
-      photos: photoUrls,
-      status: 'disponible',
+      price: Number(price),
     });
+
+    const moderationStatus =
+      analysis.recommendation === 'block'
+        ? 'blocked'
+        : analysis.recommendation === 'review'
+        ? 'pending_review'
+        : 'approved';
+
+    const myId = await getDeviceUserId();
+    const { data: newListing, error } = await supabase
+      .from('listings')
+      .insert({
+        vendeur_id: myId,
+        title: title.trim(),
+        description: description.trim(),
+        price: Number(price),
+        city: city.trim(),
+        category,
+        condition,
+        delai_livraison: delaiLivraison,
+        photo_url: photoUrls[0],
+        photos: photoUrls,
+        status: 'disponible',
+        moderation_status: moderationStatus,
+        moderation_score: analysis.score,
+        moderation_flags: analysis.flags,
+      })
+      .select()
+      .single();
     setSaving(false);
 
     if (error) {
@@ -141,7 +165,50 @@ export default function PostListingScreen() {
       return;
     }
 
-    Alert.alert('Publiée', 'Ton annonce est en ligne.');
+    // Traçabilité : chaque décision automatique est journalisée, avec le
+    // détail des signaux détectés.
+    await supabase.from('moderation_logs').insert({
+      listing_id: newListing.id,
+      actor_type: 'system',
+      action:
+        moderationStatus === 'blocked'
+          ? 'auto_block'
+          : moderationStatus === 'pending_review'
+          ? 'auto_flag'
+          : 'auto_approve',
+      details: { score: analysis.score, flags: analysis.flags },
+    });
+
+    // Si un risque a été détecté (bloqué ou à vérifier), l'annonce rejoint
+    // la file de vérification humaine.
+    if (moderationStatus !== 'approved') {
+      await supabase.from('moderation_queue').insert({
+        listing_id: newListing.id,
+        source: 'auto_detection',
+        category: analysis.matchedIllegalCategories[0] || null,
+        score: analysis.score,
+        detected_keywords: analysis.flags.map((f) => f.matched),
+      });
+    }
+
+    if (moderationStatus === 'blocked') {
+      Alert.alert(
+        'Annonce bloquée',
+        "Cette annonce n'a pas pu être publiée car son contenu semble enfreindre les règles de Zuno" +
+          (analysis.matchedIllegalCategories.length
+            ? ` (catégorie détectée : ${analysis.matchedIllegalCategories.join(', ')})`
+            : '') +
+          ". Si tu penses qu'il s'agit d'une erreur, contacte le support."
+      );
+    } else if (moderationStatus === 'pending_review') {
+      Alert.alert(
+        'Annonce en cours de vérification',
+        "Ton annonce a bien été reçue. Certains éléments demandent une vérification manuelle avant qu'elle soit visible publiquement — ça ne prend généralement pas longtemps."
+      );
+    } else {
+      Alert.alert('Publiée', 'Ton annonce est en ligne.');
+    }
+
     setTitle('');
     setDescription('');
     setPrice('');

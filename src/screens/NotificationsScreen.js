@@ -56,6 +56,7 @@ export default function NotificationsScreen({ navigation }) {
         .select('*')
         .in('category', Array.from(categories))
         .eq('status', 'disponible')
+        .eq('moderation_status', 'approved')
         .order('created_at', { ascending: false })
         .limit(5);
       setNewListings(recent || []);

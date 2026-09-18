@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
+import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
 
 const CATEGORY_ICONS = {
@@ -47,17 +48,32 @@ const COUNTRIES = [
   { code: 'ML', name: 'Mali', flag: '🇲🇱', available: true },
   { code: 'BF', name: 'Burkina Faso', flag: '🇧🇫', available: true },
   { code: 'BJ', name: 'Bénin', flag: '🇧🇯', available: true },
-  { code: 'TD', name: 'Tchad', flag: '🇹🇩', available: true },
+  { code: 'CI', name: "Côte d'Ivoire", flag: '🇨🇮', available: true },
   { code: 'TG', name: 'Togo', flag: '🇹🇬', available: true },
 ];
 
 export default function HomeScreen({ navigation }) {
+  const { switchMode } = useMode();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [country, setCountry] = useState(COUNTRIES[0]);
+  const adListRef = useRef(null);
+
+  // Fait défiler le carrousel publicitaire tout seul, une bannière toutes
+  // les 4 secondes, et revient au début une fois la dernière atteinte.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAdIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % ADS.length;
+        adListRef.current?.scrollToOffset({ offset: nextIndex * AD_WIDTH, animated: true });
+        return nextIndex;
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
@@ -72,6 +88,7 @@ export default function HomeScreen({ navigation }) {
       .from('listings')
       .select('*')
       .eq('status', 'disponible')
+      .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false });
 
     if (!error && data) {
@@ -217,6 +234,7 @@ export default function HomeScreen({ navigation }) {
                 />
 
                 <FlatList
+                  ref={adListRef}
                   data={ADS}
                   horizontal
                   pagingEnabled
@@ -387,6 +405,16 @@ export default function HomeScreen({ navigation }) {
               </Text>
             </TouchableOpacity>
             <View style={styles.menuDivider} />
+            <TouchableOpacity
+              style={styles.menuRow}
+              onPress={() => {
+                setMenuVisible(false);
+                switchMode('marchand');
+              }}
+            >
+              <Ionicons name="storefront-outline" size={18} color={colors.purple} />
+              <Text style={styles.menuLabel}>Passer en mode marchand</Text>
+            </TouchableOpacity>
             <View style={styles.menuDivider} />
             <TouchableOpacity style={styles.menuRow} onPress={() => goToMenuItem('MessagesList')}>
               <Ionicons name="mail-outline" size={18} color={colors.textPrimary} />

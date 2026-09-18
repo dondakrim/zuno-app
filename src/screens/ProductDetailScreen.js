@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import { ILLEGAL_KEYWORDS } from '../lib/moderation';
+import { getSellerRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../lib/reputation';
+
+const REPORT_CATEGORIES = [...Object.keys(ILLEGAL_KEYWORDS), 'AUTRE'];
 
 const screenWidth = Dimensions.get('window').width;
 const GALLERY_WIDTH = screenWidth - spacing.lg * 2;
@@ -14,12 +18,45 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [similar, setSimilar] = useState([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [wishlistId, setWishlistId] = useState(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerAmount, setOfferAmount] = useState('');
+  const [sendingOffer, setSendingOffer] = useState(false);
+  const [showReport, setShowReport] = useState(false);
+  const [reportCategory, setReportCategory] = useState(null);
+  const [reportComment, setReportComment] = useState('');
+  const [sendingReport, setSendingReport] = useState(false);
+  const [sellerStats, setSellerStats] = useState({ average: null, count: 0, completedSales: 0 });
+  const [sellerProfile, setSellerProfile] = useState(null);
   // Les annonces publiées avant l'ajout du carrousel n'ont qu'une seule
   // photo (photo_url) : on retombe dessus si `photos` n'existe pas.
   const gallery = listing.photos?.length ? listing.photos : listing.photo_url ? [listing.photo_url] : [];
   // Les annonces créées avant la connexion par téléphone n'ont pas
-  // encore de vendeur identifié : on affiche un repère temporaire.
-  const seller = listing.seller || { name: 'Vendeur Zuno', rating: 5, sales: 0, initials: 'VZ' };
+  // encore de vendeur identifié, ou son profil n'a pas encore été rempli :
+  // on affiche un repère temporaire dans ces cas-là.
+  const seller = sellerProfile?.nom
+    ? { name: sellerProfile.nom, initials: sellerProfile.nom.slice(0, 2).toUpperCase(), photo: sellerProfile.photo_url }
+    : { name: 'Vendeur Zuno', initials: 'VZ', photo: null };
+
+  useEffect(() => {
+    if (!listing.vendeur_id) return;
+    let cancelled = false;
+    Promise.all([
+      getSellerRating(listing.vendeur_id),
+      countCompletedSales(listing.vendeur_id),
+      supabase.from('users').select('nom, photo_url').eq('id', listing.vendeur_id).maybeSingle(),
+    ]).then(([rating, completedSales, profileResult]) => {
+      if (cancelled) return;
+      setSellerStats({ ...rating, completedSales });
+      if (profileResult.data?.nom && profileResult.data.nom !== 'Toi (test)') {
+        setSellerProfile(profileResult.data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [listing.vendeur_id]);
 
   useEffect(() => {
     if (!listing.vendeur_id) return;
@@ -42,6 +79,27 @@ export default function ProductDetailScreen({ route, navigation }) {
       cancelled = true;
     };
   }, [listing.vendeur_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWishlistState() {
+      const myId = await getDeviceUserId();
+      const { data } = await supabase
+        .from('wishlist_items')
+        .select('id')
+        .eq('acheteur_id', myId)
+        .eq('listing_id', listing.id)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setIsWishlisted(true);
+        setWishlistId(data.id);
+      }
+    }
+    loadWishlistState();
+    return () => {
+      cancelled = true;
+    };
+  }, [listing.id]);
 
   const handleToggleFavorite = async () => {
     if (!listing.vendeur_id) {
@@ -68,6 +126,77 @@ export default function ProductDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleToggleWishlist = async () => {
+    const myId = await getDeviceUserId();
+    if (isWishlisted) {
+      await supabase.from('wishlist_items').delete().eq('id', wishlistId);
+      setIsWishlisted(false);
+      setWishlistId(null);
+    } else {
+      const { data } = await supabase
+        .from('wishlist_items')
+        .insert({ acheteur_id: myId, listing_id: listing.id })
+        .select()
+        .single();
+      setIsWishlisted(true);
+      setWishlistId(data?.id || null);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await Share.share({
+        message: `${listing.title} — ${Number(listing.price).toLocaleString('fr-FR')} FCFA sur Zuno (${listing.city || 'Niger'}). Trouve-le en cherchant "${listing.title}" dans l'appli Zuno !`,
+      });
+    } catch (e) {
+      // L'utilisateur a simplement annulé le partage, rien à faire.
+    }
+  };
+
+  const handleSendOffer = async () => {
+    const amount = Number(offerAmount);
+    if (!amount || amount <= 0) {
+      Alert.alert('Montant invalide', 'Indique un montant valide pour ton offre.');
+      return;
+    }
+    if (!listing.vendeur_id) {
+      Alert.alert('Vendeur non identifié', "Impossible de faire une offre sur cette annonce.");
+      return;
+    }
+
+    setSendingOffer(true);
+    const myId = await getDeviceUserId();
+
+    const { error } = await supabase.from('offers').insert({
+      listing_id: listing.id,
+      buyer_id: myId,
+      seller_id: listing.vendeur_id,
+      montant: amount,
+    });
+
+    if (error) {
+      setSendingOffer(false);
+      Alert.alert('Erreur', `Détail technique : ${error.message}`);
+      return;
+    }
+
+    await supabase.from('messages').insert({
+      listing_id: listing.id,
+      expediteur_id: myId,
+      destinataire_id: listing.vendeur_id,
+      contenu: `💰 Offre : ${amount.toLocaleString('fr-FR')} FCFA pour « ${listing.title} » (prix affiché : ${Number(listing.price).toLocaleString('fr-FR')} FCFA)`,
+    });
+
+    setSendingOffer(false);
+    setShowOfferModal(false);
+    setOfferAmount('');
+    navigation.navigate('Chat', {
+      listingId: listing.id,
+      listingTitle: listing.title,
+      otherUserId: listing.vendeur_id,
+    });
+  };
+
   useEffect(() => {
     let cancelled = false;
     async function loadSimilar() {
@@ -76,6 +205,7 @@ export default function ProductDetailScreen({ route, navigation }) {
         .select('*')
         .eq('category', listing.category)
         .eq('status', 'disponible')
+        .eq('moderation_status', 'approved')
         .neq('id', listing.id)
         .order('created_at', { ascending: false })
         .limit(8);
@@ -106,11 +236,48 @@ export default function ProductDetailScreen({ route, navigation }) {
     });
   };
 
+  const handleSendReport = async () => {
+    if (!reportCategory) {
+      Alert.alert('Catégorie manquante', 'Choisis le motif du signalement.');
+      return;
+    }
+    setSendingReport(true);
+    const myId = await getDeviceUserId();
+
+    await supabase.from('moderation_queue').insert({
+      listing_id: listing.id,
+      source: 'user_report',
+      category: reportCategory === 'AUTRE' ? 'OTHER_ILLEGAL' : reportCategory,
+      reporter_id: myId,
+      reporter_comment: reportComment.trim() || null,
+    });
+
+    await supabase.from('moderation_logs').insert({
+      listing_id: listing.id,
+      actor_type: 'user',
+      actor_id: myId,
+      action: 'user_report',
+      details: { category: reportCategory, comment: reportComment.trim() },
+    });
+
+    setSendingReport(false);
+    setShowReport(false);
+    setReportCategory(null);
+    setReportComment('');
+    Alert.alert('Signalement envoyé', 'Merci, notre équipe va vérifier cette annonce.');
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: spacing.md }}>
-        <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-      </TouchableOpacity>
+      <View style={styles.topRow}>
+        <TouchableOpacity onPress={() => navigation.goBack()}>
+          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowReport(true)} style={styles.reportLink}>
+          <Ionicons name="flag-outline" size={16} color={colors.textMuted} />
+          <Text style={styles.reportLinkText}>Signaler</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.image}>
         {gallery.length > 0 ? (
@@ -142,7 +309,19 @@ export default function ProductDetailScreen({ route, navigation }) {
         )}
       </View>
 
-      <Text style={styles.title}>{listing.title}</Text>
+      <View style={styles.titleRow}>
+        <Text style={[styles.title, { flex: 1 }]}>{listing.title}</Text>
+        <TouchableOpacity onPress={handleToggleWishlist} style={styles.iconButton}>
+          <Ionicons
+            name={isWishlisted ? 'bookmark' : 'bookmark-outline'}
+            size={20}
+            color={isWishlisted ? colors.orange : colors.textMuted}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
+          <Ionicons name="share-social-outline" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
       <Text style={styles.price}>{Number(listing.price).toLocaleString('fr-FR')} FCFA</Text>
 
       <View style={styles.badge}>
@@ -167,12 +346,25 @@ export default function ProductDetailScreen({ route, navigation }) {
 
       <View style={styles.sellerRow}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{seller.initials}</Text>
+          {seller.photo ? (
+            <Image source={{ uri: seller.photo }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{seller.initials}</Text>
+          )}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.sellerName}>{seller.name}</Text>
+          <View style={styles.sellerNameRow}>
+            <Text style={styles.sellerName}>{seller.name}</Text>
+            {sellerStats.completedSales >= TRUST_BADGE_THRESHOLD && (
+              <Ionicons name="shield-checkmark" size={14} color={colors.success} />
+            )}
+          </View>
           <Text style={styles.sellerMeta}>
-            {seller.rating} · {seller.sales} ventes
+            {sellerStats.count > 0
+              ? `★ ${sellerStats.average.toFixed(1)} (${sellerStats.count} avis) · ${sellerStats.completedSales} ventes`
+              : listing.vendeur_id
+              ? "Pas encore d'avis"
+              : 'Vendeur non identifié'}
           </Text>
         </View>
         <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
@@ -192,6 +384,51 @@ export default function ProductDetailScreen({ route, navigation }) {
           <Text style={styles.primaryButtonText}>Acheter</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.offerLink}
+        onPress={() => setShowOfferModal(true)}
+      >
+        <Ionicons name="pricetag-outline" size={14} color={colors.purple} />
+        <Text style={styles.offerLinkText}>Faire une offre à ce prix</Text>
+      </TouchableOpacity>
+
+      <Modal visible={showOfferModal} transparent animationType="fade" onRequestClose={() => setShowOfferModal(false)}>
+        <View style={styles.offerModalOverlay}>
+          <View style={styles.offerModalCard}>
+            <Text style={styles.offerModalTitle}>Faire une offre</Text>
+            <Text style={styles.offerModalSubtitle}>
+              Prix affiché : {Number(listing.price).toLocaleString('fr-FR')} FCFA
+            </Text>
+            <TextInput
+              placeholder="Ton offre en FCFA"
+              placeholderTextColor={colors.textMuted}
+              value={offerAmount}
+              onChangeText={setOfferAmount}
+              keyboardType="numeric"
+              style={styles.offerInput}
+              autoFocus
+            />
+            <View style={styles.offerModalButtons}>
+              <TouchableOpacity
+                style={styles.offerModalCancel}
+                onPress={() => setShowOfferModal(false)}
+              >
+                <Text style={styles.offerModalCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.offerModalSend}
+                onPress={handleSendOffer}
+                disabled={sendingOffer}
+              >
+                <Text style={styles.offerModalSendText}>
+                  {sendingOffer ? 'Envoi…' : "Envoyer l'offre"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {similar.length > 0 && (
         <View style={styles.similarSection}>
@@ -225,6 +462,59 @@ export default function ProductDetailScreen({ route, navigation }) {
           />
         </View>
       )}
+
+      <Modal visible={showReport} animationType="slide" onRequestClose={() => setShowReport(false)}>
+        <View style={styles.reportModalContainer}>
+          <View style={styles.reportModalHeader}>
+            <Text style={styles.reportModalTitle}>Signaler cette annonce</Text>
+            <TouchableOpacity onPress={() => setShowReport(false)}>
+              <Ionicons name="close" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+            <Text style={styles.reportLabel}>Motif</Text>
+            <View style={styles.reportPillRow}>
+              {REPORT_CATEGORIES.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  onPress={() => setReportCategory(cat)}
+                  style={[styles.reportPill, reportCategory === cat && styles.reportPillActive]}
+                >
+                  <Text
+                    style={[
+                      styles.reportPillText,
+                      reportCategory === cat && styles.reportPillTextActive,
+                    ]}
+                  >
+                    {cat.replace(/_/g, ' ')}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.reportLabel}>Précision (facultatif)</Text>
+            <TextInput
+              placeholder="Décris ce qui te semble poser problème…"
+              placeholderTextColor={colors.textMuted}
+              value={reportComment}
+              onChangeText={setReportComment}
+              style={styles.reportInput}
+              multiline
+            />
+          </ScrollView>
+          <View style={styles.reportModalFooter}>
+            <TouchableOpacity
+              style={styles.reportSendButton}
+              onPress={handleSendReport}
+              disabled={sendingReport}
+            >
+              <Text style={styles.reportSendButtonText}>
+                {sendingReport ? 'Envoi…' : 'Envoyer le signalement'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -302,11 +592,67 @@ const styles = StyleSheet.create({
     backgroundColor: colors.purple,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: '100%', height: '100%' },
   avatarText: { color: colors.white, fontWeight: '600', fontSize: 13 },
   sellerName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sellerMeta: { fontSize: 12, color: colors.textSecondary },
   favoriteButton: { padding: spacing.xs },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  iconButton: { padding: spacing.xs },
+  offerLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  offerLinkText: { fontSize: 13, color: colors.purple, fontWeight: '600' },
+  offerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  offerModalCard: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  offerModalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
+  offerModalSubtitle: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md },
+  offerInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    height: 46,
+    paddingHorizontal: spacing.md,
+    fontSize: 15,
+    marginBottom: spacing.md,
+  },
+  offerModalButtons: { flexDirection: 'row', gap: spacing.sm },
+  offerModalCancel: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  offerModalCancelText: { color: colors.textPrimary, fontWeight: '600' },
+  offerModalSend: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.orange,
+    alignItems: 'center',
+  },
+  offerModalSendText: { color: colors.white, fontWeight: '700' },
   buttonRow: { flexDirection: 'row', gap: spacing.sm },
   secondaryButton: {
     flex: 1,
@@ -326,6 +672,57 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: colors.white, fontWeight: '600' },
   similarSection: { marginTop: spacing.xl },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reportLinkText: { fontSize: 12, color: colors.textMuted },
+  reportModalContainer: { flex: 1, backgroundColor: colors.background },
+  reportModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  reportModalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  reportLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.sm },
+  reportPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
+  reportPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  reportPillActive: { backgroundColor: colors.danger, borderColor: colors.danger },
+  reportPillText: { fontSize: 11, color: colors.textPrimary },
+  reportPillTextActive: { color: colors.white, fontWeight: '600' },
+  reportInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  reportModalFooter: {
+    padding: spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  reportSendButton: {
+    backgroundColor: colors.danger,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  reportSendButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
   similarCard: {
     width: 130,
     backgroundColor: colors.surface,

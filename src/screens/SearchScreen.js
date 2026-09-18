@@ -31,7 +31,7 @@ export default function SearchScreen({ navigation }) {
     setLoading(true);
     setSearched(true);
 
-    let query = supabase.from('listings').select('*').eq('status', 'disponible');
+    let query = supabase.from('listings').select('*').eq('status', 'disponible').eq('moderation_status', 'approved');
 
     if (search.trim()) query = query.ilike('title', `%${search.trim()}%`);
     if (category) query = query.eq('category', category);
