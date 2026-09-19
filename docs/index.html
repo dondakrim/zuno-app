@@ -796,7 +796,7 @@ async function loadComptes() {
 
   const { data, error } = await sb
     .from('users')
-    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, is_banned, created_at')
+    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, id_document_url, is_banned, ban_reason, created_at')
     .order('created_at', { ascending: false });
 
   if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
@@ -821,8 +821,49 @@ async function loadComptes() {
       <span class="pill">${u.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
       <p class="card-meta">Inscrit le ${new Date(u.created_at).toLocaleDateString('fr-FR')}</p>
+
+      <div id="compte-detail-${u.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+        <p class="card-meta">Chargement de l'activité…</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-approve" onclick="toggleCompteDetail('${u.id}', '${(u.id_document_url || '').replace(/'/g, "\\'")}', ${u.ban_reason ? "'" + u.ban_reason.replace(/'/g, "\\'") + "'" : 'null'})">Voir les détails</button>
+      </div>
     </div>
   `).join('');
+}
+
+async function toggleCompteDetail(userId, idDocumentUrl, banReason) {
+  const el = document.getElementById('compte-detail-' + userId);
+  if (!el) return;
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'block' : 'none';
+  if (!opening) return;
+
+  el.innerHTML = '<p class="card-meta">Chargement de l\'activité…</p>';
+
+  const [{ count: nbAnnonces }, { count: nbAchats }, { count: nbSignalements }, { count: nbLitiges }] = await Promise.all([
+    sb.from('listings').select('id', { count: 'exact', head: true }).eq('vendeur_id', userId),
+    sb.from('orders').select('id', { count: 'exact', head: true }).eq('acheteur_id', userId),
+    sb.from('moderation_queue').select('id', { count: 'exact', head: true }).eq('reporter_id', userId),
+    sb.from('order_disputes').select('id', { count: 'exact', head: true }).eq('opened_by', userId),
+  ]);
+
+  let idPhotoHtml = '<p class="card-meta">Aucune pièce d\'identité fournie.</p>';
+  if (idDocumentUrl) {
+    const { data: signed } = await sb.storage.from('identity-documents').createSignedUrl(idDocumentUrl, 3600);
+    if (signed?.signedUrl) {
+      idPhotoHtml = '<p class="card-meta"><strong>Pièce d\'identité :</strong></p><img class="id-photo" src="' + signed.signedUrl + '">';
+    }
+  }
+
+  el.innerHTML = `
+    <p class="card-meta"><strong>Activité sur la plateforme :</strong></p>
+    <p class="card-meta">${nbAnnonces || 0} annonce(s) publiée(s) · ${nbAchats || 0} achat(s) effectué(s)</p>
+    <p class="card-meta">${nbSignalements || 0} signalement(s) fait(s) · ${nbLitiges || 0} litige(s) ouvert(s)</p>
+    ${banReason ? '<p class="card-meta"><strong>Motif de suspension :</strong> ' + banReason + '</p>' : ''}
+    ${idPhotoHtml}
+  `;
 }
 </script>
 </body>
