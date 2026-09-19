@@ -31,7 +31,9 @@ const CATEGORY_ICONS = {
 
 // Bannières publicitaires internes, en attendant un vrai système de
 // promotions gérées par les vendeurs.
-const ADS = [
+// Bannières de secours, utilisées uniquement tant qu'aucune publicité n'a
+// été ajoutée depuis le tableau de bord admin (table `ads`).
+const FALLBACK_ADS = [
   { id: 'ad-1', title: 'Bienvenue sur Zuno', subtitle: 'Achète et vends d\'occasion partout au Niger', color: '#2E0B8C' },
   { id: 'ad-2', title: 'Vends en 5 minutes', subtitle: 'Publie une annonce avec photos en quelques clics', color: '#FF6A00' },
   { id: 'ad-3', title: 'Discute en direct', subtitle: 'Contacte les vendeurs sans quitter l\'appli', color: '#1D9E75' },
@@ -60,20 +62,30 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [country, setCountry] = useState(COUNTRIES[0]);
+  const [ads, setAds] = useState(FALLBACK_ADS);
   const adListRef = useRef(null);
+
+  const loadAds = useCallback(async () => {
+    const { data } = await supabase
+      .from('ads')
+      .select('*')
+      .eq('active', true)
+      .order('position', { ascending: true });
+    if (data && data.length > 0) setAds(data);
+  }, []);
 
   // Fait défiler le carrousel publicitaire tout seul, une bannière toutes
   // les 4 secondes, et revient au début une fois la dernière atteinte.
   useEffect(() => {
     const interval = setInterval(() => {
       setAdIndex((prevIndex) => {
-        const nextIndex = (prevIndex + 1) % ADS.length;
+        const nextIndex = (prevIndex + 1) % ads.length;
         adListRef.current?.scrollToOffset({ offset: nextIndex * AD_WIDTH, animated: true });
         return nextIndex;
       });
     }, 4000);
     return () => clearInterval(interval);
-  }, []);
+  }, [ads.length]);
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
@@ -99,11 +111,13 @@ export default function HomeScreen({ navigation }) {
   }, []);
 
   // Recharge la liste à chaque fois qu'on revient sur cet écran
-  // (par exemple juste après avoir publié une annonce).
+  // (par exemple juste après avoir publié une annonce, ou ajouté une
+  // publicité depuis le tableau de bord admin).
   useFocusEffect(
     useCallback(() => {
       fetchListings();
-    }, [fetchListings])
+      loadAds();
+    }, [fetchListings, loadAds])
   );
 
   const filtered = listings.filter((item) => {
@@ -235,7 +249,7 @@ export default function HomeScreen({ navigation }) {
 
                 <FlatList
                   ref={adListRef}
-                  data={ADS}
+                  data={ads}
                   horizontal
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
@@ -245,14 +259,21 @@ export default function HomeScreen({ navigation }) {
                     setAdIndex(Math.round(e.nativeEvent.contentOffset.x / AD_WIDTH));
                   }}
                   renderItem={({ item }) => (
-                    <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color }]}>
-                      <Text style={styles.adTitle}>{item.title}</Text>
-                      <Text style={styles.adSubtitle}>{item.subtitle}</Text>
+                    <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}>
+                      {item.image_url && (
+                        <Image source={{ uri: item.image_url }} style={styles.adImage} />
+                      )}
+                      {(item.title || item.subtitle) && (
+                        <View style={item.image_url ? styles.adTextOverlay : null}>
+                          {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
+                          {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
+                        </View>
+                      )}
                     </View>
                   )}
                 />
                 <View style={styles.dotsRow}>
-                  {ADS.map((_, i) => (
+                  {ads.map((_, i) => (
                     <View key={i} style={[styles.dot, i === adIndex && styles.dotActive]} />
                   ))}
                 </View>
@@ -504,6 +525,14 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  adImage: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  adTextOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    padding: spacing.sm,
+    borderRadius: radius.sm,
+    alignSelf: 'flex-start',
   },
   adTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   adSubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
