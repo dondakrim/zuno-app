@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zuno — Admin</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --purple: #2E0B8C;
+    --orange: #FF6A00;
+    --bg: #F7F7F5;
+    --surface: #FFFFFF;
+    --border: #E5E3DC;
+    --text: #1A1A1A;
+    --text-secondary: #6B6A63;
+    --text-muted: #9B998F;
+    --danger: #E24B4A;
+    --success: #1D9E75;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .topbar {
+    background: var(--purple);
+    color: #fff;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
+  .logo-icon {
+    width: 26px; height: 26px; border-radius: 7px; background: var(--orange);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
+  }
+  .logout-btn { background: none; border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; }
+
+  #login-screen {
+    max-width: 380px; margin: 80px auto; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 32px;
+  }
+  #login-screen h1 { font-size: 18px; margin: 0 0 4px; }
+  #login-screen p { color: var(--text-secondary); font-size: 13px; margin: 0 0 20px; }
+  input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; margin-bottom: 10px;
+  }
+  button.primary {
+    width: 100%; padding: 11px; border: none; border-radius: 8px; background: var(--orange);
+    color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: default; }
+  #login-error { color: var(--danger); font-size: 13px; margin-top: 8px; display: none; }
+
+  #app { display: none; max-width: 900px; margin: 0 auto; padding: 20px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab-btn {
+    padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface); cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text);
+  }
+  .tab-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; margin-bottom: 12px;
+  }
+  .card-title { font-weight: 700; font-size: 14px; margin: 0 0 4px; }
+  .card-sub { color: var(--text-secondary); font-size: 12px; margin: 0 0 8px; }
+  .card-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
+  .pill {
+    display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px;
+    border-radius: 999px; background: var(--bg); color: var(--text-secondary); margin-right: 6px;
+  }
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .btn {
+    padding: 7px 14px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .btn-approve { background: var(--success); color: #fff; }
+  .btn-reject { background: var(--danger); color: #fff; }
+  .empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 30px; }
+  .id-photo { max-width: 220px; border-radius: 8px; border: 1px solid var(--border); display: block; margin-bottom: 10px; }
+  .loading { text-align: center; padding: 30px; color: var(--text-muted); }
+  #not-admin { max-width: 420px; margin: 80px auto; text-align: center; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h1>Zuno — Espace admin</h1>
+  <p>Connexion réservée aux comptes administrateurs.</p>
+  <input type="email" id="login-email" placeholder="Adresse email">
+  <input type="password" id="login-password" placeholder="Mot de passe">
+  <button class="primary" id="login-btn">Se connecter</button>
+  <div id="login-error"></div>
+</div>
+
+<div id="not-admin">
+  <p>Ce compte n'est pas autorisé à accéder à l'espace admin.</p>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand"><div class="logo-icon">Z</div> Zuno — Admin</div>
+    <button class="logout-btn" id="logout-btn">Se déconnecter</button>
+  </div>
+  <div style="padding: 20px;">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="litiges">Litiges</button>
+      <button class="tab-btn" data-tab="moderation">Modération</button>
+      <button class="tab-btn" data-tab="identites">Identités</button>
+      <button class="tab-btn" data-tab="publicites">Publicités</button>
+    </div>
+
+    <div class="panel active" id="panel-litiges"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-publicites">
+      <div class="card">
+        <p class="card-title" style="margin-bottom: 12px;">Ajouter une publicité</p>
+        <input type="text" id="ad-title" placeholder="Titre (ex: Vends en 5 minutes)">
+        <input type="text" id="ad-subtitle" placeholder="Sous-titre (facultatif)">
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Couleur de fond (si pas d'image)</label>
+        <input type="color" id="ad-color" value="#2E0B8C" style="height:40px; padding:4px; margin-bottom:10px;">
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Image (facultative — remplace la couleur si fournie)</label>
+        <input type="file" id="ad-image" accept="image/*" style="margin-bottom:14px;">
+        <button class="btn btn-approve" id="ad-submit-btn" style="width:100%; padding:11px;" onclick="addAd()">Publier cette bannière</button>
+      </div>
+      <div id="ads-list"><div class="loading">Chargement…</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Remplace ces deux valeurs par celles de ton projet Supabase
+// (Project Settings > API dans le tableau de bord Supabase) —
+// exactement les mêmes que dans src/lib/supabase.js de l'appli mobile.
+const SUPABASE_URL = 'https://pxtapnrcottfulhlezdq.supabase.co/';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGFwbnJjb3R0ZnVsaGxlemRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDg2MTEsImV4cCI6MjEwNDgyNDYxMX0.RaenFO9NKUkfEuo6RfkNKu22hbXesehm8KDQFFMm4VM';
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const DISPUTE_LABELS = {
+  non_recu: 'Article non reçu',
+  non_conforme_description: 'Article non conforme',
+  vendeur_injoignable: 'Vendeur injoignable',
+  autre: 'Autre problème',
+};
+
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    errorEl.textContent = error.message;
+    errorEl.style.display = 'block';
+    return;
+  }
+  await checkAdminAndInit();
+});
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  location.reload();
+});
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+async function checkAdminAndInit() {
+  document.getElementById('not-admin').style.display = 'none';
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const { data: adminRow } = await sb.from('admins').select('id').eq('id', user.id).maybeSingle();
+  document.getElementById('login-screen').style.display = 'none';
+
+  if (!adminRow) {
+    document.getElementById('not-admin').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('app').style.display = 'block';
+  loadLitiges();
+  loadModeration();
+  loadIdentites();
+  loadAds();
+}
+
+async function loadLitiges() {
+  const panel = document.getElementById('panel-litiges');
+  const { data, error } = await sb
+    .from('order_disputes')
+    .select('*, orders(id, montant, listings(title), acheteur:users!orders_acheteur_id_fkey(nom, telephone), listings_vendeur:listings(vendeur_id))')
+    .eq('status', 'ouvert')
+    .order('created_at', { ascending: false });
+
+  if (error) { panel.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { panel.innerHTML = '<div class="empty">Aucun litige en attente.</div>'; return; }
+
+  panel.innerHTML = data.map((d) => `
+    <div class="card" data-id="${d.id}">
+      <p class="card-title">${d.orders?.listings?.title || 'Annonce'}</p>
+      <p class="card-sub">Acheteur : ${d.orders?.acheteur?.nom || '—'} · ${d.orders?.acheteur?.telephone || ''}</p>
+      <span class="pill">${DISPUTE_LABELS[d.category] || d.category}</span>
+      <span class="pill">${Number(d.orders?.montant || 0).toLocaleString('fr-FR')} FCFA</span>
+      ${d.description ? '<p class="card-meta">' + d.description + '</p>' : ''}
+      <div class="actions">
+        <button class="btn btn-approve" onclick="resolveDispute('${d.id}', 'resolu')">Marquer résolu</button>
+        <button class="btn btn-reject" onclick="resolveDispute('${d.id}', 'rejete')">Rejeter</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function resolveDispute(id, status) {
+  const { error } = await sb.from('order_disputes').update({ status }).eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadLitiges();
+}
+
+async function loadModeration() {
+  const panel = document.getElementById('panel-moderation');
+  const { data, error } = await sb
+    .from('moderation_queue')
+    .select('*, listings(title, price, city, description)')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) { panel.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { panel.innerHTML = '<div class="empty">Aucune annonce en attente de vérification.</div>'; return; }
+
+  panel.innerHTML = data.map((m) => `
+    <div class="card" data-id="${m.id}">
+      <p class="card-title">${m.listings?.title || 'Annonce supprimée'}</p>
+      <p class="card-sub">${m.listings?.price ? Number(m.listings.price).toLocaleString('fr-FR') + ' FCFA · ' : ''}${m.listings?.city || ''}</p>
+      ${m.category ? '<span class="pill">' + m.category + '</span>' : ''}
+      <span class="pill">Score ${m.score}</span>
+      ${m.detected_keywords?.length ? '<p class="card-meta">Mots détectés : ' + m.detected_keywords.join(', ') + '</p>' : ''}
+      ${m.reporter_comment ? '<p class="card-meta">Commentaire du signalement : ' + m.reporter_comment + '</p>' : ''}
+      <div class="actions">
+        <button class="btn btn-approve" onclick="reviewModeration('${m.id}', '${m.listing_id}', true)">Approuver l'annonce</button>
+        <button class="btn btn-reject" onclick="reviewModeration('${m.id}', '${m.listing_id}', false)">Retirer l'annonce</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function reviewModeration(queueId, listingId, approve) {
+  const { error: e1 } = await sb.from('moderation_queue')
+    .update({ status: approve ? 'reviewed_ok' : 'reviewed_removed' })
+    .eq('id', queueId);
+  const { error: e2 } = await sb.from('listings')
+    .update({ moderation_status: approve ? 'approved' : 'blocked' })
+    .eq('id', listingId);
+  if (e1 || e2) { alert('Erreur : ' + (e1 || e2).message); return; }
+  loadModeration();
+}
+
+async function loadIdentites() {
+  const panel = document.getElementById('panel-identites');
+  const { data, error } = await sb
+    .from('users')
+    .select('id, nom, telephone, ville, id_document_url')
+    .eq('identity_status', 'en_attente');
+
+  if (error) { panel.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { panel.innerHTML = '<div class="empty">Aucune vérification en attente.</div>'; return; }
+
+  panel.innerHTML = '<div class="loading">Chargement des photos…</div>';
+  const cards = await Promise.all(data.map(async (u) => {
+    let photoUrl = '';
+    if (u.id_document_url) {
+      const { data: signed } = await sb.storage.from('identity-documents').createSignedUrl(u.id_document_url, 3600);
+      photoUrl = signed?.signedUrl || '';
+    }
+    return `
+      <div class="card" data-id="${u.id}">
+        <p class="card-title">${u.nom || 'Sans nom'}</p>
+        <p class="card-sub">${u.telephone || ''} · ${u.ville || ''}</p>
+        ${photoUrl ? '<img class="id-photo" src="' + photoUrl + '">' : '<p class="card-meta">Aucune photo trouvée.</p>'}
+        <div class="actions">
+          <button class="btn btn-approve" onclick="reviewIdentity('${u.id}', 'verifiee')">Valider</button>
+          <button class="btn btn-reject" onclick="reviewIdentity('${u.id}', 'rejetee')">Rejeter</button>
+        </div>
+      </div>
+    `;
+  }));
+  panel.innerHTML = cards.join('');
+}
+
+async function reviewIdentity(userId, status) {
+  const { error } = await sb.from('users').update({ identity_status: status }).eq('id', userId);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadIdentites();
+}
+
+async function loadAds() {
+  const list = document.getElementById('ads-list');
+  const { data, error } = await sb.from('ads').select('*').order('position', { ascending: true });
+
+  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Aucune publicité pour l\'instant — celles par défaut de l\'appli restent affichées.</div>'; return; }
+
+  list.innerHTML = data.map((ad) => `
+    <div class="card" data-id="${ad.id}">
+      ${ad.image_url ? '<img src="' + ad.image_url + '" style="width:100%; max-height:140px; object-fit:cover; border-radius:8px; margin-bottom:10px;">' : ''}
+      <p class="card-title">${ad.title}</p>
+      ${ad.subtitle ? '<p class="card-sub">' + ad.subtitle + '</p>' : ''}
+      <span class="pill">${ad.active ? 'Active' : 'Désactivée'}</span>
+      <div class="actions">
+        <button class="btn btn-approve" onclick="toggleAd('${ad.id}', ${!ad.active})">${ad.active ? 'Désactiver' : 'Activer'}</button>
+        <button class="btn btn-reject" onclick="deleteAd('${ad.id}')">Supprimer</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function addAd() {
+  const title = document.getElementById('ad-title').value.trim();
+  const subtitle = document.getElementById('ad-subtitle').value.trim();
+  const color = document.getElementById('ad-color').value;
+  const fileInput = document.getElementById('ad-image');
+  const btn = document.getElementById('ad-submit-btn');
+
+  if (!title) { alert('Le titre est obligatoire.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Envoi…';
+
+  let imageUrl = null;
+  const file = fileInput.files[0];
+  if (file) {
+    const fileName = Date.now() + '-' + file.name.replace(/\s+/g, '-');
+    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, file);
+    if (uploadError) {
+      alert('Erreur upload image : ' + uploadError.message);
+      btn.disabled = false;
+      btn.textContent = 'Publier cette bannière';
+      return;
+    }
+    const { data: pub } = sb.storage.from('ad-images').getPublicUrl(fileName);
+    imageUrl = pub.publicUrl;
+  }
+
+  const { error } = await sb.from('ads').insert({ title, subtitle, color, image_url: imageUrl, active: true });
+  btn.disabled = false;
+  btn.textContent = 'Publier cette bannière';
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+
+  document.getElementById('ad-title').value = '';
+  document.getElementById('ad-subtitle').value = '';
+  fileInput.value = '';
+  loadAds();
+}
+
+async function toggleAd(id, active) {
+  const { error } = await sb.from('ads').update({ active }).eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadAds();
+}
+
+async function deleteAd(id) {
+  if (!confirm('Supprimer définitivement cette publicité ?')) return;
+  const { error } = await sb.from('ads').delete().eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadAds();
+}
+
+// Reprend automatiquement la session si déjà connecté (évite de se
+// reconnecter à chaque ouverture de la page).
+sb.auth.getSession().then(({ data: { session } }) => {
+  if (session) checkAdminAndInit();
+});
+</script>
+</body>
+</html>
