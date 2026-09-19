@@ -226,16 +226,25 @@ async function loadLitiges() {
       <span class="pill">${Number(d.orders?.montant || 0).toLocaleString('fr-FR')} FCFA</span>
       ${d.description ? '<p class="card-meta">' + d.description + '</p>' : ''}
       <div class="actions">
-        <button class="btn btn-approve" onclick="resolveDispute('${d.id}', 'resolu')">Marquer résolu</button>
-        <button class="btn btn-reject" onclick="resolveDispute('${d.id}', 'rejete')">Rejeter</button>
+        <button class="btn btn-approve" onclick="resolveDispute('${d.id}', 'resolu', '${d.opened_by}')">Marquer résolu</button>
+        <button class="btn btn-reject" onclick="resolveDispute('${d.id}', 'rejete', '${d.opened_by}')">Rejeter</button>
       </div>
     </div>
   `).join('');
 }
 
-async function resolveDispute(id, status) {
+async function resolveDispute(id, status, openedBy) {
   const { error } = await sb.from('order_disputes').update({ status }).eq('id', id);
   if (error) { alert('Erreur : ' + error.message); return; }
+  await sb.from('notifications').insert({
+    user_id: openedBy,
+    title: status === 'resolu' ? 'Ton litige a été résolu' : 'Ton litige a été rejeté',
+    body: status === 'resolu'
+      ? 'Notre équipe a traité ton signalement.'
+      : "Après vérification, nous n'avons pas donné suite à ce signalement.",
+    type: 'dispute',
+    related_id: id,
+  });
   loadLitiges();
 }
 
@@ -243,7 +252,7 @@ async function loadModeration() {
   const panel = document.getElementById('panel-moderation');
   const { data, error } = await sb
     .from('moderation_queue')
-    .select('*, listings(title, price, city, description)')
+    .select('*, listings(title, price, city, description, vendeur_id)')
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
@@ -259,20 +268,31 @@ async function loadModeration() {
       ${m.detected_keywords?.length ? '<p class="card-meta">Mots détectés : ' + m.detected_keywords.join(', ') + '</p>' : ''}
       ${m.reporter_comment ? '<p class="card-meta">Commentaire du signalement : ' + m.reporter_comment + '</p>' : ''}
       <div class="actions">
-        <button class="btn btn-approve" onclick="reviewModeration('${m.id}', '${m.listing_id}', true)">Approuver l'annonce</button>
-        <button class="btn btn-reject" onclick="reviewModeration('${m.id}', '${m.listing_id}', false)">Retirer l'annonce</button>
+        <button class="btn btn-approve" onclick="reviewModeration('${m.id}', '${m.listing_id}', true, '${m.listings?.vendeur_id}')">Approuver l'annonce</button>
+        <button class="btn btn-reject" onclick="reviewModeration('${m.id}', '${m.listing_id}', false, '${m.listings?.vendeur_id}')">Retirer l'annonce</button>
       </div>
     </div>
   `).join('');
 }
 
-async function reviewModeration(queueId, listingId, approve) {
+async function reviewModeration(queueId, listingId, approve, vendeurId) {
   const { error: e1 } = await sb.from('moderation_queue')
     .update({ status: approve ? 'reviewed_ok' : 'reviewed_removed' })
     .eq('id', queueId);
   const { error: e2 } = await sb.from('listings')
     .update({ moderation_status: approve ? 'approved' : 'blocked' })
     .eq('id', listingId);
+  if (vendeurId && vendeurId !== 'undefined') {
+    await sb.from('notifications').insert({
+      user_id: vendeurId,
+      title: approve ? 'Ton annonce a été approuvée' : 'Ton annonce a été retirée',
+      body: approve
+        ? 'Elle est de nouveau visible par tous les acheteurs.'
+        : "Après vérification, elle ne respecte pas les règles de Zuno.",
+      type: 'moderation',
+      related_id: listingId,
+    });
+  }
   if (e1 || e2) { alert('Erreur : ' + (e1 || e2).message); return; }
   loadModeration();
 }
@@ -312,6 +332,15 @@ async function loadIdentites() {
 async function reviewIdentity(userId, status) {
   const { error } = await sb.from('users').update({ identity_status: status }).eq('id', userId);
   if (error) { alert('Erreur : ' + error.message); return; }
+  await sb.from('notifications').insert({
+    user_id: userId,
+    title: status === 'verifiee' ? 'Identité vérifiée ✅' : 'Identité refusée',
+    body: status === 'verifiee'
+      ? 'Le badge "Identité vérifiée" est maintenant visible sur ton profil.'
+      : "Ta pièce n'a pas pu être validée. Réessaie avec une photo plus lisible.",
+    type: 'identity',
+    related_id: userId,
+  });
   loadIdentites();
 }
 
@@ -408,26 +437,40 @@ async function loadBoosts() {
       <p class="card-sub">${b.vendeur?.nom || '—'} · ${b.vendeur?.telephone || ''}</p>
       <span class="pill">${b.amount} FCFA · ${b.duration_days} jours</span>
       <div class="actions">
-        <button class="btn btn-approve" onclick="confirmBoost('${b.id}', '${b.listing_id}', ${b.duration_days})">Paiement reçu</button>
-        <button class="btn btn-reject" onclick="rejectBoost('${b.id}')">Rejeter</button>
+        <button class="btn btn-approve" onclick="confirmBoost('${b.id}', '${b.listing_id}', ${b.duration_days}, '${b.vendeur_id}', '${(b.listings?.title || '').replace(/'/g, "\\'")}')">Paiement reçu</button>
+        <button class="btn btn-reject" onclick="rejectBoost('${b.id}', '${b.vendeur_id}', '${(b.listings?.title || '').replace(/'/g, "\\'")}')">Rejeter</button>
       </div>
     </div>
   `).join('');
 }
 
-async function confirmBoost(requestId, listingId, durationDays) {
+async function confirmBoost(requestId, listingId, durationDays, vendeurId, listingTitle) {
   const boostUntil = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
   const { error: e1 } = await sb.from('boost_requests')
     .update({ status: 'paye', confirmed_at: new Date().toISOString() })
     .eq('id', requestId);
   const { error: e2 } = await sb.from('listings').update({ boost_until: boostUntil }).eq('id', listingId);
   if (e1 || e2) { alert('Erreur : ' + (e1 || e2).message); return; }
+  await sb.from('notifications').insert({
+    user_id: vendeurId,
+    title: 'Mise en avant activée 🚀',
+    body: '« ' + listingTitle + ' » est maintenant en vedette dans Tendances pour ' + durationDays + ' jours.',
+    type: 'boost',
+    related_id: listingId,
+  });
   loadBoosts();
 }
 
-async function rejectBoost(requestId) {
+async function rejectBoost(requestId, vendeurId, listingTitle) {
   const { error } = await sb.from('boost_requests').update({ status: 'rejete' }).eq('id', requestId);
   if (error) { alert('Erreur : ' + error.message); return; }
+  await sb.from('notifications').insert({
+    user_id: vendeurId,
+    title: 'Mise en avant refusée',
+    body: 'Ta demande pour « ' + listingTitle + ' » n\'a pas pu être confirmée. Contacte-nous si besoin.',
+    type: 'boost',
+    related_id: requestId,
+  });
   loadBoosts();
 }
 
@@ -485,6 +528,12 @@ async function banUser(userId) {
 async function setBan(userId, banned, reason) {
   const { error } = await sb.from('users').update({ is_banned: banned, ban_reason: reason }).eq('id', userId);
   if (error) { alert('Erreur : ' + error.message); return; }
+  await sb.from('notifications').insert({
+    user_id: userId,
+    title: banned ? 'Compte suspendu' : 'Compte réactivé',
+    body: banned ? (reason || 'Ton compte a été suspendu.') : 'Ton compte est de nouveau actif.',
+    type: 'moderation',
+  });
   loadUsers();
 }
 

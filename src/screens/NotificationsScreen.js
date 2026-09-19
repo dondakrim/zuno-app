@@ -19,11 +19,26 @@ const PROMOS = [
 export default function NotificationsScreen({ navigation }) {
   const [messages, setMessages] = useState([]);
   const [newListings, setNewListings] = useState([]);
+  const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
     const myId = await getDeviceUserId();
+
+    // Décisions d'un admin sur une demande (mise en avant, identité,
+    // litige, modération) — les plus importantes, en tête de l'écran.
+    const { data: updatesData } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', myId)
+      .order('created_at', { ascending: false })
+      .limit(15);
+    setUpdates(updatesData || []);
+
+    // Marque tout comme lu dès que la personne ouvre cet écran, pour
+    // faire disparaître le point rouge sur la cloche.
+    await supabase.from('notifications').update({ read: true }).eq('user_id', myId).eq('read', false);
 
     // Derniers messages reçus.
     const { data: msgData } = await supabase
@@ -74,6 +89,7 @@ export default function NotificationsScreen({ navigation }) {
   );
 
   const sections = [
+    { key: 'updates', title: 'Mises à jour de tes demandes', icon: 'checkmark-done-outline', data: updates },
     { key: 'messages', title: 'Messages', icon: 'chatbubble-outline', data: messages },
     { key: 'promos', title: 'Promotions', icon: 'pricetag-outline', data: PROMOS },
     { key: 'listings', title: 'Nouveaux articles pour toi', icon: 'sparkles-outline', data: newListings },
@@ -106,6 +122,14 @@ export default function NotificationsScreen({ navigation }) {
               {section.data.length === 0 && (
                 <Text style={styles.emptyText}>Rien de nouveau ici pour l'instant.</Text>
               )}
+
+              {section.key === 'updates' &&
+                section.data.map((u) => (
+                  <View key={u.id} style={styles.card}>
+                    <Text style={styles.cardTitle}>{u.title}</Text>
+                    {u.body ? <Text style={styles.cardSubtitle}>{u.body}</Text> : null}
+                  </View>
+                ))}
 
               {section.key === 'messages' &&
                 section.data.map((m) => (

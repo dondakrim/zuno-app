@@ -95,6 +95,17 @@ export default function HomeScreen({ navigation }) {
   const [adIndex, setAdIndex] = useState(0);
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [sellerRatings, setSellerRatings] = useState({});
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+  const loadUnreadNotifications = useCallback(async () => {
+    const myId = await getDeviceUserId();
+    const { count } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', myId)
+      .eq('read', false);
+    setHasUnreadNotifications((count || 0) > 0);
+  }, []);
 
   const loadWishlist = useCallback(async () => {
     const myId = await getDeviceUserId();
@@ -167,7 +178,8 @@ export default function HomeScreen({ navigation }) {
       fetchListings();
       loadAds();
       loadWishlist();
-    }, [fetchListings, loadAds, loadWishlist])
+      loadUnreadNotifications();
+    }, [fetchListings, loadAds, loadWishlist, loadUnreadNotifications])
   );
 
   const filtered = listings.filter((item) => {
@@ -242,6 +254,7 @@ export default function HomeScreen({ navigation }) {
             style={styles.headerIconButton}
           >
             <Ionicons name="notifications-outline" size={22} color={colors.white} />
+            {hasUnreadNotifications && <View style={styles.notificationDot} />}
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.headerIconButton}>
             <Ionicons name="menu-outline" size={24} color={colors.white} />
@@ -498,7 +511,18 @@ const styles = StyleSheet.create({
   logo: { width: 26, height: 26, borderRadius: 7 },
   brandText: { color: colors.white, fontSize: 18, fontWeight: '600' },
   headerIcons: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  headerIconButton: { padding: 2 },
+  headerIconButton: { padding: 2, position: 'relative' },
+  notificationDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: colors.danger,
+    borderWidth: 1.5,
+    borderColor: colors.purple,
+  },
   subHeader: {
     backgroundColor: colors.purple,
     flexDirection: 'row',
