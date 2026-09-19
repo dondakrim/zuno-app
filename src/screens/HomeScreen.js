@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
+  ImageBackground,
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
@@ -258,25 +259,28 @@ export default function HomeScreen({ navigation }) {
                   onMomentumScrollEnd={(e) => {
                     setAdIndex(Math.round(e.nativeEvent.contentOffset.x / AD_WIDTH));
                   }}
-                  renderItem={({ item }) => (
-                    <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}>
-                      {item.image_url && (
-                        <Image
-                          source={{ uri: item.image_url }}
-                          style={styles.adImage}
-                          onError={(e) =>
-                            console.log('Erreur chargement image pub:', item.image_url, e.nativeEvent.error)
-                          }
-                        />
-                      )}
-                      {(item.title || item.subtitle) && (
-                        <View style={item.image_url ? styles.adTextOverlay : null}>
-                          {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
-                          {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
-                        </View>
-                      )}
-                    </View>
-                  )}
+                  renderItem={({ item }) =>
+                    item.image_url ? (
+                      <ImageBackground
+                        source={{ uri: item.image_url }}
+                        style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}
+                        imageStyle={{ borderRadius: radius.md }}
+                        resizeMode="contain"
+                      >
+                        {(item.title || item.subtitle) && (
+                          <View style={styles.adTextOverlay}>
+                            {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
+                            {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
+                          </View>
+                        )}
+                      </ImageBackground>
+                    ) : (
+                      <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}>
+                        {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
+                        {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
+                      </View>
+                    )
+                  }
                 />
                 <View style={styles.dotsRow}>
                   {ads.map((_, i) => (
@@ -533,7 +537,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  adImage: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
   adTextOverlay: {
     backgroundColor: 'rgba(0,0,0,0.35)',
     padding: spacing.sm,
