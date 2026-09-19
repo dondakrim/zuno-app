@@ -261,7 +261,13 @@ export default function HomeScreen({ navigation }) {
                   renderItem={({ item }) => (
                     <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}>
                       {item.image_url && (
-                        <Image source={{ uri: item.image_url }} style={styles.adImage} />
+                        <Image
+                          source={{ uri: item.image_url }}
+                          style={styles.adImage}
+                          onError={(e) =>
+                            console.log('Erreur chargement image pub:', item.image_url, e.nativeEvent.error)
+                          }
+                        />
                       )}
                       {(item.title || item.subtitle) && (
                         <View style={item.image_url ? styles.adTextOverlay : null}>
