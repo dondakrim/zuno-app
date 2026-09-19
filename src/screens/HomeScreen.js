@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   Image,
   ImageBackground,
@@ -21,6 +22,8 @@ import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
 import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
+import { getDeviceUserId } from '../lib/deviceUser';
+import MasonrySection from '../components/MasonrySection';
 
 const CATEGORY_ICONS = {
   'Mode et vêtements': 'shirt-outline',
@@ -90,6 +93,50 @@ export default function HomeScreen({ navigation }) {
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
+  const [wishlistIds, setWishlistIds] = useState(new Set());
+  const [sellerRatings, setSellerRatings] = useState({});
+
+  const loadWishlist = useCallback(async () => {
+    const myId = await getDeviceUserId();
+    const { data } = await supabase.from('wishlist_items').select('listing_id').eq('acheteur_id', myId);
+    setWishlistIds(new Set((data || []).map((w) => w.listing_id)));
+  }, []);
+
+  const handleToggleWishlist = useCallback(
+    async (listing) => {
+      const myId = await getDeviceUserId();
+      if (wishlistIds.has(listing.id)) {
+        await supabase
+          .from('wishlist_items')
+          .delete()
+          .eq('acheteur_id', myId)
+          .eq('listing_id', listing.id);
+      } else {
+        await supabase.from('wishlist_items').insert({ acheteur_id: myId, listing_id: listing.id });
+      }
+      loadWishlist();
+    },
+    [wishlistIds, loadWishlist]
+  );
+
+  // Les avis sont liés au vendeur, pas à un article précis : on calcule
+  // une moyenne par vendeur en une seule requête, plutôt qu'une par carte.
+  const loadSellerRatings = useCallback(async (currentListings) => {
+    const vendeurIds = [...new Set(currentListings.map((l) => l.vendeur_id).filter(Boolean))];
+    if (vendeurIds.length === 0) return;
+    const { data } = await supabase.from('reviews').select('vendeur_id, note').in('vendeur_id', vendeurIds);
+    const totals = {};
+    (data || []).forEach((r) => {
+      if (!totals[r.vendeur_id]) totals[r.vendeur_id] = { sum: 0, count: 0 };
+      totals[r.vendeur_id].sum += r.note;
+      totals[r.vendeur_id].count += 1;
+    });
+    const averages = {};
+    Object.keys(totals).forEach((id) => {
+      averages[id] = totals[id].sum / totals[id].count;
+    });
+    setSellerRatings(averages);
+  }, []);
 
   const fetchListings = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -106,10 +153,11 @@ export default function HomeScreen({ navigation }) {
 
     if (!error && data) {
       setListings(data);
+      loadSellerRatings(data);
     }
     setLoading(false);
     setRefreshing(false);
-  }, []);
+  }, [loadSellerRatings]);
 
   // Recharge la liste à chaque fois qu'on revient sur cet écran
   // (par exemple juste après avoir publié une annonce, ou ajouté une
@@ -118,7 +166,8 @@ export default function HomeScreen({ navigation }) {
     useCallback(() => {
       fetchListings();
       loadAds();
-    }, [fetchListings, loadAds])
+      loadWishlist();
+    }, [fetchListings, loadAds, loadWishlist])
   );
 
   const filtered = listings.filter((item) => {
@@ -130,11 +179,19 @@ export default function HomeScreen({ navigation }) {
   });
 
   // Nouveautés : les annonces les plus récentes.
-  const newArrivals = listings.slice(0, 10);
+  const newArrivals = listings.slice(0, 8);
   // En vedette : approximation simple en attendant un vrai système de mise
   // en avant payante — les articles au prix le plus élevé, qui ont souvent
   // le plus besoin de visibilité.
-  const featured = [...listings].sort((a, b) => b.price - a.price).slice(0, 10);
+  const featured = [...listings].sort((a, b) => b.price - a.price).slice(0, 8);
+  // Une section par catégorie qui a au moins un article, limitée à 8
+  // articles chacune sur l'accueil (le reste via "Voir tout").
+  const categorySections = categories
+    .map((cat) => ({ name: cat, items: listings.filter((l) => l.category === cat).slice(0, 8) }))
+    .filter((section) => section.items.length > 0);
+
+  const getSellerRating = (vendeurId) =>
+    vendeurId && sellerRatings[vendeurId] !== undefined ? sellerRatings[vendeurId] : undefined;
 
   const handleSelectCountry = (c) => {
     if (!c.available) {
@@ -210,175 +267,131 @@ export default function HomeScreen({ navigation }) {
         {loading ? (
           <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
         ) : (
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
-            numColumns={1}
+          <ScrollView
             contentContainerStyle={{ paddingBottom: spacing.xl }}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={() => fetchListings(true)} />
             }
-            ListHeaderComponent={
-              <View>
-                <FlatList
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  data={categories}
-                  keyExtractor={(item) => item}
-                  style={styles.categoryRow}
-                  contentContainerStyle={{ gap: spacing.md }}
-                  renderItem={({ item }) => {
-                    return (
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('CategoryListing', { category: item })}
-                        style={styles.categoryItem}
-                      >
-                        <View style={styles.categoryIcon}>
-                          <Ionicons
-                            name={CATEGORY_ICONS[item] || 'pricetag-outline'}
-                            size={20}
-                            color={colors.purple}
-                          />
-                        </View>
-                        <Text style={styles.categoryLabel} numberOfLines={1}>
-                          {item.split(' ')[0]}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
+          >
+            <FlatList
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              data={categories}
+              keyExtractor={(item) => item}
+              style={styles.categoryRow}
+              contentContainerStyle={{ gap: spacing.md }}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('CategoryListing', { category: item })}
+                  style={styles.categoryItem}
+                >
+                  <View style={styles.categoryIcon}>
+                    <Ionicons
+                      name={CATEGORY_ICONS[item] || 'pricetag-outline'}
+                      size={20}
+                      color={colors.purple}
+                    />
+                  </View>
+                  <Text style={styles.categoryLabel} numberOfLines={1}>
+                    {item.split(' ')[0]}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
 
-                <FlatList
-                  ref={adListRef}
-                  data={ads}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(item) => item.id}
-                  style={{ marginTop: spacing.lg }}
-                  onMomentumScrollEnd={(e) => {
-                    setAdIndex(Math.round(e.nativeEvent.contentOffset.x / AD_WIDTH));
-                  }}
-                  renderItem={({ item }) =>
-                    item.image_url ? (
-                      <ImageBackground
-                        source={{ uri: item.image_url }}
-                        style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}
-                        imageStyle={{ borderRadius: radius.md }}
-                        resizeMode="contain"
-                      >
-                        {(item.title || item.subtitle) && (
-                          <View style={styles.adTextOverlay}>
-                            {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
-                            {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
-                          </View>
-                        )}
-                      </ImageBackground>
-                    ) : (
-                      <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}>
+            <FlatList
+              ref={adListRef}
+              data={ads}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.id}
+              style={{ marginTop: spacing.lg }}
+              onMomentumScrollEnd={(e) => {
+                setAdIndex(Math.round(e.nativeEvent.contentOffset.x / AD_WIDTH));
+              }}
+              renderItem={({ item }) =>
+                item.image_url ? (
+                  <ImageBackground
+                    source={{ uri: item.image_url }}
+                    style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}
+                    imageStyle={{ borderRadius: radius.md }}
+                    resizeMode="cover"
+                  >
+                    {(item.title || item.subtitle) && (
+                      <View style={styles.adTextOverlay}>
                         {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
                         {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
                       </View>
-                    )
-                  }
+                    )}
+                  </ImageBackground>
+                ) : (
+                  <View style={[styles.adSlide, { width: AD_WIDTH, backgroundColor: item.color || colors.purple }]}>
+                    {item.title ? <Text style={styles.adTitle}>{item.title}</Text> : null}
+                    {item.subtitle ? <Text style={styles.adSubtitle}>{item.subtitle}</Text> : null}
+                  </View>
+                )
+              }
+            />
+            <View style={styles.dotsRow}>
+              {ads.map((_, i) => (
+                <View key={i} style={[styles.dot, i === adIndex && styles.dotActive]} />
+              ))}
+            </View>
+
+            {search.trim() ? (
+              <MasonrySection
+                title="Résultats"
+                items={filtered}
+                getSellerRating={getSellerRating}
+                wishlistIds={wishlistIds}
+                onToggleWishlist={handleToggleWishlist}
+                onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
+              />
+            ) : (
+              <>
+                <MasonrySection
+                  title="Articles en vedette"
+                  items={featured}
+                  onSeeAll={() => navigation.navigate('Tendances')}
+                  getSellerRating={getSellerRating}
+                  wishlistIds={wishlistIds}
+                  onToggleWishlist={handleToggleWishlist}
+                  onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
                 />
-                <View style={styles.dotsRow}>
-                  {ads.map((_, i) => (
-                    <View key={i} style={[styles.dot, i === adIndex && styles.dotActive]} />
-                  ))}
-                </View>
 
-                {featured.length > 0 && (
-                  <View style={styles.sliderSection}>
-                    <Text style={styles.sliderTitle}>Articles en vedette</Text>
-                    <FlatList
-                      data={featured}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      keyExtractor={(item) => 'feat-' + item.id}
-                      contentContainerStyle={{ gap: spacing.sm }}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={styles.sliderCard}
-                          onPress={() => navigation.navigate('ProductDetail', { listing: item })}
-                        >
-                          <View style={styles.sliderThumb}>
-                            {item.photo_url ? (
-                              <Image source={{ uri: item.photo_url }} style={styles.sliderThumbImage} />
-                            ) : (
-                              <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                            )}
-                          </View>
-                          <Text style={styles.sliderCardTitle} numberOfLines={1}>{item.title}</Text>
-                          <Text style={styles.sliderCardPrice}>
-                            {Number(item.price).toLocaleString('fr-FR')} FCFA
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    />
-                  </View>
-                )}
+                <MasonrySection
+                  title="Nouveaux articles"
+                  items={newArrivals}
+                  onSeeAll={() => navigation.navigate('Tendances')}
+                  getSellerRating={getSellerRating}
+                  wishlistIds={wishlistIds}
+                  onToggleWishlist={handleToggleWishlist}
+                  onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
+                />
 
-                {newArrivals.length > 0 && (
-                  <View style={styles.sliderSection}>
-                    <Text style={styles.sliderTitle}>Nouveaux articles</Text>
-                    <FlatList
-                      data={newArrivals}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      keyExtractor={(item) => 'new-' + item.id}
-                      contentContainerStyle={{ gap: spacing.sm }}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={styles.sliderCard}
-                          onPress={() => navigation.navigate('ProductDetail', { listing: item })}
-                        >
-                          <View style={styles.sliderThumb}>
-                            {item.photo_url ? (
-                              <Image source={{ uri: item.photo_url }} style={styles.sliderThumbImage} />
-                            ) : (
-                              <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                            )}
-                          </View>
-                          <Text style={styles.sliderCardTitle} numberOfLines={1}>{item.title}</Text>
-                          <Text style={styles.sliderCardPrice}>
-                            {Number(item.price).toLocaleString('fr-FR')} FCFA
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    />
-                  </View>
-                )}
+                {categorySections.map((section) => (
+                  <MasonrySection
+                    key={section.name}
+                    title={section.name}
+                    items={section.items}
+                    onSeeAll={() => navigation.navigate('CategoryListing', { category: section.name })}
+                    getSellerRating={getSellerRating}
+                    wishlistIds={wishlistIds}
+                    onToggleWishlist={handleToggleWishlist}
+                    onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
+                  />
+                ))}
 
-                <Text style={styles.sliderTitle}>Tous les articles</Text>
-              </View>
-            }
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>
-                Aucune annonce pour l'instant. Sois le premier à en publier une !
-              </Text>
-            }
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.card}
-                onPress={() => navigation.navigate('ProductDetail', { listing: item })}
-              >
-                <View style={styles.thumb}>
-                  {item.photo_url ? (
-                    <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
-                  ) : (
-                    <Ionicons name="image-outline" size={22} color={colors.textMuted} />
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
-                  <Text style={styles.cardSubtitle}>
-                    {Number(item.price).toLocaleString('fr-FR')} FCFA · {item.city}
+                {listings.length === 0 && (
+                  <Text style={styles.emptyText}>
+                    Aucune annonce pour l'instant. Sois le premier à en publier une !
                   </Text>
-                </View>
-              </TouchableOpacity>
+                )}
+              </>
             )}
-          />
+          </ScrollView>
         )}
       </View>
 
@@ -550,6 +563,24 @@ const styles = StyleSheet.create({
   dotActive: { backgroundColor: colors.orange, width: 16 },
   sliderSection: { marginTop: spacing.lg },
   sliderTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+  gridCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  gridThumb: {
+    width: '100%',
+    height: 110,
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: spacing.xs,
+  },
   sliderCard: {
     width: 120,
     backgroundColor: colors.surface,

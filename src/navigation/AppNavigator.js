@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme/colors';
+import { colors, radius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
@@ -251,18 +251,20 @@ function MainTabs() {
   // sans cet ajustement, les icônes du bas peuvent être coupées ou
   // masquées derrière ces boutons système.
   const insets = useSafeAreaInsets();
-  const tabBarHeight = 58 + insets.bottom;
+  const tabBarHeight = 64 + insets.bottom;
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: colors.orange,
         tabBarInactiveTintColor: colors.white,
         tabBarStyle: {
           backgroundColor: colors.purple,
           borderTopWidth: 0,
+          borderTopLeftRadius: radius.lg,
+          borderTopRightRadius: radius.lg,
           height: tabBarHeight,
           paddingTop: 8,
           paddingBottom: insets.bottom,
@@ -270,13 +272,21 @@ function MainTabs() {
         tabBarIcon: ({ color, size }) => (
           <Ionicons name={icons[route.name]} size={size} color={color} />
         ),
+        tabBarLabel: ({ focused, color, children }) => (
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ color, fontSize: 10, fontWeight: focused ? '700' : '500' }}>{children}</Text>
+            {focused && (
+              <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.orange, marginTop: 2 }} />
+            )}
+          </View>
+        ),
       })}
     >
-      <Tab.Screen name="Accueil" component={HomeStackNavigator} />
-      <Tab.Screen name="Boutique" component={SearchStackNavigator} />
-      <Tab.Screen name="Tendances" component={TrendingStackNavigator} />
-      <Tab.Screen name="Panier" component={PanierStackNavigator} />
-      <Tab.Screen name="Moi" component={MoiStackNavigator} />
+      <Tab.Screen name="Accueil" component={HomeStackNavigator} options={{ tabBarLabel: 'Accueil' }} />
+      <Tab.Screen name="Boutique" component={SearchStackNavigator} options={{ tabBarLabel: 'Boutiques' }} />
+      <Tab.Screen name="Tendances" component={TrendingStackNavigator} options={{ tabBarLabel: 'Tendances' }} />
+      <Tab.Screen name="Panier" component={PanierStackNavigator} options={{ tabBarLabel: 'Mon panier' }} />
+      <Tab.Screen name="Moi" component={MoiStackNavigator} options={{ tabBarLabel: 'Profil' }} />
     </Tab.Navigator>
   );
 }
