@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
-import { getDeviceUserId } from '../lib/deviceUser';
+import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { ILLEGAL_KEYWORDS } from '../lib/moderation';
 import { getSellerRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../lib/reputation';
 
@@ -36,8 +36,8 @@ export default function ProductDetailScreen({ route, navigation }) {
   // encore de vendeur identifié, ou son profil n'a pas encore été rempli :
   // on affiche un repère temporaire dans ces cas-là.
   const seller = sellerProfile?.nom
-    ? { name: sellerProfile.nom, initials: sellerProfile.nom.slice(0, 2).toUpperCase(), photo: sellerProfile.photo_url }
-    : { name: 'Vendeur Zuno', initials: 'VZ', photo: null };
+    ? { name: sellerProfile.nom, initials: sellerProfile.nom.slice(0, 2).toUpperCase(), photo: sellerProfile.photo_url, whatsapp: sellerProfile.whatsapp }
+    : { name: 'Vendeur Zuno', initials: 'VZ', photo: null, whatsapp: null };
 
   useEffect(() => {
     if (!listing.vendeur_id) return;
@@ -45,7 +45,7 @@ export default function ProductDetailScreen({ route, navigation }) {
     Promise.all([
       getSellerRating(listing.vendeur_id),
       countCompletedSales(listing.vendeur_id),
-      supabase.from('users').select('nom, photo_url').eq('id', listing.vendeur_id).maybeSingle(),
+      supabase.from('users').select('nom, photo_url, whatsapp').eq('id', listing.vendeur_id).maybeSingle(),
     ]).then(([rating, completedSales, profileResult]) => {
       if (cancelled) return;
       setSellerStats({ ...rating, completedSales });
@@ -133,6 +133,8 @@ export default function ProductDetailScreen({ route, navigation }) {
       setIsWishlisted(false);
       setWishlistId(null);
     } else {
+      const ok = await ensureAccountComplete(navigation, 'mettre un article de côté');
+      if (!ok) return;
       const { data } = await supabase
         .from('wishlist_items')
         .insert({ acheteur_id: myId, listing_id: listing.id })
@@ -217,7 +219,9 @@ export default function ProductDetailScreen({ route, navigation }) {
     };
   }, [listing.id, listing.category]);
 
-  const handleBuy = () => {
+  const handleBuy = async () => {
+    const ok = await ensureAccountComplete(navigation, 'acheter un article');
+    if (!ok) return;
     navigation.navigate('Cart', { listing });
   };
 
@@ -367,6 +371,18 @@ export default function ProductDetailScreen({ route, navigation }) {
               : 'Vendeur non identifié'}
           </Text>
         </View>
+        {seller.whatsapp && (
+          <TouchableOpacity
+            onPress={() => {
+              const digits = seller.whatsapp.replace(/[^0-9]/g, '');
+              const message = encodeURIComponent(`Bonjour, je suis intéressé(e) par « ${listing.title} » sur Zuno.`);
+              Linking.openURL(`https://wa.me/${digits}?text=${message}`);
+            }}
+            style={styles.whatsappButton}
+          >
+            <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
           <Ionicons
             name={isFavorite ? 'heart' : 'heart-outline'}
@@ -600,6 +616,7 @@ const styles = StyleSheet.create({
   sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sellerMeta: { fontSize: 12, color: colors.textSecondary },
   favoriteButton: { padding: spacing.xs },
+  whatsappButton: { padding: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   iconButton: { padding: spacing.xs },
   offerLink: {

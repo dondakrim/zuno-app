@@ -119,6 +119,7 @@
       <button class="tab-btn" data-tab="utilisateurs">Utilisateurs</button>
       <button class="tab-btn" data-tab="articles">Articles</button>
       <button class="tab-btn" data-tab="marchands">Marchands</button>
+      <button class="tab-btn" data-tab="comptes">Comptes</button>
     </div>
 
     <div class="panel active" id="panel-litiges"><div class="loading">Chargement…</div></div>
@@ -141,6 +142,12 @@
       <div id="articles-list"><div class="loading">Chargement…</div></div>
     </div>
     <div class="panel" id="panel-marchands"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-comptes">
+      <div class="card" style="margin-bottom: 16px;">
+        <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email)…" oninput="loadComptes()">
+      </div>
+      <div id="comptes-list"><div class="loading">Chargement…</div></div>
+    </div>
     <div class="panel" id="panel-publicites">
       <div class="card">
         <p class="card-title" style="margin-bottom: 12px;">Ajouter une publicité</p>
@@ -224,6 +231,7 @@ async function checkAdminAndInit() {
   loadUsers();
   loadArticles();
   loadMerchants();
+  loadComptes();
 }
 
 async function loadLitiges() {
@@ -499,7 +507,7 @@ async function loadUsers() {
   const [{ data: blockedListings }, { data: disputes }, { data: users }] = await Promise.all([
     sb.from('listings').select('vendeur_id').eq('moderation_status', 'blocked'),
     sb.from('order_disputes').select('order_id, status').eq('status', 'ouvert'),
-    sb.from('users').select('id, nom, telephone, is_banned, ban_reason'),
+    sb.from('users').select('id, nom, telephone, whatsapp, email, is_banned, ban_reason'),
   ]);
 
   const blockedCounts = {};
@@ -524,7 +532,7 @@ async function loadUsers() {
   panel.innerHTML = risky.map((u) => `
     <div class="card" data-id="${u.id}">
       <p class="card-title">${u.nom || 'Sans nom'}</p>
-      <p class="card-sub">${u.telephone || ''}</p>
+      <p class="card-sub">📞 ${u.telephone || '—'} · 💬 ${u.whatsapp || '—'}${u.email ? ' · ✉️ ' + u.email : ''}</p>
       <span class="pill">${u.blockedCount} annonce(s) bloquée(s)</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Compte suspendu</span>' : ''}
       ${u.ban_reason ? '<p class="card-meta">Motif : ' + u.ban_reason + '</p>' : ''}
@@ -691,7 +699,7 @@ async function loadMerchants() {
   const panel = document.getElementById('panel-marchands');
 
   const [{ data: users }, { data: listings }, { data: orders }] = await Promise.all([
-    sb.from('users').select('id, nom, telephone, ville, photo_url, boutique_nom, is_banned, ban_reason, identity_status'),
+    sb.from('users').select('id, nom, telephone, whatsapp, email, ville, photo_url, boutique_nom, is_banned, ban_reason, identity_status'),
     sb.from('listings').select('id, vendeur_id, status, moderation_status'),
     sb.from('orders').select('montant, listing_id, deliveries(statut_livraison), listings!inner(vendeur_id)'),
   ]);
@@ -737,7 +745,8 @@ async function loadMerchants() {
     return `
     <div class="card" data-id="${m.id}">
       <p class="card-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
-      <p class="card-sub">${m.telephone || ''}${m.ville ? ' · ' + m.ville : ''}</p>
+      <p class="card-sub">📞 ${m.telephone || '—'} · 💬 ${m.whatsapp || '—'}${m.ville ? ' · ' + m.ville : ''}</p>
+      ${m.email ? '<p class="card-sub">✉️ ' + m.email + '</p>' : ''}
       <span class="pill">Solde : ${s.revenue.toLocaleString('fr-FR')} FCFA</span>
       <span class="pill">${s.soldListings} vendu(s)</span>
       <span class="pill">${s.activeListings} en ligne</span>
@@ -777,6 +786,43 @@ async function toggleShopVisibility(vendeurId, currentlyHidden) {
     .eq('vendeur_id', vendeurId);
   if (error) { alert('Erreur : ' + error.message); return; }
   loadMerchants();
+}
+
+// ---------- Comptes (tous les inscrits, acheteurs comme vendeurs) ----------
+
+async function loadComptes() {
+  const list = document.getElementById('comptes-list');
+  const search = (document.getElementById('comptes-search')?.value || '').toLowerCase();
+
+  const { data, error } = await sb
+    .from('users')
+    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, is_banned, created_at')
+    .order('created_at', { ascending: false });
+
+  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data) { list.innerHTML = '<div class="empty">Aucun compte.</div>'; return; }
+
+  const filtered = data.filter((u) => {
+    if (!search) return true;
+    return (u.nom || '').toLowerCase().includes(search)
+      || (u.telephone || '').toLowerCase().includes(search)
+      || (u.whatsapp || '').toLowerCase().includes(search)
+      || (u.email || '').toLowerCase().includes(search);
+  });
+
+  if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucun compte ne correspond.</div>'; return; }
+
+  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)</p>' + filtered.map((u) => `
+    <div class="card" data-id="${u.id}">
+      <p class="card-title">${u.boutique_nom || u.nom || 'Sans nom'}</p>
+      <p class="card-sub">📞 ${u.telephone || '—'} · 💬 WhatsApp : ${u.whatsapp || '—'}</p>
+      ${u.email ? '<p class="card-sub">✉️ ' + u.email + '</p>' : ''}
+      <span class="pill">${u.ville || 'Ville non renseignée'}</span>
+      <span class="pill">${u.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
+      ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
+      <p class="card-meta">Inscrit le ${new Date(u.created_at).toLocaleDateString('fr-FR')}</p>
+    </div>
+  `).join('');
 }
 </script>
 </body>

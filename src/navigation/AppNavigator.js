@@ -19,6 +19,7 @@ import MessagesListScreen from '../screens/MessagesListScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
+import AccountSetupScreen from '../screens/onboarding/AccountSetupScreen';
 import ProductDetailScreen from '../screens/ProductDetailScreen';
 import CartScreen from '../screens/CartScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
@@ -66,6 +67,7 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="HomeFeed" component={HomeScreen} />
       <HomeStack.Screen name="CategoryListing" component={CategoryListingScreen} />
       <HomeStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <HomeStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <HomeStack.Screen name="Cart" component={CartScreen} />
       <HomeStack.Screen name="Checkout" component={CheckoutScreen} />
       <HomeStack.Screen name="Chat" component={ChatScreen} />
@@ -85,6 +87,7 @@ function SearchStackNavigator() {
     <SearchStack.Navigator screenOptions={{ headerShown: false }}>
       <SearchStack.Screen name="SearchHome" component={SearchScreen} />
       <SearchStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <SearchStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <SearchStack.Screen name="Cart" component={CartScreen} />
       <SearchStack.Screen name="Checkout" component={CheckoutScreen} />
       <SearchStack.Screen name="Chat" component={ChatScreen} />
@@ -99,6 +102,7 @@ function TrendingStackNavigator() {
     <TrendingStack.Navigator screenOptions={{ headerShown: false }}>
       <TrendingStack.Screen name="TrendingHome" component={TrendingScreen} />
       <TrendingStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <TrendingStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <TrendingStack.Screen name="Cart" component={CartScreen} />
       <TrendingStack.Screen name="Checkout" component={CheckoutScreen} />
       <TrendingStack.Screen name="Chat" component={ChatScreen} />
@@ -113,6 +117,7 @@ function PanierStackNavigator() {
     <PanierStack.Navigator screenOptions={{ headerShown: false }}>
       <PanierStack.Screen name="MyCart" component={MyCartScreen} />
       <PanierStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <PanierStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <PanierStack.Screen name="Cart" component={CartScreen} />
       <PanierStack.Screen name="Checkout" component={CheckoutScreen} />
       <PanierStack.Screen name="Chat" component={ChatScreen} />
@@ -130,6 +135,7 @@ function MoiStackNavigator() {
       <MoiStack.Screen name="MyOrders" component={MyOrdersScreen} />
       <MoiStack.Screen name="CategoryListing" component={CategoryListingScreen} />
       <MoiStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MoiStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <MoiStack.Screen name="Cart" component={CartScreen} />
       <MoiStack.Screen name="Checkout" component={CheckoutScreen} />
       <MoiStack.Screen name="Chat" component={ChatScreen} />
@@ -166,6 +172,7 @@ function MerchantDashboardStackNavigator() {
       <MerchantDashboardStack.Screen name="MerchantOrders" component={MerchantOrdersScreen} />
       <MerchantDashboardStack.Screen name="PostListing" component={PostListingScreen} />
       <MerchantDashboardStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantDashboardStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <MerchantDashboardStack.Screen name="Chat" component={ChatScreen} />
     </MerchantDashboardStack.Navigator>
   );
@@ -177,6 +184,7 @@ function MerchantListingsStackNavigator() {
       <MerchantListingsStack.Screen name="MerchantListingsHome" component={MerchantListingsScreen} />
       <MerchantListingsStack.Screen name="PostListing" component={PostListingScreen} />
       <MerchantListingsStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantListingsStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <MerchantListingsStack.Screen name="Chat" component={ChatScreen} />
     </MerchantListingsStack.Navigator>
   );
@@ -187,6 +195,7 @@ function MerchantOrdersStackNavigator() {
     <MerchantOrdersStack.Navigator screenOptions={{ headerShown: false }}>
       <MerchantOrdersStack.Screen name="MerchantOrdersHome" component={MerchantOrdersScreen} />
       <MerchantOrdersStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantOrdersStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <MerchantOrdersStack.Screen name="Chat" component={ChatScreen} />
     </MerchantOrdersStack.Navigator>
   );
@@ -202,6 +211,7 @@ function MerchantMoiStackNavigator() {
       <MerchantMoiStack.Screen name="MyOrders" component={MyOrdersScreen} />
       <MerchantMoiStack.Screen name="CategoryListing" component={CategoryListingScreen} />
       <MerchantMoiStack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <MerchantMoiStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <MerchantMoiStack.Screen name="Cart" component={CartScreen} />
       <MerchantMoiStack.Screen name="Checkout" component={CheckoutScreen} />
       <MerchantMoiStack.Screen name="Chat" component={ChatScreen} />

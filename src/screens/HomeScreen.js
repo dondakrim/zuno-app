@@ -22,7 +22,7 @@ import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
 import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
-import { getDeviceUserId } from '../lib/deviceUser';
+import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import MasonrySection from '../components/MasonrySection';
 
 const CATEGORY_ICONS = {
@@ -123,11 +123,13 @@ export default function HomeScreen({ navigation }) {
           .eq('acheteur_id', myId)
           .eq('listing_id', listing.id);
       } else {
+        const ok = await ensureAccountComplete(navigation, 'mettre un article de côté');
+        if (!ok) return;
         await supabase.from('wishlist_items').insert({ acheteur_id: myId, listing_id: listing.id });
       }
       loadWishlist();
     },
-    [wishlistIds, loadWishlist]
+    [wishlistIds, loadWishlist, navigation]
   );
 
   // Les avis sont liés au vendeur, pas à un article précis : on calcule

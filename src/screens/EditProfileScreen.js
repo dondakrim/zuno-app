@@ -22,6 +22,8 @@ import { getDeviceUserId } from '../lib/deviceUser';
 export default function EditProfileScreen({ navigation }) {
   const [nom, setNom] = useState('');
   const [telephone, setTelephone] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [email, setEmail] = useState('');
   const [ville, setVille] = useState('');
   const [boutiqueNom, setBoutiqueNom] = useState('');
   const [photoUrl, setPhotoUrl] = useState(null);
@@ -34,13 +36,15 @@ export default function EditProfileScreen({ navigation }) {
     const myId = await getDeviceUserId();
     const { data } = await supabase
       .from('users')
-      .select('nom, telephone, ville, boutique_nom, photo_url')
+      .select('nom, telephone, whatsapp, email, ville, boutique_nom, photo_url')
       .eq('id', myId)
       .maybeSingle();
 
     if (data) {
       setNom(data.nom && data.nom !== 'Toi (test)' ? data.nom : '');
       setTelephone(data.telephone?.startsWith('local-') ? '' : data.telephone || '');
+      setWhatsapp(data.whatsapp || '');
+      setEmail(data.email || '');
       setVille(data.ville || '');
       setBoutiqueNom(data.boutique_nom || '');
       setPhotoUrl(data.photo_url || null);
@@ -98,6 +102,8 @@ export default function EditProfileScreen({ navigation }) {
         .update({
           nom: nom.trim(),
           telephone: telephone.trim() || undefined,
+          whatsapp: whatsapp.trim() || null,
+          email: email.trim() || null,
           ville: ville.trim() || null,
           boutique_nom: boutiqueNom.trim() || null,
           photo_url: finalPhotoUrl,
@@ -158,6 +164,27 @@ export default function EditProfileScreen({ navigation }) {
             value={telephone}
             onChangeText={setTelephone}
             keyboardType="phone-pad"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Numéro WhatsApp</Text>
+          <TextInput
+            placeholder="+227 90 00 00 00"
+            placeholderTextColor={colors.textMuted}
+            value={whatsapp}
+            onChangeText={setWhatsapp}
+            keyboardType="phone-pad"
+            style={styles.input}
+          />
+
+          <Text style={styles.label}>Adresse email (facultatif)</Text>
+          <TextInput
+            placeholder="toi@exemple.com"
+            placeholderTextColor={colors.textMuted}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
             style={styles.input}
           />
 

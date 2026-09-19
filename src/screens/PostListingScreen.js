@@ -17,7 +17,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { colors, spacing, radius } from '../theme/colors';
 import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
-import { getDeviceUserId } from '../lib/deviceUser';
+import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { analyzeListing } from '../lib/moderation';
 
 const conditions = ['Neuf', 'Bon état', 'Usé'];
@@ -25,7 +25,7 @@ const delais = ['1-2 jours', '3-5 jours', '1 semaine', 'Plus d\'une semaine'];
 const MIN_PHOTOS = 4;
 const MAX_PHOTOS = 8;
 
-export default function PostListingScreen() {
+export default function PostListingScreen({ navigation }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
@@ -92,6 +92,9 @@ export default function PostListingScreen() {
   };
 
   const handlePublish = async () => {
+    const ok = await ensureAccountComplete(navigation, 'publier une annonce');
+    if (!ok) return;
+
     if (!title.trim() || !price.trim() || !city.trim()) {
       Alert.alert('Champs manquants', 'Titre, prix et ville sont obligatoires.');
       return;
