@@ -33,6 +33,9 @@ export default function PostListingScreen() {
   const [category, setCategory] = useState(categories[0]);
   const [condition, setCondition] = useState(conditions[1]);
   const [delaiLivraison, setDelaiLivraison] = useState(delais[0]);
+  const [showPromo, setShowPromo] = useState(false);
+  const [promoPrice, setPromoPrice] = useState('');
+  const [certified, setCertified] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
@@ -102,6 +105,19 @@ export default function PostListingScreen() {
       return;
     }
 
+    if (showPromo && promoPrice.trim() && Number(promoPrice) >= Number(price)) {
+      Alert.alert('Prix promo invalide', 'Le prix promo doit être inférieur au prix normal.');
+      return;
+    }
+
+    if (!certified) {
+      Alert.alert(
+        'Certification requise',
+        "Coche la case en bas confirmant que tu es responsable de l'état et de la provenance de cet article avant de publier."
+      );
+      return;
+    }
+
     setSaving(true);
 
     let photoUrls = [];
@@ -150,6 +166,8 @@ export default function PostListingScreen() {
         delai_livraison: delaiLivraison,
         photo_url: photoUrls[0],
         photos: photoUrls,
+        promo_price: showPromo && promoPrice.trim() ? Number(promoPrice) : null,
+        seller_certified: true,
         status: 'disponible',
         moderation_status: moderationStatus,
         moderation_score: analysis.score,
@@ -215,6 +233,9 @@ export default function PostListingScreen() {
     setCity('');
     setPhotos([]);
     setDelaiLivraison(delais[0]);
+    setShowPromo(false);
+    setPromoPrice('');
+    setCertified(false);
   };
 
   return (
@@ -278,6 +299,25 @@ export default function PostListingScreen() {
         style={styles.input}
       />
 
+      <TouchableOpacity style={styles.promoToggle} onPress={() => setShowPromo((v) => !v)}>
+        <Ionicons
+          name={showPromo ? 'checkbox' : 'square-outline'}
+          size={18}
+          color={showPromo ? colors.orange : colors.textMuted}
+        />
+        <Text style={styles.promoToggleText}>Ajouter un prix promo (facultatif)</Text>
+      </TouchableOpacity>
+      {showPromo && (
+        <TextInput
+          placeholder="Prix promo en FCFA (inférieur au prix normal)"
+          placeholderTextColor={colors.textMuted}
+          value={promoPrice}
+          onChangeText={setPromoPrice}
+          keyboardType="numeric"
+          style={styles.input}
+        />
+      )}
+
       <Text style={styles.label}>Catégorie</Text>
       <View style={styles.pillRow}>
         {categories.map((c) => (
@@ -324,6 +364,18 @@ export default function PostListingScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      <TouchableOpacity style={styles.certifyRow} onPress={() => setCertified((v) => !v)}>
+        <Ionicons
+          name={certified ? 'checkbox' : 'square-outline'}
+          size={20}
+          color={certified ? colors.orange : colors.textMuted}
+        />
+        <Text style={styles.certifyText}>
+          Je certifie être seul responsable de l'état et de la provenance de cet article, et
+          confirme qu'il ne s'agit pas d'un article interdit sur Zuno.
+        </Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.publishButton, photos.length < MIN_PHOTOS && styles.publishButtonDisabled]}
@@ -420,4 +472,18 @@ const styles = StyleSheet.create({
   },
   publishButtonDisabled: { opacity: 0.5 },
   publishButtonText: { color: colors.white, fontWeight: '600' },
+  promoToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  promoToggleText: { fontSize: 13, color: colors.textSecondary },
+  certifyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  certifyText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
 });

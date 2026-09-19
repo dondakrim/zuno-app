@@ -28,7 +28,19 @@ export default function TrendingScreen({ navigation }) {
       .eq('moderation_status', 'approved')
       .order('created_at', { ascending: false })
       .limit(40);
-    if (!error && data) setListings(data);
+    if (!error && data) {
+      // Les annonces mises en avant (boost payant en cours) remontent en
+      // premier, le reste garde l'ordre du plus récent au plus ancien.
+      const now = new Date();
+      const sorted = [...data].sort((a, b) => {
+        const aBoosted = a.boost_until && new Date(a.boost_until) > now;
+        const bBoosted = b.boost_until && new Date(b.boost_until) > now;
+        if (aBoosted && !bBoosted) return -1;
+        if (!aBoosted && bBoosted) return 1;
+        return 0;
+      });
+      setListings(sorted);
+    }
     setLoading(false);
   }, []);
 
@@ -66,6 +78,12 @@ export default function TrendingScreen({ navigation }) {
                   <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
                 ) : (
                   <Ionicons name="image-outline" size={26} color={colors.textMuted} />
+                )}
+                {item.boost_until && new Date(item.boost_until) > new Date() && (
+                  <View style={styles.boostBadge}>
+                    <Ionicons name="flash" size={10} color={colors.white} />
+                    <Text style={styles.boostBadgeText}>En vedette</Text>
+                  </View>
                 )}
               </View>
               <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
@@ -108,7 +126,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
     marginBottom: spacing.xs,
+    position: 'relative',
   },
+  boostBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: colors.orange,
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  boostBadgeText: { color: colors.white, fontSize: 9, fontWeight: '700' },
   thumbImage: { width: '100%', height: '100%' },
   cardTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
   cardPrice: { fontSize: 13, fontWeight: '700', color: colors.orange, marginTop: 2 },

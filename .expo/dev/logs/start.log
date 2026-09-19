@@ -2886,3 +2886,53 @@
 {"_e":"metro:client_log","_t":1789790171300,"level":"error","data":["[ReferenceError: Property 'radius' doesn't exist]"]}
 {"_e":"metro:client_log","_t":1789790211487,"level":"error","data":["[ReferenceError: Property 'radius' doesn't exist]"]}
 {"_e":"metro:client_log","_t":1789790262272,"level":"error","data":["[ReferenceError: Property 'radius' doesn't exist]"]}
+{"_e":"root:init","_t":1789827092011,"format":"v0-jsonl","version":"57.0.25"}
+{"_e":"env:mode","_t":1789827092012,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789827092013,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789827092282,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789827092533,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789827092663,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789827093006,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789827106066,"id":"3","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789827106066,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789827106068,"id":"3","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789827106408,"id":"3","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1789827106509,"id":"3","progress":0.04000000000000001,"total":6,"current":2}
+{"_e":"metro:bundling:progress","_t":1789827106612,"id":"3","progress":0.04000000000000001,"total":110,"current":7}
+{"_e":"metro:bundling:progress","_t":1789827106713,"id":"3","progress":0.04000000000000001,"total":124,"current":12}
+{"_e":"metro:bundling:progress","_t":1789827106815,"id":"3","progress":0.04000000000000001,"total":151,"current":20}
+{"_e":"metro:bundling:progress","_t":1789827106918,"id":"3","progress":0.04000000000000001,"total":171,"current":31}
+{"_e":"metro:bundling:progress","_t":1789827107018,"id":"3","progress":0.11325813609467457,"total":208,"current":70}
+{"_e":"metro:bundling:progress","_t":1789827107121,"id":"3","progress":0.23473649420106962,"total":258,"current":125}
+{"_e":"metro:bundling:progress","_t":1789827107227,"id":"3","progress":0.259241369131479,"total":273,"current":139}
+{"_e":"metro:bundling:progress","_t":1789827107328,"id":"3","progress":0.31687206701460463,"total":302,"current":170}
+{"_e":"metro:bundling:progress","_t":1789827107432,"id":"3","progress":0.31687206701460463,"total":393,"current":216}
+{"_e":"metro:bundling:progress","_t":1789827107533,"id":"3","progress":0.35776050310070745,"total":428,"current":256}
+{"_e":"metro:bundling:progress","_t":1789827107633,"id":"3","progress":0.35776050310070745,"total":513,"current":299}
+{"_e":"metro:bundling:progress","_t":1789827107736,"id":"3","progress":0.35914183582361814,"total":559,"current":335}
+{"_e":"metro:bundling:progress","_t":1789827107837,"id":"3","progress":0.3723797703809461,"total":567,"current":346}
+{"_e":"metro:bundling:progress","_t":1789827107937,"id":"3","progress":0.4475308549270265,"total":577,"current":386}
+{"_e":"metro:bundling:progress","_t":1789827108037,"id":"3","progress":0.5581116077315668,"total":597,"current":446}
+{"_e":"metro:bundling:progress","_t":1789827108138,"id":"3","progress":0.5581116077315668,"total":706,"current":516}
+{"_e":"metro:bundling:progress","_t":1789827108238,"id":"3","progress":0.5581116077315668,"total":769,"current":573}
+{"_e":"metro:bundling:progress","_t":1789827108339,"id":"3","progress":0.587162142546088,"total":830,"current":636}
+{"_e":"metro:bundling:progress","_t":1789827108439,"id":"3","progress":0.6718624025799517,"total":854,"current":700}
+{"_e":"metro:bundling:progress","_t":1789827108539,"id":"3","progress":0.7161224415246115,"total":891,"current":754}
+{"_e":"metro:bundling:progress","_t":1789827108639,"id":"3","progress":0.7161224415246115,"total":993,"current":810}
+{"_e":"metro:bundling:progress","_t":1789827108740,"id":"3","progress":0.7161224415246115,"total":1028,"current":859}
+{"_e":"metro:bundling:progress","_t":1789827108840,"id":"3","progress":0.770681397928994,"total":1040,"current":913}
+{"_e":"metro:bundling:progress","_t":1789827108943,"id":"3","progress":0.7804684565033404,"total":1081,"current":955}
+{"_e":"metro:bundling:progress","_t":1789827109043,"id":"3","progress":0.7999591093328469,"total":1108,"current":991}
+{"_e":"metro:bundling:progress","_t":1789827109144,"id":"3","progress":0.8703321161926644,"total":1118,"current":1043}
+{"_e":"metro:bundling:progress","_t":1789827109244,"id":"3","progress":0.9289352794952671,"total":1133,"current":1092}
+{"_e":"metro:bundling:progress","_t":1789827109367,"id":"3","progress":0.958767361111111,"total":1152,"current":1128}
+{"_e":"metro:bundling:progress","_t":1789827109467,"id":"3","progress":0.9982766052318669,"total":1160,"current":1159}
+{"_e":"metro:bundling:progress","_t":1789827109795,"id":"3","progress":0.999,"total":1160,"current":1160}
+{"_e":"metro:bundling:progress","_t":1789827109897,"id":"3","progress":0.999,"total":1171,"current":1171}
+{"_e":"metro:bundling:done","_t":1789827109981,"id":"3","total":1171,"ms":3915.410958}
+{"_e":"metro:bundling:started","_t":1789827677532,"id":"4","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789827677536,"id":"4","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1789827677657,"id":"4","total":1,"ms":123.450292}
+{"_e":"metro:client_log","_t":1789828982519,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
+{"_e":"metro:client_log","_t":1789828990025,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
+{"_e":"metro:client_log","_t":1789828997349,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}

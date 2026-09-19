@@ -115,15 +115,19 @@
       <button class="tab-btn" data-tab="moderation">Modération</button>
       <button class="tab-btn" data-tab="identites">Identités</button>
       <button class="tab-btn" data-tab="publicites">Publicités</button>
+      <button class="tab-btn" data-tab="boosts">Mises en avant</button>
+      <button class="tab-btn" data-tab="utilisateurs">Utilisateurs</button>
     </div>
 
     <div class="panel active" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-boosts"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-utilisateurs"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-publicites">
       <div class="card">
         <p class="card-title" style="margin-bottom: 12px;">Ajouter une publicité</p>
-        <input type="text" id="ad-title" placeholder="Titre (ex: Vends en 5 minutes)">
+        <input type="text" id="ad-title" placeholder="Titre (facultatif si ton image contient déjà son texte)">
         <input type="text" id="ad-subtitle" placeholder="Sous-titre (facultatif)">
         <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Couleur de fond (si pas d'image)</label>
         <input type="color" id="ad-color" value="#2E0B8C" style="height:40px; padding:4px; margin-bottom:10px;">
@@ -199,6 +203,8 @@ async function checkAdminAndInit() {
   loadModeration();
   loadIdentites();
   loadAds();
+  loadBoosts();
+  loadUsers();
 }
 
 async function loadLitiges() {
@@ -319,7 +325,7 @@ async function loadAds() {
   list.innerHTML = data.map((ad) => `
     <div class="card" data-id="${ad.id}">
       ${ad.image_url ? '<div style="width:100%; height:140px; overflow:hidden; border-radius:8px; margin-bottom:10px;"><img src="' + ad.image_url + '" style="width:100%; height:100%; object-fit:cover; display:block;"></div>' : ''}
-      <p class="card-title">${ad.title}</p>
+      <p class="card-title">${ad.title || '(image sans titre)'}</p>
       ${ad.subtitle ? '<p class="card-sub">' + ad.subtitle + '</p>' : ''}
       <span class="pill">${ad.active ? 'Active' : 'Désactivée'}</span>
       <div class="actions">
@@ -338,15 +344,18 @@ async function addAd() {
   const btn = document.getElementById('ad-submit-btn');
   const file = fileInput.files[0];
 
-  if (!title) { alert('Le titre est obligatoire.'); return; }
+  if (!title && !file) { alert('Indique au moins un titre ou une image.'); return; }
 
   btn.disabled = true;
   btn.textContent = 'Envoi…';
 
   let imageUrl = null;
   if (file) {
-    const fileName = Date.now() + '-' + file.name.replace(/\s+/g, '-');
-    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, file);
+    const extension = file.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const fileName = Date.now() + '.' + extension;
+    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, file, {
+      contentType: file.type || 'image/png',
+    });
     if (uploadError) {
       alert('Erreur upload image : ' + uploadError.message);
       btn.disabled = false;
@@ -380,6 +389,103 @@ async function deleteAd(id) {
   const { error } = await sb.from('ads').delete().eq('id', id);
   if (error) { alert('Erreur : ' + error.message); return; }
   loadAds();
+}
+
+async function loadBoosts() {
+  const panel = document.getElementById('panel-boosts');
+  const { data, error } = await sb
+    .from('boost_requests')
+    .select('*, listings(title), vendeur:users!boost_requests_vendeur_id_fkey(nom, telephone)')
+    .eq('status', 'en_attente')
+    .order('created_at', { ascending: false });
+
+  if (error) { panel.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { panel.innerHTML = '<div class="empty">Aucune demande de mise en avant en attente.</div>'; return; }
+
+  panel.innerHTML = data.map((b) => `
+    <div class="card" data-id="${b.id}">
+      <p class="card-title">${b.listings?.title || 'Annonce'}</p>
+      <p class="card-sub">${b.vendeur?.nom || '—'} · ${b.vendeur?.telephone || ''}</p>
+      <span class="pill">${b.amount} FCFA · ${b.duration_days} jours</span>
+      <div class="actions">
+        <button class="btn btn-approve" onclick="confirmBoost('${b.id}', '${b.listing_id}', ${b.duration_days})">Paiement reçu</button>
+        <button class="btn btn-reject" onclick="rejectBoost('${b.id}')">Rejeter</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function confirmBoost(requestId, listingId, durationDays) {
+  const boostUntil = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000).toISOString();
+  const { error: e1 } = await sb.from('boost_requests')
+    .update({ status: 'paye', confirmed_at: new Date().toISOString() })
+    .eq('id', requestId);
+  const { error: e2 } = await sb.from('listings').update({ boost_until: boostUntil }).eq('id', listingId);
+  if (e1 || e2) { alert('Erreur : ' + (e1 || e2).message); return; }
+  loadBoosts();
+}
+
+async function rejectBoost(requestId) {
+  const { error } = await sb.from('boost_requests').update({ status: 'rejete' }).eq('id', requestId);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadBoosts();
+}
+
+async function loadUsers() {
+  const panel = document.getElementById('panel-utilisateurs');
+
+  const [{ data: blockedListings }, { data: disputes }, { data: users }] = await Promise.all([
+    sb.from('listings').select('vendeur_id').eq('moderation_status', 'blocked'),
+    sb.from('order_disputes').select('order_id, status').eq('status', 'ouvert'),
+    sb.from('users').select('id, nom, telephone, is_banned, ban_reason'),
+  ]);
+
+  const blockedCounts = {};
+  (blockedListings || []).forEach((l) => {
+    if (l.vendeur_id) blockedCounts[l.vendeur_id] = (blockedCounts[l.vendeur_id] || 0) + 1;
+  });
+
+  // Les litiges sont liés à une commande, pas directement à un vendeur :
+  // on ne peut pas les rattacher sans une requête supplémentaire par
+  // commande, donc on affiche seulement les annonces bloquées ici pour
+  // rester simple — le nombre de litiges se consulte dans l'onglet Litiges.
+  const risky = (users || [])
+    .map((u) => ({ ...u, blockedCount: blockedCounts[u.id] || 0 }))
+    .filter((u) => u.blockedCount > 0 || u.is_banned)
+    .sort((a, b) => b.blockedCount - a.blockedCount);
+
+  if (risky.length === 0) {
+    panel.innerHTML = '<div class="empty">Aucun compte signalé pour l\'instant.</div>';
+    return;
+  }
+
+  panel.innerHTML = risky.map((u) => `
+    <div class="card" data-id="${u.id}">
+      <p class="card-title">${u.nom || 'Sans nom'}</p>
+      <p class="card-sub">${u.telephone || ''}</p>
+      <span class="pill">${u.blockedCount} annonce(s) bloquée(s)</span>
+      ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Compte suspendu</span>' : ''}
+      ${u.ban_reason ? '<p class="card-meta">Motif : ' + u.ban_reason + '</p>' : ''}
+      <div class="actions">
+        ${u.is_banned
+          ? `<button class="btn btn-approve" onclick="setBan('${u.id}', false, null)">Réactiver le compte</button>`
+          : `<button class="btn btn-reject" onclick="banUser('${u.id}')">Suspendre ce compte</button>`
+        }
+      </div>
+    </div>
+  `).join('');
+}
+
+async function banUser(userId) {
+  const reason = prompt('Motif de la suspension (visible par la personne concernée) :');
+  if (reason === null) return;
+  await setBan(userId, true, reason);
+}
+
+async function setBan(userId, banned, reason) {
+  const { error } = await sb.from('users').update({ is_banned: banned, ban_reason: reason }).eq('id', userId);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadUsers();
 }
 
 // Reprend automatiquement la session si déjà connecté (évite de se

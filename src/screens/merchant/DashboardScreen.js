@@ -43,6 +43,7 @@ export default function MerchantDashboardScreen({ navigation }) {
   const { switchMode } = useMode();
   const [loading, setLoading] = useState(true);
   const [listings, setListings] = useState([]);
+  const [boostByListing, setBoostByListing] = useState({});
   const [stats, setStats] = useState({ actives: 0, enAttente: 0, chiffreAffaires: 0, favoris: 0 });
   const [solde, setSolde] = useState(0);
   const [recentOrders, setRecentOrders] = useState([]);
@@ -60,6 +61,20 @@ export default function MerchantDashboardScreen({ navigation }) {
       .select('*, orders(*, deliveries(*))')
       .eq('vendeur_id', myId)
       .order('created_at', { ascending: false });
+
+    const listingIds = (myListings || []).map((l) => l.id);
+    if (listingIds.length > 0) {
+      const { data: boosts } = await supabase
+        .from('boost_requests')
+        .select('*')
+        .in('listing_id', listingIds)
+        .eq('status', 'en_attente');
+      const map = {};
+      (boosts || []).forEach((b) => {
+        map[b.listing_id] = b;
+      });
+      setBoostByListing(map);
+    }
 
     const { data: orders } = await supabase
       .from('orders')
@@ -129,6 +144,37 @@ export default function MerchantDashboardScreen({ navigation }) {
               Alert.alert('Erreur', `Détail technique : ${error.message}`);
               return;
             }
+            loadDashboard();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBoostListing = (listing) => {
+    Alert.alert(
+      'Mettre en avant cette annonce',
+      "« " + listing.title + " » apparaîtra en priorité dans Tendances pendant 3 jours, pour 500 FCFA. Le paiement se fait pour l'instant par mobile money, confirmé manuellement (le paiement en ligne automatique arrive bientôt). Continuer ?",
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Demander la mise en avant',
+          onPress: async () => {
+            const myId = await getDeviceUserId();
+            const { error } = await supabase.from('boost_requests').insert({
+              listing_id: listing.id,
+              vendeur_id: myId,
+              amount: 500,
+              duration_days: 3,
+            });
+            if (error) {
+              Alert.alert('Erreur', `Détail technique : ${error.message}`);
+              return;
+            }
+            Alert.alert(
+              'Demande envoyée',
+              "On te contactera pour le règlement des 500 FCFA. L'annonce sera mise en avant dès la confirmation du paiement."
+            );
             loadDashboard();
           },
         },
@@ -290,6 +336,29 @@ export default function MerchantDashboardScreen({ navigation }) {
                 <Ionicons name="trash-outline" size={14} color={colors.danger} />
                 <Text style={styles.removeButtonText}>Retirer l'annonce</Text>
               </TouchableOpacity>
+
+              {item.status !== 'vendu' && (
+                <>
+                  {item.boost_until && new Date(item.boost_until) > new Date() ? (
+                    <View style={styles.boostActiveBadge}>
+                      <Ionicons name="flash" size={12} color={colors.orange} />
+                      <Text style={styles.boostActiveBadgeText}>
+                        En vedette jusqu'au {new Date(item.boost_until).toLocaleDateString('fr-FR')}
+                      </Text>
+                    </View>
+                  ) : boostByListing[item.id] ? (
+                    <View style={styles.boostActiveBadge}>
+                      <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+                      <Text style={styles.boostPendingText}>En attente de paiement (500 FCFA)</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.boostButton} onPress={() => handleBoostListing(item)}>
+                      <Ionicons name="flash-outline" size={14} color={colors.purple} />
+                      <Text style={styles.boostButtonText}>Mettre en avant (500 FCFA / 3j)</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              )}
             </View>
           )}
         />
@@ -449,4 +518,25 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   removeButtonText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
+  boostButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  boostButtonText: { fontSize: 12, color: colors.purple, fontWeight: '700' },
+  boostActiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  boostActiveBadgeText: { fontSize: 11, color: colors.orange, fontWeight: '700' },
+  boostPendingText: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
 });
