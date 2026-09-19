@@ -29,15 +29,16 @@ export default function TrendingScreen({ navigation }) {
       .order('created_at', { ascending: false })
       .limit(40);
     if (!error && data) {
-      // Les annonces mises en avant (boost payant en cours) remontent en
-      // premier, le reste garde l'ordre du plus récent au plus ancien.
+      // Priorité : d'abord les annonces boostées, puis triées par le
+      // champ "priority" fixé depuis le tableau de bord admin, puis par
+      // date de publication.
       const now = new Date();
       const sorted = [...data].sort((a, b) => {
         const aBoosted = a.boost_until && new Date(a.boost_until) > now;
         const bBoosted = b.boost_until && new Date(b.boost_until) > now;
         if (aBoosted && !bBoosted) return -1;
         if (!aBoosted && bBoosted) return 1;
-        return 0;
+        return (b.priority || 0) - (a.priority || 0);
       });
       setListings(sorted);
     }

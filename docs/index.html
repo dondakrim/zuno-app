@@ -117,6 +117,8 @@
       <button class="tab-btn" data-tab="publicites">Publicités</button>
       <button class="tab-btn" data-tab="boosts">Mises en avant</button>
       <button class="tab-btn" data-tab="utilisateurs">Utilisateurs</button>
+      <button class="tab-btn" data-tab="articles">Articles</button>
+      <button class="tab-btn" data-tab="marchands">Marchands</button>
     </div>
 
     <div class="panel active" id="panel-litiges"><div class="loading">Chargement…</div></div>
@@ -124,6 +126,21 @@
     <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-boosts"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-utilisateurs"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-articles">
+      <div class="card" style="margin-bottom: 16px;">
+        <input type="text" id="articles-search" placeholder="Rechercher un article (titre)…" oninput="loadArticles()" style="margin-bottom: 10px;">
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:6px;">Trier par</label>
+        <select id="articles-sort" onchange="loadArticles()" style="width:100%; padding:9px; border-radius:8px; border:1px solid var(--border); font-size:14px;">
+          <option value="priority">Priorité (décroissant)</option>
+          <option value="recent">Plus récent</option>
+          <option value="price_desc">Prix décroissant</option>
+          <option value="price_asc">Prix croissant</option>
+          <option value="boosted">En vedette d'abord</option>
+        </select>
+      </div>
+      <div id="articles-list"><div class="loading">Chargement…</div></div>
+    </div>
+    <div class="panel" id="panel-marchands"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-publicites">
       <div class="card">
         <p class="card-title" style="margin-bottom: 12px;">Ajouter une publicité</p>
@@ -205,6 +222,8 @@ async function checkAdminAndInit() {
   loadAds();
   loadBoosts();
   loadUsers();
+  loadArticles();
+  loadMerchants();
 }
 
 async function loadLitiges() {
@@ -542,6 +561,150 @@ async function setBan(userId, banned, reason) {
 sb.auth.getSession().then(({ data: { session } }) => {
   if (session) checkAdminAndInit();
 });
+
+// ---------- Articles (toutes les annonces de l'appli) ----------
+
+async function loadArticles() {
+  const list = document.getElementById('articles-list');
+  const search = (document.getElementById('articles-search')?.value || '').toLowerCase();
+  const sortBy = document.getElementById('articles-sort')?.value || 'priority';
+
+  const { data, error } = await sb
+    .from('listings')
+    .select('*, vendeur:users!listings_vendeur_id_fkey(nom, boutique_nom)');
+
+  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data) { list.innerHTML = '<div class="empty">Aucun article.</div>'; return; }
+
+  const now = new Date();
+  let filtered = data.filter((l) => !search || l.title?.toLowerCase().includes(search));
+
+  filtered.sort((a, b) => {
+    if (sortBy === 'priority') return (b.priority || 0) - (a.priority || 0);
+    if (sortBy === 'price_desc') return b.price - a.price;
+    if (sortBy === 'price_asc') return a.price - b.price;
+    if (sortBy === 'boosted') {
+      const aBoost = a.boost_until && new Date(a.boost_until) > now ? 1 : 0;
+      const bBoost = b.boost_until && new Date(b.boost_until) > now ? 1 : 0;
+      return bBoost - aBoost;
+    }
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+
+  if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucun article ne correspond.</div>'; return; }
+
+  list.innerHTML = filtered.map((l) => {
+    const isBoosted = l.boost_until && new Date(l.boost_until) > now;
+    const isHidden = l.moderation_status === 'blocked';
+    return `
+    <div class="card" data-id="${l.id}">
+      ${l.photo_url ? '<img src="' + l.photo_url + '" style="width:100%; max-height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;">' : ''}
+      <p class="card-title">${l.title}</p>
+      <p class="card-sub">${l.vendeur?.boutique_nom || l.vendeur?.nom || 'Vendeur inconnu'} · ${l.city || ''}</p>
+      <span class="pill">${Number(l.price).toLocaleString('fr-FR')} FCFA</span>
+      <span class="pill">${l.category || ''}</span>
+      <span class="pill">${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span>
+      ${isHidden ? '<span class="pill" style="background:var(--danger); color:#fff;">Masquée</span>' : ''}
+      ${isBoosted ? '<span class="pill" style="background:var(--orange); color:#fff;">En vedette</span>' : ''}
+      <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+        <label style="font-size:12px; color: var(--text-secondary);">Priorité :</label>
+        <input type="number" value="${l.priority || 0}" style="width:70px; padding:6px; border:1px solid var(--border); border-radius:6px;"
+          onchange="updatePriority('${l.id}', this.value)">
+      </div>
+      <div class="actions">
+        <button class="btn btn-approve" onclick="boostFromAdmin('${l.id}')">${isBoosted ? 'Prolonger 3j' : 'Mettre en avant 3j'}</button>
+        <button class="btn ${isHidden ? 'btn-approve' : 'btn-reject'}" onclick="toggleArticleVisibility('${l.id}', ${isHidden})">${isHidden ? 'Afficher' : 'Masquer'}</button>
+        <button class="btn btn-reject" onclick="deleteArticleAdmin('${l.id}')">Supprimer</button>
+      </div>
+    </div>
+  `;
+  }).join('');
+}
+
+async function updatePriority(id, value) {
+  const { error } = await sb.from('listings').update({ priority: parseInt(value, 10) || 0 }).eq('id', id);
+  if (error) alert('Erreur : ' + error.message);
+}
+
+async function boostFromAdmin(id) {
+  const boostUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await sb.from('listings').update({ boost_until: boostUntil }).eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadArticles();
+}
+
+async function toggleArticleVisibility(id, currentlyHidden) {
+  const { error } = await sb.from('listings')
+    .update({ moderation_status: currentlyHidden ? 'approved' : 'blocked' })
+    .eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadArticles();
+}
+
+async function deleteArticleAdmin(id) {
+  if (!confirm('Supprimer définitivement cet article ? Cette action échouera si des commandes y sont déjà liées.')) return;
+  const { error } = await sb.from('listings').delete().eq('id', id);
+  if (error) { alert("Impossible de supprimer : " + error.message + " (probablement des commandes déjà liées à cet article — utilise \"Masquer\" à la place)"); return; }
+  loadArticles();
+}
+
+// ---------- Marchands (profil, solde, ventes, commandes) ----------
+
+async function loadMerchants() {
+  const panel = document.getElementById('panel-marchands');
+
+  const [{ data: users }, { data: listings }, { data: orders }] = await Promise.all([
+    sb.from('users').select('id, nom, telephone, boutique_nom, is_banned, identity_status'),
+    sb.from('listings').select('id, vendeur_id, status'),
+    sb.from('orders').select('montant, listing_id, deliveries(statut_livraison), listings!inner(vendeur_id)'),
+  ]);
+
+  if (!users || !listings) { panel.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
+
+  const sellerIds = new Set(listings.map((l) => l.vendeur_id).filter(Boolean));
+  const merchants = users.filter((u) => sellerIds.has(u.id));
+
+  const stats = {};
+  merchants.forEach((m) => {
+    stats[m.id] = { totalListings: 0, activeListings: 0, soldListings: 0, ordersPending: 0, revenue: 0 };
+  });
+  listings.forEach((l) => {
+    if (!stats[l.vendeur_id]) return;
+    stats[l.vendeur_id].totalListings++;
+    if (l.status === 'disponible') stats[l.vendeur_id].activeListings++;
+    if (l.status === 'vendu') stats[l.vendeur_id].soldListings++;
+  });
+  (orders || []).forEach((o) => {
+    const vendeurId = o.listings?.vendeur_id;
+    if (!vendeurId || !stats[vendeurId]) return;
+    const status = o.deliveries?.[0]?.statut_livraison;
+    if (status === 'livre') {
+      stats[vendeurId].revenue += Number(o.montant || 0);
+    } else if (status && status !== 'annulee') {
+      stats[vendeurId].ordersPending++;
+    }
+  });
+
+  const sorted = merchants.sort((a, b) => stats[b.id].revenue - stats[a.id].revenue);
+
+  if (sorted.length === 0) { panel.innerHTML = '<div class="empty">Aucun marchand pour l\'instant.</div>'; return; }
+
+  panel.innerHTML = sorted.map((m) => {
+    const s = stats[m.id];
+    return `
+    <div class="card" data-id="${m.id}">
+      <p class="card-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
+      <p class="card-sub">${m.telephone || ''}</p>
+      <span class="pill">Solde : ${s.revenue.toLocaleString('fr-FR')} FCFA</span>
+      <span class="pill">${s.soldListings} vendu(s)</span>
+      <span class="pill">${s.activeListings} en vente</span>
+      <span class="pill">${s.ordersPending} en commande</span>
+      ${m.identity_status === 'verifiee' ? '<span class="pill" style="background:#0B6BA8; color:#fff;">Identité vérifiée</span>' : ''}
+      ${m.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
+    </div>
+  `;
+  }).join('');
+}
 </script>
 </body>
 </html>

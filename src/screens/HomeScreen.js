@@ -192,10 +192,20 @@ export default function HomeScreen({ navigation }) {
 
   // Nouveautés : les annonces les plus récentes.
   const newArrivals = listings.slice(0, 8);
-  // En vedette : approximation simple en attendant un vrai système de mise
-  // en avant payante — les articles au prix le plus élevé, qui ont souvent
-  // le plus besoin de visibilité.
-  const featured = [...listings].sort((a, b) => b.price - a.price).slice(0, 8);
+  // En vedette : d'abord les annonces boostées ou avec une priorité fixée
+  // depuis le tableau de bord admin, puis les prix les plus élevés.
+  const now = new Date();
+  const featured = [...listings]
+    .sort((a, b) => {
+      const aBoosted = a.boost_until && new Date(a.boost_until) > now;
+      const bBoosted = b.boost_until && new Date(b.boost_until) > now;
+      if (aBoosted && !bBoosted) return -1;
+      if (!aBoosted && bBoosted) return 1;
+      const priorityDiff = (b.priority || 0) - (a.priority || 0);
+      if (priorityDiff !== 0) return priorityDiff;
+      return b.price - a.price;
+    })
+    .slice(0, 8);
   // Une section par catégorie qui a au moins un article, limitée à 8
   // articles chacune sur l'accueil (le reste via "Voir tout").
   const categorySections = categories

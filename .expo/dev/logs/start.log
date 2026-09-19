@@ -2985,3 +2985,55 @@
 {"_e":"metro:client_log","_t":1789830572773,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
 {"_e":"metro:client_log","_t":1789830572774,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
 {"_e":"metro:client_log","_t":1789830572774,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
+{"_e":"root:init","_t":1789830712438,"format":"v0-jsonl","version":"57.0.25"}
+{"_e":"env:mode","_t":1789830712438,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789830712439,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789830712677,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789830712871,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789830712993,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789830713386,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1789830723250,"id":"1","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789830723250,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789830723252,"id":"1","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1789830723564,"id":"1","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1789830723665,"id":"1","progress":0.19753086419753085,"total":18,"current":8}
+{"_e":"metro:bundling:progress","_t":1789830723765,"id":"1","progress":0.19753086419753085,"total":55,"current":21}
+{"_e":"metro:bundling:progress","_t":1789830723865,"id":"1","progress":0.40876108572964265,"total":61,"current":39}
+{"_e":"metro:bundling:progress","_t":1789830723967,"id":"1","progress":0.5933162892622352,"total":74,"current":57}
+{"_e":"metro:bundling:progress","_t":1789830724067,"id":"1","progress":0.5933162892622352,"total":232,"current":76}
+{"_e":"metro:bundling:progress","_t":1789830724170,"id":"1","progress":0.5933162892622352,"total":258,"current":101}
+{"_e":"metro:bundling:progress","_t":1789830724271,"id":"1","progress":0.5933162892622352,"total":307,"current":135}
+{"_e":"metro:bundling:progress","_t":1789830724372,"id":"1","progress":0.5933162892622352,"total":338,"current":159}
+{"_e":"metro:bundling:progress","_t":1789830724471,"id":"1","progress":0.5933162892622352,"total":394,"current":219}
+{"_e":"metro:bundling:progress","_t":1789830724572,"id":"1","progress":0.5933162892622352,"total":463,"current":262}
+{"_e":"metro:bundling:progress","_t":1789830724675,"id":"1","progress":0.5933162892622352,"total":475,"current":275}
+{"_e":"metro:bundling:progress","_t":1789830724776,"id":"1","progress":0.5933162892622352,"total":509,"current":320}
+{"_e":"metro:bundling:progress","_t":1789830724876,"id":"1","progress":0.5933162892622352,"total":609,"current":399}
+{"_e":"metro:bundling:progress","_t":1789830724976,"id":"1","progress":0.5933162892622352,"total":713,"current":464}
+{"_e":"metro:bundling:progress","_t":1789830725076,"id":"1","progress":0.5933162892622352,"total":767,"current":492}
+{"_e":"metro:bundling:progress","_t":1789830725176,"id":"1","progress":0.5933162892622352,"total":796,"current":539}
+{"_e":"metro:bundling:progress","_t":1789830725277,"id":"1","progress":0.5933162892622352,"total":855,"current":611}
+{"_e":"metro:bundling:progress","_t":1789830725411,"id":"1","progress":0.5933162892622352,"total":879,"current":633}
+{"_e":"metro:bundling:progress","_t":1789830725511,"id":"1","progress":0.5933162892622352,"total":936,"current":671}
+{"_e":"metro:bundling:progress","_t":1789830725612,"id":"1","progress":0.5933162892622352,"total":952,"current":721}
+{"_e":"metro:bundling:progress","_t":1789830725712,"id":"1","progress":0.6380698678995502,"total":994,"current":794}
+{"_e":"metro:bundling:progress","_t":1789830725812,"id":"1","progress":0.6764819158993032,"total":1014,"current":834}
+{"_e":"metro:bundling:progress","_t":1789830725912,"id":"1","progress":0.7041681689802296,"total":1032,"current":866}
+{"_e":"metro:bundling:progress","_t":1789830726012,"id":"1","progress":0.7379847754605648,"total":1043,"current":896}
+{"_e":"metro:bundling:progress","_t":1789830726112,"id":"1","progress":0.7601508368184605,"total":1077,"current":939}
+{"_e":"metro:bundling:progress","_t":1789830726213,"id":"1","progress":0.8126060711097449,"total":1106,"current":997}
+{"_e":"metro:bundling:progress","_t":1789830726314,"id":"1","progress":0.8342865114795918,"total":1120,"current":1023}
+{"_e":"metro:bundling:progress","_t":1789830726415,"id":"1","progress":0.8412303578777428,"total":1123,"current":1030}
+{"_e":"metro:bundling:progress","_t":1789830726515,"id":"1","progress":0.8638833677046494,"total":1134,"current":1054}
+{"_e":"metro:bundling:progress","_t":1789830726615,"id":"1","progress":0.921331956665418,"total":1146,"current":1100}
+{"_e":"metro:bundling:progress","_t":1789830726715,"id":"1","progress":0.968913824485817,"total":1149,"current":1131}
+{"_e":"metro:bundling:progress","_t":1789830726815,"id":"1","progress":0.9965457711468801,"total":1157,"current":1155}
+{"_e":"metro:bundling:progress","_t":1789830726934,"id":"1","progress":0.9982721385516292,"total":1157,"current":1156}
+{"_e":"metro:bundling:progress","_t":1789830727034,"id":"1","progress":0.999,"total":1171,"current":1171}
+{"_e":"metro:bundling:done","_t":1789830727179,"id":"1","total":1171,"ms":3929.064708}
+{"_e":"metro:bundling:started","_t":1789831404315,"id":"2","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1789831404315,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:done","_t":1789831404382,"id":"2","total":1,"ms":67.247917}
+{"_e":"metro:client_log","_t":1789831778163,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
+{"_e":"metro:client_log","_t":1789831778163,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
+{"_e":"metro:client_log","_t":1789831778164,"level":"error","data":["Erreur création identité de test:","\n\n\u001b[1mCall Stack\u001b[22m\n\u001b[2m\u001b[90m  CodedError (http:/10.178.209.140:8081/node_modules/expo/AppEntry.bundle)\u001b[39m\u001b[22m"]}
