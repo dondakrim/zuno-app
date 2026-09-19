@@ -140,7 +140,7 @@
 // Remplace ces deux valeurs par celles de ton projet Supabase
 // (Project Settings > API dans le tableau de bord Supabase) —
 // exactement les mêmes que dans src/lib/supabase.js de l'appli mobile.
-const SUPABASE_URL = 'https://pxtapnrcottfulhlezdq.supabase.co/';
+const SUPABASE_URL = 'https://pxtapnrcottfulhlezdq.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGFwbnJjb3R0ZnVsaGxlemRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDg2MTEsImV4cCI6MjEwNDgyNDYxMX0.RaenFO9NKUkfEuo6RfkNKu22hbXesehm8KDQFFMm4VM';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -336,6 +336,7 @@ async function addAd() {
   const color = document.getElementById('ad-color').value;
   const fileInput = document.getElementById('ad-image');
   const btn = document.getElementById('ad-submit-btn');
+  const file = fileInput.files[0];
 
   if (!title) { alert('Le titre est obligatoire.'); return; }
 
@@ -343,7 +344,6 @@ async function addAd() {
   btn.textContent = 'Envoi…';
 
   let imageUrl = null;
-  const file = fileInput.files[0];
   if (file) {
     const fileName = Date.now() + '-' + file.name.replace(/\s+/g, '-');
     const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, file);
