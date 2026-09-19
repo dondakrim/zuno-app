@@ -554,6 +554,7 @@ async function setBan(userId, banned, reason) {
     type: 'moderation',
   });
   loadUsers();
+  loadMerchants();
 }
 
 // Reprend automatiquement la session si déjà connecté (évite de se
@@ -571,7 +572,7 @@ async function loadArticles() {
 
   const { data, error } = await sb
     .from('listings')
-    .select('*, vendeur:users!listings_vendeur_id_fkey(nom, boutique_nom)');
+    .select('*, vendeur:users!listings_vendeur_id_fkey(nom, telephone, boutique_nom, ville)');
 
   if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
   if (!data) { list.innerHTML = '<div class="empty">Aucun article.</div>'; return; }
@@ -603,15 +604,26 @@ async function loadArticles() {
       <p class="card-sub">${l.vendeur?.boutique_nom || l.vendeur?.nom || 'Vendeur inconnu'} · ${l.city || ''}</p>
       <span class="pill">${Number(l.price).toLocaleString('fr-FR')} FCFA</span>
       <span class="pill">${l.category || ''}</span>
+      <span class="pill">${l.condition || ''}</span>
       <span class="pill">${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span>
       ${isHidden ? '<span class="pill" style="background:var(--danger); color:#fff;">Masquée</span>' : ''}
       ${isBoosted ? '<span class="pill" style="background:var(--orange); color:#fff;">En vedette</span>' : ''}
+
+      <div id="article-detail-${l.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+        <p class="card-meta"><strong>Description :</strong> ${l.description || '—'}</p>
+        <p class="card-meta"><strong>Lieu :</strong> ${l.city || '—'} · <strong>Délai livraison :</strong> ${l.delai_livraison || '—'}</p>
+        <p class="card-meta"><strong>Vendeur :</strong> ${l.vendeur?.nom || '—'} · ${l.vendeur?.telephone || '—'} · ${l.vendeur?.ville || ''}</p>
+        <p class="card-meta"><strong>Score de modération :</strong> ${l.moderation_score ?? 0}${l.moderation_flags?.length ? ' · signaux : ' + l.moderation_flags.map(f => f.matched || f).join(', ') : ''}</p>
+        <div id="article-history-${l.id}"><p class="card-meta">Chargement de l'historique…</p></div>
+      </div>
+
       <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
         <label style="font-size:12px; color: var(--text-secondary);">Priorité :</label>
         <input type="number" value="${l.priority || 0}" style="width:70px; padding:6px; border:1px solid var(--border); border-radius:6px;"
           onchange="updatePriority('${l.id}', this.value)">
       </div>
       <div class="actions">
+        <button class="btn btn-approve" onclick="toggleArticleDetail('${l.id}')">Voir détails</button>
         <button class="btn btn-approve" onclick="boostFromAdmin('${l.id}')">${isBoosted ? 'Prolonger 3j' : 'Mettre en avant 3j'}</button>
         <button class="btn ${isHidden ? 'btn-approve' : 'btn-reject'}" onclick="toggleArticleVisibility('${l.id}', ${isHidden})">${isHidden ? 'Afficher' : 'Masquer'}</button>
         <button class="btn btn-reject" onclick="deleteArticleAdmin('${l.id}')">Supprimer</button>
@@ -619,6 +631,29 @@ async function loadArticles() {
     </div>
   `;
   }).join('');
+}
+
+async function toggleArticleDetail(id) {
+  const el = document.getElementById('article-detail-' + id);
+  if (!el) return;
+  const opening = el.style.display === 'none';
+  el.style.display = opening ? 'block' : 'none';
+  if (!opening) return;
+
+  const historyEl = document.getElementById('article-history-' + id);
+  const { data, error } = await sb
+    .from('moderation_logs')
+    .select('*')
+    .eq('listing_id', id)
+    .order('created_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    historyEl.innerHTML = '<p class="card-meta">Aucun historique de modération.</p>';
+    return;
+  }
+  historyEl.innerHTML = '<p class="card-meta"><strong>Historique :</strong></p>' + data.map((h) =>
+    '<p class="card-meta">' + new Date(h.created_at).toLocaleString('fr-FR') + ' — ' + h.action + ' (' + h.actor_type + ')</p>'
+  ).join('');
 }
 
 async function updatePriority(id, value) {
@@ -650,12 +685,14 @@ async function deleteArticleAdmin(id) {
 
 // ---------- Marchands (profil, solde, ventes, commandes) ----------
 
+let merchantsData = {};
+
 async function loadMerchants() {
   const panel = document.getElementById('panel-marchands');
 
   const [{ data: users }, { data: listings }, { data: orders }] = await Promise.all([
-    sb.from('users').select('id, nom, telephone, boutique_nom, is_banned, identity_status'),
-    sb.from('listings').select('id, vendeur_id, status'),
+    sb.from('users').select('id, nom, telephone, ville, photo_url, boutique_nom, is_banned, ban_reason, identity_status'),
+    sb.from('listings').select('id, vendeur_id, status, moderation_status'),
     sb.from('orders').select('montant, listing_id, deliveries(statut_livraison), listings!inner(vendeur_id)'),
   ]);
 
@@ -666,26 +703,32 @@ async function loadMerchants() {
 
   const stats = {};
   merchants.forEach((m) => {
-    stats[m.id] = { totalListings: 0, activeListings: 0, soldListings: 0, ordersPending: 0, revenue: 0 };
+    stats[m.id] = {
+      totalListings: 0, activeListings: 0, soldListings: 0, hiddenListings: 0,
+      aTraiter: 0, prisEnCharge: 0, enCours: 0, livre: 0, annulee: 0, revenue: 0,
+    };
   });
   listings.forEach((l) => {
     if (!stats[l.vendeur_id]) return;
     stats[l.vendeur_id].totalListings++;
     if (l.status === 'disponible') stats[l.vendeur_id].activeListings++;
     if (l.status === 'vendu') stats[l.vendeur_id].soldListings++;
+    if (l.moderation_status === 'blocked') stats[l.vendeur_id].hiddenListings++;
   });
   (orders || []).forEach((o) => {
     const vendeurId = o.listings?.vendeur_id;
     if (!vendeurId || !stats[vendeurId]) return;
     const status = o.deliveries?.[0]?.statut_livraison;
-    if (status === 'livre') {
-      stats[vendeurId].revenue += Number(o.montant || 0);
-    } else if (status && status !== 'annulee') {
-      stats[vendeurId].ordersPending++;
-    }
+    if (status === 'livre') { stats[vendeurId].revenue += Number(o.montant || 0); stats[vendeurId].livre++; }
+    else if (status === 'a_traiter') stats[vendeurId].aTraiter++;
+    else if (status === 'pris_en_charge') stats[vendeurId].prisEnCharge++;
+    else if (status === 'en_cours') stats[vendeurId].enCours++;
+    else if (status === 'annulee') stats[vendeurId].annulee++;
   });
 
   const sorted = merchants.sort((a, b) => stats[b.id].revenue - stats[a.id].revenue);
+  merchantsData = {};
+  sorted.forEach((m) => { merchantsData[m.id] = { ...m, stats: stats[m.id] }; });
 
   if (sorted.length === 0) { panel.innerHTML = '<div class="empty">Aucun marchand pour l\'instant.</div>'; return; }
 
@@ -694,16 +737,47 @@ async function loadMerchants() {
     return `
     <div class="card" data-id="${m.id}">
       <p class="card-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
-      <p class="card-sub">${m.telephone || ''}</p>
+      <p class="card-sub">${m.telephone || ''}${m.ville ? ' · ' + m.ville : ''}</p>
       <span class="pill">Solde : ${s.revenue.toLocaleString('fr-FR')} FCFA</span>
       <span class="pill">${s.soldListings} vendu(s)</span>
-      <span class="pill">${s.activeListings} en vente</span>
-      <span class="pill">${s.ordersPending} en commande</span>
-      ${m.identity_status === 'verifiee' ? '<span class="pill" style="background:#0B6BA8; color:#fff;">Identité vérifiée</span>' : ''}
+      <span class="pill">${s.activeListings} en ligne</span>
+      ${s.hiddenListings > 0 ? '<span class="pill">' + s.hiddenListings + ' masquée(s)</span>' : ''}
+      <span class="pill">${m.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${m.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
+
+      <div id="merchant-detail-${m.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+        <p class="card-meta">Commandes — À traiter : ${s.aTraiter} · Pris en charge : ${s.prisEnCharge} · Expédiées : ${s.enCours} · Livrées : ${s.livre} · Annulées : ${s.annulee}</p>
+        ${m.is_banned && m.ban_reason ? '<p class="card-meta">Motif de suspension : ' + m.ban_reason + '</p>' : ''}
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-approve" onclick="toggleMerchantDetail('${m.id}')">Voir le profil</button>
+        <button class="btn ${s.hiddenListings === s.totalListings && s.totalListings > 0 ? 'btn-approve' : 'btn-reject'}"
+          onclick="toggleShopVisibility('${m.id}', ${s.hiddenListings === s.totalListings && s.totalListings > 0})">
+          ${s.hiddenListings === s.totalListings && s.totalListings > 0 ? 'Afficher la boutique' : 'Masquer la boutique'}
+        </button>
+        ${m.is_banned
+          ? `<button class="btn btn-approve" onclick="setBan('${m.id}', false, null)">Réactiver</button>`
+          : `<button class="btn btn-reject" onclick="banUser('${m.id}')">Suspendre</button>`
+        }
+      </div>
     </div>
   `;
   }).join('');
+}
+
+function toggleMerchantDetail(id) {
+  const el = document.getElementById('merchant-detail-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function toggleShopVisibility(vendeurId, currentlyHidden) {
+  const { error } = await sb.from('listings')
+    .update({ moderation_status: currentlyHidden ? 'approved' : 'blocked' })
+    .eq('vendeur_id', vendeurId);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadMerchants();
+}
 }
 </script>
 </body>
