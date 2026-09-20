@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, ActivityIndicator, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
@@ -126,6 +126,9 @@ export default function NotificationsScreen({ navigation }) {
               {section.key === 'updates' &&
                 section.data.map((u) => (
                   <View key={u.id} style={styles.card}>
+                    {u.image_url && (
+                      <Image source={{ uri: u.image_url }} style={styles.updateImage} />
+                    )}
                     <Text style={styles.cardTitle}>{u.title}</Text>
                     {u.body ? <Text style={styles.cardSubtitle}>{u.body}</Text> : null}
                   </View>
@@ -207,5 +210,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   cardTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  updateImage: { width: '100%', height: 140, borderRadius: 8, marginBottom: 8 },
   cardSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
 });

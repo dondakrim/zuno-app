@@ -201,12 +201,44 @@
   </div>
 </div>
 
+<div id="email-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100; padding:20px;">
+  <div class="card" style="max-width:480px; width:100%; max-height:85vh; overflow-y:auto;">
+    <p class="card-title" style="margin-bottom:12px;">Envoyer un email</p>
+    <p class="card-sub" id="email-modal-to"></p>
+    <input type="text" id="email-subject" placeholder="Objet">
+    <textarea id="email-message" placeholder="Message" rows="5" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font:inherit; margin-bottom:10px; resize:vertical;"></textarea>
+    <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Image à joindre (facultatif)</label>
+    <input type="file" id="email-image" accept="image/*" style="margin-bottom:14px;">
+    <img id="email-image-preview" style="display:none; max-width:100%; max-height:160px; border-radius:8px; margin-bottom:14px;">
+    <div class="actions">
+      <button class="btn btn-reject" onclick="closeEmailModal()">Annuler</button>
+      <button class="btn btn-approve" id="email-send-btn" onclick="submitEmail()">Envoyer</button>
+    </div>
+  </div>
+</div>
+
+<div id="notif-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100; padding:20px;">
+  <div class="card" style="max-width:480px; width:100%; max-height:85vh; overflow-y:auto;">
+    <p class="card-title" style="margin-bottom:12px;">Envoyer une notification</p>
+    <p class="card-sub" id="notif-modal-to"></p>
+    <input type="text" id="notif-title" placeholder="Titre">
+    <textarea id="notif-body" placeholder="Message (facultatif)" rows="4" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font:inherit; margin-bottom:10px; resize:vertical;"></textarea>
+    <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Image (facultative — visible dans l'appli, transmise au push mais pas garantie à l'affichage direct sur tous les téléphones)</label>
+    <input type="file" id="notif-image" accept="image/*" style="margin-bottom:14px;">
+    <img id="notif-image-preview" style="display:none; max-width:100%; max-height:160px; border-radius:8px; margin-bottom:14px;">
+    <div class="actions">
+      <button class="btn btn-reject" onclick="closeNotifModal()">Annuler</button>
+      <button class="btn btn-approve" id="notif-send-btn" onclick="submitNotif()">Envoyer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // Remplace ces deux valeurs par celles de ton projet Supabase
 // (Project Settings > API dans le tableau de bord Supabase) —
 // exactement les mêmes que dans src/lib/supabase.js de l'appli mobile.
 const SUPABASE_URL = 'https://pxtapnrcottfulhlezdq.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_pIqRGpBJISbwpKdoWjrL8g_FILEE6If';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGFwbnJjb3R0ZnVsaGxlemRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDg2MTEsImV4cCI6MjEwNDgyNDYxMX0.RaenFO9NKUkfEuo6RfkNKu22hbXesehm8KDQFFMm4VM';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -909,26 +941,137 @@ async function toggleCompteDetail(userId, idDocumentUrl, banReason) {
 
 // ---------- Envoyer une notification (in-app + push automatique) ----------
 
-async function sendNotificationTo(userId, defaultTitle) {
-  const title = prompt('Titre de la notification :', defaultTitle || '');
-  if (!title) return;
-  const body = prompt('Message (facultatif) :', '') || '';
+let notifTarget = null;
+let notifImageFile = null;
 
-  const { error } = await sb.from('notifications').insert({ user_id: userId, title, body, type: 'admin' });
+function sendNotificationTo(userId, defaultTitle) {
+  notifTarget = userId;
+  notifImageFile = null;
+  document.getElementById('notif-modal-to').textContent = '';
+  document.getElementById('notif-title').value = defaultTitle || '';
+  document.getElementById('notif-body').value = '';
+  document.getElementById('notif-image').value = '';
+  document.getElementById('notif-image-preview').style.display = 'none';
+  document.getElementById('notif-modal-overlay').style.display = 'flex';
+}
+
+function closeNotifModal() {
+  document.getElementById('notif-modal-overlay').style.display = 'none';
+}
+
+document.getElementById('notif-image').addEventListener('change', (e) => {
+  notifImageFile = e.target.files[0] || null;
+  const preview = document.getElementById('notif-image-preview');
+  if (notifImageFile) {
+    preview.src = URL.createObjectURL(notifImageFile);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+async function submitNotif() {
+  const title = document.getElementById('notif-title').value.trim();
+  const body = document.getElementById('notif-body').value.trim();
+  if (!title) { alert('Le titre est obligatoire.'); return; }
+
+  const btn = document.getElementById('notif-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi…';
+
+  let imageUrl = null;
+  if (notifImageFile) {
+    const extension = notifImageFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const fileName = 'notif-' + Date.now() + '.' + extension;
+    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, notifImageFile, {
+      contentType: notifImageFile.type || 'image/jpeg',
+    });
+    if (uploadError) {
+      alert('Erreur upload image : ' + uploadError.message);
+      btn.disabled = false;
+      btn.textContent = 'Envoyer';
+      return;
+    }
+    const { data: pub } = sb.storage.from('ad-images').getPublicUrl(fileName);
+    imageUrl = pub.publicUrl;
+  }
+
+  const { error } = await sb.from('notifications').insert({
+    user_id: notifTarget, title, body, type: 'admin', image_url: imageUrl,
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Envoyer';
+
   if (error) { alert('Erreur : ' + error.message); return; }
+  closeNotifModal();
   alert('Notification envoyée.');
 }
 
-async function sendEmailTo(email, defaultSubject) {
-  if (!email) { alert("Cette personne n'a pas renseigné d'adresse email."); return; }
-  const subject = prompt('Objet de l\'email :', defaultSubject || '');
-  if (!subject) return;
-  const message = prompt('Message :', '');
-  if (!message) return;
+let emailTarget = null;
+let emailImageFile = null;
 
-  const html = '<p>' + message.replace(/\n/g, '<br>') + '</p><p style="color:#999; font-size:12px; margin-top:20px;">— L\'équipe Zuno</p>';
-  const { error } = await sb.rpc('send_email', { to_email: email, subject, html_body: html });
+function sendEmailTo(email, defaultSubject) {
+  if (!email) { alert("Cette personne n'a pas renseigné d'adresse email."); return; }
+  emailTarget = email;
+  emailImageFile = null;
+  document.getElementById('email-modal-to').textContent = 'À : ' + email;
+  document.getElementById('email-subject').value = defaultSubject || '';
+  document.getElementById('email-message').value = '';
+  document.getElementById('email-image').value = '';
+  document.getElementById('email-image-preview').style.display = 'none';
+  document.getElementById('email-modal-overlay').style.display = 'flex';
+}
+
+function closeEmailModal() {
+  document.getElementById('email-modal-overlay').style.display = 'none';
+}
+
+document.getElementById('email-image').addEventListener('change', (e) => {
+  emailImageFile = e.target.files[0] || null;
+  const preview = document.getElementById('email-image-preview');
+  if (emailImageFile) {
+    preview.src = URL.createObjectURL(emailImageFile);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+async function submitEmail() {
+  const subject = document.getElementById('email-subject').value.trim();
+  const message = document.getElementById('email-message').value.trim();
+  if (!subject || !message) { alert('Objet et message sont obligatoires.'); return; }
+
+  const btn = document.getElementById('email-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi…';
+
+  let imageHtml = '';
+  if (emailImageFile) {
+    const extension = emailImageFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const fileName = 'email-' + Date.now() + '.' + extension;
+    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, emailImageFile, {
+      contentType: emailImageFile.type || 'image/jpeg',
+    });
+    if (uploadError) {
+      alert('Erreur upload image : ' + uploadError.message);
+      btn.disabled = false;
+      btn.textContent = 'Envoyer';
+      return;
+    }
+    const { data: pub } = sb.storage.from('ad-images').getPublicUrl(fileName);
+    imageHtml = '<img src="' + pub.publicUrl + '" style="max-width:100%; border-radius:8px; margin-bottom:16px;"><br>';
+  }
+
+  const html = imageHtml + '<p>' + message.replace(/\n/g, '<br>') + '</p><p style="color:#999; font-size:12px; margin-top:20px;">— L\'équipe Zuno</p>';
+  const { error } = await sb.rpc('send_email', { to_email: emailTarget, subject, html_body: html });
+
+  btn.disabled = false;
+  btn.textContent = 'Envoyer';
+
   if (error) { alert('Erreur : ' + error.message); return; }
+  closeEmailModal();
   alert('Email envoyé (ou en cours de livraison).');
 }
 
