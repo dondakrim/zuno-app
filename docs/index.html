@@ -201,28 +201,12 @@
   </div>
 </div>
 
-<div id="email-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100; padding:20px;">
-  <div class="card" style="max-width:480px; width:100%; max-height:85vh; overflow-y:auto;">
-    <p class="card-title" style="margin-bottom:12px;">Envoyer un email</p>
-    <p class="card-sub" id="email-modal-to"></p>
-    <input type="text" id="email-subject" placeholder="Objet">
-    <textarea id="email-message" placeholder="Message" rows="5" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font:inherit; margin-bottom:10px; resize:vertical;"></textarea>
-    <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Image à joindre (facultatif)</label>
-    <input type="file" id="email-image" accept="image/*" style="margin-bottom:14px;">
-    <img id="email-image-preview" style="display:none; max-width:100%; max-height:160px; border-radius:8px; margin-bottom:14px;">
-    <div class="actions">
-      <button class="btn btn-reject" onclick="closeEmailModal()">Annuler</button>
-      <button class="btn btn-approve" id="email-send-btn" onclick="submitEmail()">Envoyer</button>
-    </div>
-  </div>
-</div>
-
 <script>
 // Remplace ces deux valeurs par celles de ton projet Supabase
 // (Project Settings > API dans le tableau de bord Supabase) —
 // exactement les mêmes que dans src/lib/supabase.js de l'appli mobile.
 const SUPABASE_URL = 'https://pxtapnrcottfulhlezdq.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGFwbnJjb3R0ZnVsaGxlemRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDg2MTEsImV4cCI6MjEwNDgyNDYxMX0.RaenFO9NKUkfEuo6RfkNKu22hbXesehm8KDQFFMm4VM';
+const SUPABASE_ANON_KEY = 'sb_publishable_pIqRGpBJISbwpKdoWjrL8g_FILEE6If';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -935,70 +919,16 @@ async function sendNotificationTo(userId, defaultTitle) {
   alert('Notification envoyée.');
 }
 
-let emailTarget = null;
-let emailImageFile = null;
-
-function sendEmailTo(email, defaultSubject) {
+async function sendEmailTo(email, defaultSubject) {
   if (!email) { alert("Cette personne n'a pas renseigné d'adresse email."); return; }
-  emailTarget = email;
-  emailImageFile = null;
-  document.getElementById('email-modal-to').textContent = 'À : ' + email;
-  document.getElementById('email-subject').value = defaultSubject || '';
-  document.getElementById('email-message').value = '';
-  document.getElementById('email-image').value = '';
-  document.getElementById('email-image-preview').style.display = 'none';
-  document.getElementById('email-modal-overlay').style.display = 'flex';
-}
+  const subject = prompt('Objet de l\'email :', defaultSubject || '');
+  if (!subject) return;
+  const message = prompt('Message :', '');
+  if (!message) return;
 
-function closeEmailModal() {
-  document.getElementById('email-modal-overlay').style.display = 'none';
-}
-
-document.getElementById('email-image').addEventListener('change', (e) => {
-  emailImageFile = e.target.files[0] || null;
-  const preview = document.getElementById('email-image-preview');
-  if (emailImageFile) {
-    preview.src = URL.createObjectURL(emailImageFile);
-    preview.style.display = 'block';
-  } else {
-    preview.style.display = 'none';
-  }
-});
-
-async function submitEmail() {
-  const subject = document.getElementById('email-subject').value.trim();
-  const message = document.getElementById('email-message').value.trim();
-  if (!subject || !message) { alert('Objet et message sont obligatoires.'); return; }
-
-  const btn = document.getElementById('email-send-btn');
-  btn.disabled = true;
-  btn.textContent = 'Envoi…';
-
-  let imageHtml = '';
-  if (emailImageFile) {
-    const extension = emailImageFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-    const fileName = 'email-' + Date.now() + '.' + extension;
-    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, emailImageFile, {
-      contentType: emailImageFile.type || 'image/jpeg',
-    });
-    if (uploadError) {
-      alert('Erreur upload image : ' + uploadError.message);
-      btn.disabled = false;
-      btn.textContent = 'Envoyer';
-      return;
-    }
-    const { data: pub } = sb.storage.from('ad-images').getPublicUrl(fileName);
-    imageHtml = '<img src="' + pub.publicUrl + '" style="max-width:100%; border-radius:8px; margin-bottom:16px;"><br>';
-  }
-
-  const html = imageHtml + '<p>' + message.replace(/\n/g, '<br>') + '</p><p style="color:#999; font-size:12px; margin-top:20px;">— L\'équipe Zuno</p>';
-  const { error } = await sb.rpc('send_email', { to_email: emailTarget, subject, html_body: html });
-
-  btn.disabled = false;
-  btn.textContent = 'Envoyer';
-
+  const html = '<p>' + message.replace(/\n/g, '<br>') + '</p><p style="color:#999; font-size:12px; margin-top:20px;">— L\'équipe Zuno</p>';
+  const { error } = await sb.rpc('send_email', { to_email: email, subject, html_body: html });
   if (error) { alert('Erreur : ' + error.message); return; }
-  closeEmailModal();
   alert('Email envoyé (ou en cours de livraison).');
 }
 
