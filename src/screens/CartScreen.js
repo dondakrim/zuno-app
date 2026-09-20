@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Image,
   Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
@@ -36,11 +37,60 @@ export default function CartScreen({ route, navigation }) {
   const [showDeliveryOptions, setShowDeliveryOptions] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState(null); // { code, discount }
+  const [checkingPromo, setCheckingPromo] = useState(false);
 
   const subtotal = listing.price * quantity;
+  const discount = appliedPromo?.discount || 0;
+  const subtotalAfterDiscount = Math.max(subtotal - discount, 0);
 
   const handleIncrease = () => setQuantity((q) => Math.min(q + 1, 20));
   const handleDecrease = () => setQuantity((q) => Math.max(q - 1, 1));
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return;
+    setCheckingPromo(true);
+    const { data, error } = await supabase
+      .from('promo_codes')
+      .select('*')
+      .ilike('code', promoInput.trim())
+      .eq('active', true)
+      .maybeSingle();
+    setCheckingPromo(false);
+
+    if (error || !data) {
+      Alert.alert('Code invalide', "Ce code promo n'existe pas ou n'est plus actif.");
+      return;
+    }
+    if (data.expires_at && new Date(data.expires_at) < new Date()) {
+      Alert.alert('Code expiré', "Ce code promo n'est plus valable.");
+      return;
+    }
+    if (data.max_uses !== null && data.uses_count >= data.max_uses) {
+      Alert.alert('Code épuisé', "Ce code promo a atteint sa limite d'utilisation.");
+      return;
+    }
+    if (subtotal < (data.min_amount || 0)) {
+      Alert.alert(
+        'Montant minimum requis',
+        `Ce code s'applique à partir de ${Number(data.min_amount).toLocaleString('fr-FR')} FCFA d'achat.`
+      );
+      return;
+    }
+
+    const rawDiscount =
+      data.discount_type === 'percentage' ? (subtotal * data.discount_value) / 100 : data.discount_value;
+    const finalDiscount = Math.min(rawDiscount, subtotal);
+
+    setAppliedPromo({ code: data.code, discount: finalDiscount });
+    Alert.alert('Code appliqué', `-${finalDiscount.toLocaleString('fr-FR')} FCFA sur ton achat.`);
+  };
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null);
+    setPromoInput('');
+  };
 
   const handleAddToCart = async () => {
     setAddingToCart(true);
@@ -86,6 +136,8 @@ export default function CartScreen({ route, navigation }) {
       listing,
       quantity,
       deliveryMethod,
+      promoCode: appliedPromo?.code || null,
+      promoDiscount: discount,
     });
   };
 
@@ -131,10 +183,49 @@ export default function CartScreen({ route, navigation }) {
           </View>
         </View>
 
+        <View style={styles.promoRow}>
+          {appliedPromo ? (
+            <View style={styles.promoApplied}>
+              <Ionicons name="pricetag" size={14} color={colors.success} />
+              <Text style={styles.promoAppliedText}>Code « {appliedPromo.code} » appliqué</Text>
+              <TouchableOpacity onPress={handleRemovePromo}>
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.promoInputRow}>
+              <TextInput
+                placeholder="Code promo"
+                placeholderTextColor={colors.textMuted}
+                value={promoInput}
+                onChangeText={setPromoInput}
+                autoCapitalize="characters"
+                style={styles.promoInput}
+              />
+              <TouchableOpacity
+                style={styles.promoApplyButton}
+                onPress={handleApplyPromo}
+                disabled={checkingPromo}
+              >
+                <Text style={styles.promoApplyButtonText}>{checkingPromo ? '…' : 'Appliquer'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {discount > 0 && (
+          <View style={styles.subtotalRow}>
+            <Text style={styles.subtotalLabel}>Réduction</Text>
+            <Text style={[styles.subtotalValue, { color: colors.success }]}>
+              -{discount.toLocaleString('fr-FR')} FCFA
+            </Text>
+          </View>
+        )}
+
         <View style={styles.subtotalRow}>
           <Text style={styles.subtotalLabel}>Sous-total</Text>
           <Text style={styles.subtotalValue}>
-            {subtotal.toLocaleString('fr-FR')} FCFA
+            {subtotalAfterDiscount.toLocaleString('fr-FR')} FCFA
           </Text>
         </View>
 
@@ -254,6 +345,34 @@ const styles = StyleSheet.create({
   },
   subtotalLabel: { fontSize: 13, color: colors.textSecondary },
   subtotalValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  promoRow: { marginBottom: spacing.sm },
+  promoInputRow: { flexDirection: 'row', gap: spacing.sm },
+  promoInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    height: 42,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surface,
+  },
+  promoApplyButton: {
+    backgroundColor: colors.purple,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoApplyButtonText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  promoApplied: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.successBg,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+  promoAppliedText: { flex: 1, fontSize: 13, fontWeight: '600', color: colors.success },
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   secondaryButton: {
     flex: 1,

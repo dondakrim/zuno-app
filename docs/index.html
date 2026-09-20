@@ -139,6 +139,7 @@
       <button class="tab-btn" data-tab="commandes">Commandes</button>
       <button class="tab-btn" data-tab="paniers">Paniers</button>
       <button class="tab-btn" data-tab="campagnes">Campagnes</button>
+      <button class="tab-btn" data-tab="promos">Promos</button>
     </div>
 
     <div class="panels">
@@ -222,6 +223,23 @@
         <button class="btn btn-approve" id="campagne-send-btn" style="width:100%; padding:11px;" onclick="submitCampagne()">Envoyer la campagne</button>
       </div>
       <div id="campagne-result"></div>
+    </div>
+    <div class="panel" id="panel-promos">
+      <div class="card" style="margin-bottom: 16px;">
+        <p class="card-title" style="margin-bottom: 12px;">Créer un code promo</p>
+        <input type="text" id="promo-code" placeholder="Code (ex: ZUNO10)" style="text-transform:uppercase;">
+        <select id="promo-type" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px;">
+          <option value="percentage">Pourcentage (%)</option>
+          <option value="fixed">Montant fixe (FCFA)</option>
+        </select>
+        <input type="number" id="promo-value" placeholder="Valeur (ex: 10 pour 10% ou 500 pour 500 FCFA)">
+        <input type="number" id="promo-min" placeholder="Montant minimum d'achat (facultatif, en FCFA)">
+        <input type="number" id="promo-max-uses" placeholder="Nombre d'utilisations maximum (facultatif)">
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Date d'expiration (facultative)</label>
+        <input type="date" id="promo-expires" style="margin-bottom:14px;">
+        <button class="btn btn-approve" style="width:100%; padding:11px;" onclick="createPromo()">Créer le code</button>
+      </div>
+      <div id="promos-list"><div class="loading">Chargement…</div></div>
     </div>
     <div class="panel" id="panel-publicites">
       <div class="card">
@@ -342,6 +360,7 @@ async function checkAdminAndInit() {
   loadComptes();
   loadCommandes();
   loadPaniers();
+  loadPromos();
 }
 
 async function loadLitiges() {
@@ -1324,6 +1343,76 @@ async function submitCampagne() {
   document.getElementById('campagne-image').value = '';
   document.getElementById('campagne-image-preview').style.display = 'none';
   campagneImageFile = null;
+}
+
+// ---------- Promos (codes de réduction) ----------
+
+async function loadPromos() {
+  const list = document.getElementById('promos-list');
+  const { data, error } = await sb.from('promo_codes').select('*').order('created_at', { ascending: false });
+
+  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Aucun code promo pour l\'instant.</div>'; return; }
+
+  list.innerHTML = data.map((p) => {
+    const valueLabel = p.discount_type === 'percentage' ? p.discount_value + '%' : Number(p.discount_value).toLocaleString('fr-FR') + ' FCFA';
+    const usesLabel = p.max_uses !== null ? p.uses_count + ' / ' + p.max_uses + ' utilisations' : p.uses_count + ' utilisation(s)';
+    const expired = p.expires_at && new Date(p.expires_at) < new Date();
+    return `
+    <div class="card" data-id="${p.id}">
+      <p class="card-title">${p.code}</p>
+      <span class="pill">-${valueLabel}</span>
+      <span class="pill">${usesLabel}</span>
+      ${p.min_amount > 0 ? '<span class="pill">Min. ' + Number(p.min_amount).toLocaleString('fr-FR') + ' FCFA</span>' : ''}
+      ${p.expires_at ? '<span class="pill">' + (expired ? 'Expiré le ' : 'Expire le ') + new Date(p.expires_at).toLocaleDateString('fr-FR') + '</span>' : ''}
+      ${!p.active ? '<span class="pill" style="background:var(--danger); color:#fff;">Désactivé</span>' : ''}
+      <div class="actions">
+        <button class="btn ${p.active ? 'btn-reject' : 'btn-approve'}" onclick="togglePromo('${p.id}', ${!p.active})">${p.active ? 'Désactiver' : 'Activer'}</button>
+        <button class="btn btn-reject" onclick="deletePromo('${p.id}')">Supprimer</button>
+      </div>
+    </div>
+  `;
+  }).join('');
+}
+
+async function createPromo() {
+  const code = document.getElementById('promo-code').value.trim().toUpperCase();
+  const discountType = document.getElementById('promo-type').value;
+  const discountValue = parseFloat(document.getElementById('promo-value').value);
+  const minAmount = parseFloat(document.getElementById('promo-min').value) || 0;
+  const maxUsesRaw = document.getElementById('promo-max-uses').value;
+  const maxUses = maxUsesRaw ? parseInt(maxUsesRaw, 10) : null;
+  const expiresRaw = document.getElementById('promo-expires').value;
+  const expiresAt = expiresRaw ? new Date(expiresRaw + 'T23:59:59').toISOString() : null;
+
+  if (!code || !discountValue) { alert('Code et valeur de la réduction sont obligatoires.'); return; }
+
+  const { error } = await sb.from('promo_codes').insert({
+    code, discount_type: discountType, discount_value: discountValue,
+    min_amount: minAmount, max_uses: maxUses, expires_at: expiresAt,
+  });
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+
+  document.getElementById('promo-code').value = '';
+  document.getElementById('promo-value').value = '';
+  document.getElementById('promo-min').value = '';
+  document.getElementById('promo-max-uses').value = '';
+  document.getElementById('promo-expires').value = '';
+  loadPromos();
+}
+
+async function togglePromo(id, active) {
+  const { error } = await sb.from('promo_codes').update({ active }).eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadPromos();
+}
+
+async function deletePromo(id) {
+  if (!confirm('Supprimer définitivement ce code promo ?')) return;
+  const { error } = await sb.from('promo_codes').delete().eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadPromos();
 }
 </script>
 </body>

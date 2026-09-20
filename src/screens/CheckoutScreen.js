@@ -30,7 +30,7 @@ Un remboursement ou un échange reste possible si l'acheteur et le vendeur trouv
 En cochant la case "J'ai lu et j'accepte les conditions", l'acheteur reconnaît avoir pris connaissance de ces conditions et les accepte pour cette commande.`;
 
 export default function CheckoutScreen({ route, navigation }) {
-  const { listing, quantity = 1, deliveryMethod } = route.params;
+  const { listing, quantity = 1, deliveryMethod, promoCode = null, promoDiscount = 0 } = route.params;
   const [nom, setNom] = useState('');
   const [telephone, setTelephone] = useState('');
   const [quartier, setQuartier] = useState('');
@@ -41,7 +41,7 @@ export default function CheckoutScreen({ route, navigation }) {
 
   const sousTotal = listing.price * quantity;
   const fraisLivraison = deliveryMethod?.price || 0;
-  const total = sousTotal + fraisLivraison;
+  const total = Math.max(sousTotal + fraisLivraison - promoDiscount, 0);
 
   const isPickup = deliveryMethod?.id === 'pickup';
 
@@ -61,6 +61,27 @@ export default function CheckoutScreen({ route, navigation }) {
     setSaving(true);
     const myId = await getDeviceUserId();
 
+    // Le code promo n'a été que prévisualisé jusqu'ici (dans le panier) :
+    // on le valide et le consomme réellement seulement maintenant, au
+    // moment où la commande est vraiment passée.
+    let finalDiscount = 0;
+    if (promoCode) {
+      const { data: rpcDiscount, error: promoError } = await supabase.rpc('use_promo_code', {
+        p_code: promoCode,
+        p_amount: sousTotal + fraisLivraison,
+      });
+      if (promoError) {
+        setSaving(false);
+        Alert.alert(
+          'Code promo invalide',
+          "Ce code n'est plus disponible (peut-être déjà utilisé son maximum de fois). La commande sera passée sans réduction."
+        );
+      } else {
+        finalDiscount = rpcDiscount || 0;
+      }
+    }
+    const finalTotal = Math.max(sousTotal + fraisLivraison - finalDiscount, 0);
+
     // Le vrai paiement MyNITA se branchera ici plus tard. Pour l'instant,
     // la commande est créée directement pour pouvoir tester tout le
     // parcours de livraison sans attendre l'accès à l'API MyNITA.
@@ -69,10 +90,12 @@ export default function CheckoutScreen({ route, navigation }) {
       .insert({
         listing_id: listing.id,
         acheteur_id: myId,
-        montant: total,
+        montant: finalTotal,
         quantite: quantity,
         frais_livraison: fraisLivraison,
         mode_livraison: deliveryMethod?.id || null,
+        promo_code: promoCode,
+        discount_amount: finalDiscount,
         statut: 'en_attente_paiement',
       })
       .select()
@@ -217,6 +240,14 @@ export default function CheckoutScreen({ route, navigation }) {
           </Text>
           <Text style={styles.summaryValue}>{fraisLivraison.toLocaleString('fr-FR')} FCFA</Text>
         </View>
+        {promoDiscount > 0 && (
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Code « {promoCode} »</Text>
+            <Text style={[styles.summaryValue, { color: colors.success }]}>
+              -{promoDiscount.toLocaleString('fr-FR')} FCFA
+            </Text>
+          </View>
+        )}
         <View style={[styles.summaryRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
           <Text style={styles.totalValue}>{total.toLocaleString('fr-FR')} FCFA</Text>
