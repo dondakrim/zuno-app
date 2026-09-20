@@ -206,7 +206,7 @@
 // (Project Settings > API dans le tableau de bord Supabase) —
 // exactement les mêmes que dans src/lib/supabase.js de l'appli mobile.
 const SUPABASE_URL = 'https://pxtapnrcottfulhlezdq.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGFwbnJjb3R0ZnVsaGxlemRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDg2MTEsImV4cCI6MjEwNDgyNDYxMX0.RaenFO9NKUkfEuo6RfkNKu22hbXesehm8KDQFFMm4VM';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB4dGFwbnJjb3R0ZnVsaGxlemRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkyNDg2MTEsImV4cCI6MjEwNDgyNDYxMX0.RaenFO9NKUkfEuo6RfkNKu22hbXesehm8KDQFFMm4VMf';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -868,6 +868,7 @@ async function loadComptes() {
       <div class="actions">
         <button class="btn btn-approve" onclick="toggleCompteDetail('${u.id}', '${(u.id_document_url || '').replace(/'/g, "\\'")}', ${u.ban_reason ? "'" + u.ban_reason.replace(/'/g, "\\'") + "'" : 'null'})">Voir les détails</button>
         <button class="btn btn-approve" onclick="sendNotificationTo('${u.id}', '')">Envoyer une notification</button>
+        ${u.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + u.email + '\', \'\')">Envoyer un email</button>' : ''}
       </div>
     </div>
   `).join('');
@@ -918,6 +919,19 @@ async function sendNotificationTo(userId, defaultTitle) {
   alert('Notification envoyée.');
 }
 
+async function sendEmailTo(email, defaultSubject) {
+  if (!email) { alert("Cette personne n'a pas renseigné d'adresse email."); return; }
+  const subject = prompt('Objet de l\'email :', defaultSubject || '');
+  if (!subject) return;
+  const message = prompt('Message :', '');
+  if (!message) return;
+
+  const html = '<p>' + message.replace(/\n/g, '<br>') + '</p><p style="color:#999; font-size:12px; margin-top:20px;">— L\'équipe Zuno</p>';
+  const { error } = await sb.rpc('send_email', { to_email: email, subject, html_body: html });
+  if (error) { alert('Erreur : ' + error.message); return; }
+  alert('Email envoyé (ou en cours de livraison).');
+}
+
 // ---------- Commandes (vue globale de la plateforme) ----------
 
 const COMMANDE_LABELS = {
@@ -946,7 +960,7 @@ async function loadCommandes() {
   const allIds = [...new Set([...acheteurIds, ...vendeurIds])];
   let profilesById = {};
   if (allIds.length > 0) {
-    const { data: profiles } = await sb.from('users').select('id, nom, telephone').in('id', allIds);
+    const { data: profiles } = await sb.from('users').select('id, nom, telephone, email').in('id', allIds);
     (profiles || []).forEach((p) => { profilesById[p.id] = p; });
   }
 
@@ -971,7 +985,9 @@ async function loadCommandes() {
       <p class="card-meta">${new Date(o.created_at).toLocaleString('fr-FR')}</p>
       <div class="actions">
         <button class="btn btn-approve" onclick="sendNotificationTo('${o.acheteur_id}', 'À propos de ta commande')">Notifier l'acheteur</button>
+        ${acheteur?.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + acheteur.email + '\', \'À propos de ta commande\')">Emailer l\'acheteur</button>' : ''}
         ${o.listings?.vendeur_id ? '<button class="btn btn-approve" onclick="sendNotificationTo(\'' + o.listings.vendeur_id + '\', \'Au sujet d une commande recue\')">Notifier le vendeur</button>' : ''}
+        ${vendeur?.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + vendeur.email + '\', \'Au sujet d une commande recue\')">Emailer le vendeur</button>' : ''}
       </div>
     </div>
   `;
@@ -995,7 +1011,7 @@ async function loadPaniers() {
   const acheteurIds = [...new Set(data.map((c) => c.acheteur_id).filter(Boolean))];
   let profilesById = {};
   if (acheteurIds.length > 0) {
-    const { data: profiles } = await sb.from('users').select('id, nom, telephone').in('id', acheteurIds);
+    const { data: profiles } = await sb.from('users').select('id, nom, telephone, email').in('id', acheteurIds);
     (profiles || []).forEach((p) => { profilesById[p.id] = p; });
   }
 
@@ -1016,6 +1032,7 @@ async function loadPaniers() {
       ${items.map((i) => '<p class="card-meta">' + (i.listings?.title || 'Annonce supprimée') + ' × ' + i.quantity + ' — ' + Number(i.listings?.price || 0).toLocaleString('fr-FR') + ' FCFA</p>').join('')}
       <div class="actions">
         <button class="btn btn-approve" onclick="sendNotificationTo('${acheteurId}', 'Ton panier t\\'attend sur Zuno')">Relancer avec une notification</button>
+        ${acheteur?.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + acheteur.email + '\', \'Ton panier t attend sur Zuno\')">Relancer par email</button>' : ''}
       </div>
     </div>
   `;
