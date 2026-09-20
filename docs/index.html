@@ -960,6 +960,7 @@ async function loadComptes() {
         <button class="btn btn-approve" onclick="toggleCompteDetail('${u.id}', '${(u.id_document_url || '').replace(/'/g, "\\'")}', ${u.ban_reason ? "'" + u.ban_reason.replace(/'/g, "\\'") + "'" : 'null'})">Voir les détails</button>
         <button class="btn btn-approve" onclick="sendNotificationTo('${u.id}', '')">Envoyer une notification</button>
         ${u.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + u.email + '\', \'\')">Envoyer un email</button>' : ''}
+        <button class="btn btn-approve" onclick="exportAccountHistory('${u.id}', '${(u.nom || 'compte').replace(/'/g, "\\'")}')">Exporter l'historique</button>
       </div>
     </div>
   `).join('');
@@ -1418,6 +1419,26 @@ async function deletePromo(id) {
 
 // ---------- Export CSV des transactions (traçabilité) ----------
 
+// Fonctions partagées, réutilisées par tous les exports CSV du tableau
+// de bord (transactions, historique de compte...).
+function escapeCsv(value) {
+  const str = String(value ?? '');
+  return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.map((r) => r.map(escapeCsv).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 async function exportTransactionsCSV() {
   const { data, error } = await sb
     .from('orders')
@@ -1442,11 +1463,6 @@ async function exportTransactionsCSV() {
     'Code promo', 'Statut livraison', 'Moyen de paiement', 'Référence paiement',
   ];
 
-  const escapeCsv = (value) => {
-    const str = String(value ?? '');
-    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
-  };
-
   const rows = data.map((o) => {
     const acheteur = profilesById[o.acheteur_id];
     const vendeur = profilesById[o.listings?.vendeur_id];
@@ -1464,19 +1480,91 @@ async function exportTransactionsCSV() {
       o.deliveries?.[0]?.statut_livraison || '',
       o.payment_provider || '',
       o.payment_reference || '',
-    ].map(escapeCsv).join(',');
+    ];
   });
 
-  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'zuno-transactions-' + new Date().toISOString().slice(0, 10) + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  downloadCsv('zuno-transactions-' + new Date().toISOString().slice(0, 10) + '.csv', headers, rows);
+}
+
+// ---------- Export de l'historique complet d'un compte (traçabilité,
+// gestion de litiges) ----------
+
+async function exportAccountHistory(userId, userName) {
+  const [
+    { data: annoncesPubliees },
+    { data: messagesEnvoyes },
+    { data: achats },
+    { data: mesAnnonces },
+    { data: avisLaisses },
+    { data: avisRecus },
+    { data: litiges },
+    { data: offres },
+    { data: signalements },
+  ] = await Promise.all([
+    sb.from('listings').select('created_at, title, price, status').eq('vendeur_id', userId),
+    sb.from('messages').select('created_at, contenu, destinataire_id').eq('expediteur_id', userId),
+    sb.from('orders').select('created_at, montant, listings(title)').eq('acheteur_id', userId),
+    sb.from('listings').select('id, title').eq('vendeur_id', userId),
+    sb.from('reviews').select('created_at, note, commentaire').eq('auteur_id', userId),
+    sb.from('reviews').select('created_at, note, commentaire').eq('cible_id', userId),
+    sb.from('order_disputes').select('created_at, category, description, status').eq('opened_by', userId),
+    sb.from('offers').select('created_at, montant, status, listing_id').eq('buyer_id', userId),
+    sb.from('moderation_queue').select('created_at, category, reporter_comment').eq('reporter_id', userId),
+  ]);
+
+  const mesAnnoncesIds = (mesAnnonces || []).map((l) => l.id);
+  let ventes = [];
+  if (mesAnnoncesIds.length > 0) {
+    const { data } = await sb
+      .from('orders')
+      .select('created_at, montant, listings(title)')
+      .in('listing_id', mesAnnoncesIds);
+    ventes = data || [];
+  }
+
+  const rows = [];
+  (annoncesPubliees || []).forEach((l) =>
+    rows.push([l.created_at, 'Annonce publiée', l.title, l.price, l.status])
+  );
+  (messagesEnvoyes || []).forEach((m) =>
+    rows.push([m.created_at, 'Message envoyé', m.contenu, '', ''])
+  );
+  (achats || []).forEach((o) =>
+    rows.push([o.created_at, 'Achat', o.listings?.title || '', o.montant, ''])
+  );
+  ventes.forEach((o) =>
+    rows.push([o.created_at, 'Vente', o.listings?.title || '', o.montant, ''])
+  );
+  (avisLaisses || []).forEach((r) =>
+    rows.push([r.created_at, 'Avis laissé', r.commentaire || '', r.note, ''])
+  );
+  (avisRecus || []).forEach((r) =>
+    rows.push([r.created_at, 'Avis reçu', r.commentaire || '', r.note, ''])
+  );
+  (litiges || []).forEach((d) =>
+    rows.push([d.created_at, 'Litige ouvert', d.description || d.category || '', '', d.status])
+  );
+  (offres || []).forEach((o) =>
+    rows.push([o.created_at, 'Offre faite', '', o.montant, o.status])
+  );
+  (signalements || []).forEach((s) =>
+    rows.push([s.created_at, 'Signalement fait', s.reporter_comment || s.category || '', '', ''])
+  );
+
+  rows.sort((a, b) => new Date(a[0]) - new Date(b[0]));
+  const formattedRows = rows.map((r) => [new Date(r[0]).toLocaleString('fr-FR'), r[1], r[2], r[3], r[4]]);
+
+  if (formattedRows.length === 0) {
+    alert('Aucune activité enregistrée pour ce compte.');
+    return;
+  }
+
+  const safeUserName = (userName || 'compte').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  downloadCsv(
+    'zuno-historique-' + safeUserName + '-' + new Date().toISOString().slice(0, 10) + '.csv',
+    ['Date', 'Type', 'Détail', 'Montant / Note', 'Statut'],
+    formattedRows
+  );
 }
 </script>
 </body>
