@@ -28,7 +28,9 @@ create table listings (
   price numeric not null,
   condition text,
   city text,
+  delai_livraison text,
   photo_url text,
+  photos text[],
   status text default 'disponible', -- disponible | vendu
   created_at timestamp with time zone default now()
 );
@@ -93,3 +95,21 @@ insert into categories (nom) values
 alter table listings enable row level security;
 create policy "Lecture publique des annonces" on listings for select using (true);
 create policy "Insertion ouverte pendant le développement" on listings for insert with check (true);
+
+alter table users enable row level security;
+create policy "Lecture publique des utilisateurs" on users for select using (true);
+create policy "Création ouverte pendant le développement" on users for insert with check (true);
+
+alter table messages enable row level security;
+create policy "Lecture des messages pendant le développement" on messages for select using (true);
+create policy "Envoi de messages pendant le développement" on messages for insert with check (true);
+
+alter table orders enable row level security;
+create policy "Lecture des commandes pendant le développement" on orders for select using (true);
+create policy "Création de commandes pendant le développement" on orders for insert with check (true);
+create policy "Mise à jour des commandes pendant le développement" on orders for update using (true);
+
+alter table deliveries enable row level security;
+create policy "Lecture des livraisons pendant le développement" on deliveries for select using (true);
+create policy "Création de livraisons pendant le développement" on deliveries for insert with check (true);
+create policy "Mise à jour des livraisons pendant le développement" on deliveries for update using (true);

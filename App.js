@@ -66,7 +66,7 @@ export default function App() {
         </Text>
         {banInfo.reason ? <Text style={bannedStyles.reason}>Motif : {banInfo.reason}</Text> : null}
         <Text style={bannedStyles.text}>
-          Si tu penses qu'il s'agit d'une erreur, contacte-nous à krimstreet@gmail.com.
+          Si tu penses qu'il s'agit d'une erreur, contacte-nous à contact@zunomarket.store.
         </Text>
       </View>
     );
