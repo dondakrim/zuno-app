@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../../theme/colors';
 import { supabase } from '../../lib/supabase';
 import { getDeviceUserId } from '../../lib/deviceUser';
+import PhoneInput from '../../components/PhoneInput';
+import { DEFAULT_COUNTRY } from '../../data/countries';
 
 export default function AccountSetupScreen({ onDone, navigation }) {
   // Utilisé à deux endroits : pendant l'accueil initial (onDone fourni
@@ -20,11 +22,11 @@ export default function AccountSetupScreen({ onDone, navigation }) {
   const handleContinue = async () => {
     const finalWhatsapp = sameAsPhone ? telephone.trim() : whatsapp.trim();
 
-    if (telephone.trim().length < 8) {
+    if (telephone.replace(/\D/g, '').length < 7) {
       Alert.alert('Numéro invalide', 'Indique un numéro de téléphone valide.');
       return;
     }
-    if (finalWhatsapp.length < 8) {
+    if (finalWhatsapp.replace(/\D/g, '').length < 7) {
       Alert.alert('Numéro WhatsApp invalide', 'Indique un numéro WhatsApp valide.');
       return;
     }
@@ -74,14 +76,7 @@ export default function AccountSetupScreen({ onDone, navigation }) {
       </Text>
 
       <Text style={styles.label}>Numéro de téléphone</Text>
-      <TextInput
-        placeholder="+227 90 00 00 00"
-        placeholderTextColor={colors.textMuted}
-        value={telephone}
-        onChangeText={setTelephone}
-        keyboardType="phone-pad"
-        style={styles.input}
-      />
+      <PhoneInput value={telephone} onChangeValue={setTelephone} />
 
       <TouchableOpacity style={styles.checkboxRow} onPress={() => setSameAsPhone((v) => !v)}>
         <Ionicons
@@ -95,14 +90,7 @@ export default function AccountSetupScreen({ onDone, navigation }) {
       {!sameAsPhone && (
         <>
           <Text style={styles.label}>Numéro WhatsApp</Text>
-          <TextInput
-            placeholder="+227 90 00 00 00"
-            placeholderTextColor={colors.textMuted}
-            value={whatsapp}
-            onChangeText={setWhatsapp}
-            keyboardType="phone-pad"
-            style={styles.input}
-          />
+          <PhoneInput value={whatsapp} onChangeValue={setWhatsapp} />
         </>
       )}
 

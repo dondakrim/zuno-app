@@ -180,6 +180,7 @@
           <option value="livre">Livrées</option>
           <option value="annulee">Annulées</option>
         </select>
+        <button class="btn btn-approve" style="width:100%; padding:10px; margin-top:10px;" onclick="exportTransactionsCSV()">Exporter toutes les transactions (CSV)</button>
       </div>
       <div id="commandes-list"><div class="loading">Chargement…</div></div>
     </div>
@@ -1413,6 +1414,69 @@ async function deletePromo(id) {
   const { error } = await sb.from('promo_codes').delete().eq('id', id);
   if (error) { alert('Erreur : ' + error.message); return; }
   loadPromos();
+}
+
+// ---------- Export CSV des transactions (traçabilité) ----------
+
+async function exportTransactionsCSV() {
+  const { data, error } = await sb
+    .from('orders')
+    .select('*, listings(title, vendeur_id), deliveries(statut_livraison)')
+    .order('created_at', { ascending: false });
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+  if (!data || data.length === 0) { alert('Aucune transaction à exporter.'); return; }
+
+  const acheteurIds = [...new Set(data.map((o) => o.acheteur_id).filter(Boolean))];
+  const vendeurIds = [...new Set(data.map((o) => o.listings?.vendeur_id).filter(Boolean))];
+  const allIds = [...new Set([...acheteurIds, ...vendeurIds])];
+  let profilesById = {};
+  if (allIds.length > 0) {
+    const { data: profiles } = await sb.from('users').select('id, nom, telephone').in('id', allIds);
+    (profiles || []).forEach((p) => { profilesById[p.id] = p; });
+  }
+
+  const headers = [
+    'ID commande', 'Date', 'Article', 'Acheteur', 'Téléphone acheteur',
+    'Vendeur', 'Téléphone vendeur', 'Montant (FCFA)', 'Réduction (FCFA)',
+    'Code promo', 'Statut livraison', 'Moyen de paiement', 'Référence paiement',
+  ];
+
+  const escapeCsv = (value) => {
+    const str = String(value ?? '');
+    return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+  };
+
+  const rows = data.map((o) => {
+    const acheteur = profilesById[o.acheteur_id];
+    const vendeur = profilesById[o.listings?.vendeur_id];
+    return [
+      o.id,
+      new Date(o.created_at).toLocaleString('fr-FR'),
+      o.listings?.title || 'Annonce supprimée',
+      acheteur?.nom || '',
+      acheteur?.telephone || '',
+      vendeur?.nom || '',
+      vendeur?.telephone || '',
+      o.montant,
+      o.discount_amount || 0,
+      o.promo_code || '',
+      o.deliveries?.[0]?.statut_livraison || '',
+      o.payment_provider || '',
+      o.payment_reference || '',
+    ].map(escapeCsv).join(',');
+  });
+
+  const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'zuno-transactions-' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 </script>
 </body>

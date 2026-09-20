@@ -21,6 +21,7 @@ import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 import { AVATAR_PALETTE } from '../components/Avatar';
+import PhoneInput from '../components/PhoneInput';
 
 export default function EditProfileScreen({ navigation }) {
   const [nom, setNom] = useState('');
@@ -225,24 +226,10 @@ export default function EditProfileScreen({ navigation }) {
           />
 
           <Text style={styles.label}>Numéro de téléphone</Text>
-          <TextInput
-            placeholder="+227 90 00 00 00"
-            placeholderTextColor={colors.textMuted}
-            value={telephone}
-            onChangeText={setTelephone}
-            keyboardType="phone-pad"
-            style={styles.input}
-          />
+          <PhoneInput value={telephone} onChangeValue={setTelephone} />
 
           <Text style={styles.label}>Numéro WhatsApp</Text>
-          <TextInput
-            placeholder="+227 90 00 00 00"
-            placeholderTextColor={colors.textMuted}
-            value={whatsapp}
-            onChangeText={setWhatsapp}
-            keyboardType="phone-pad"
-            style={styles.input}
-          />
+          <PhoneInput value={whatsapp} onChangeValue={setWhatsapp} />
 
           <Text style={styles.label}>Adresse email (facultatif)</Text>
           <TextInput

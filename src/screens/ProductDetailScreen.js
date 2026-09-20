@@ -5,7 +5,7 @@ import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { ILLEGAL_KEYWORDS } from '../lib/moderation';
-import { getSellerRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../lib/reputation';
+import { getSellerRating, getListingRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../lib/reputation';
 
 const REPORT_CATEGORIES = [...Object.keys(ILLEGAL_KEYWORDS), 'AUTRE'];
 
@@ -28,6 +28,7 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [reportComment, setReportComment] = useState('');
   const [sendingReport, setSendingReport] = useState(false);
   const [sellerStats, setSellerStats] = useState({ average: null, count: 0, completedSales: 0 });
+  const [listingRating, setListingRating] = useState({ average: null, count: 0 });
   const [sellerProfile, setSellerProfile] = useState(null);
   // Les annonces publiées avant l'ajout du carrousel n'ont qu'une seule
   // photo (photo_url) : on retombe dessus si `photos` n'existe pas.
@@ -51,11 +52,13 @@ export default function ProductDetailScreen({ route, navigation }) {
     let cancelled = false;
     Promise.all([
       getSellerRating(listing.vendeur_id),
+      getListingRating(listing.id),
       countCompletedSales(listing.vendeur_id),
       supabase.from('public_profiles').select('nom, photo_url, whatsapp, avatar_icon, avatar_color').eq('id', listing.vendeur_id).maybeSingle(),
-    ]).then(([rating, completedSales, profileResult]) => {
+    ]).then(([rating, listingRatingResult, completedSales, profileResult]) => {
       if (cancelled) return;
       setSellerStats({ ...rating, completedSales });
+      setListingRating(listingRatingResult);
       if (profileResult.data?.nom && profileResult.data.nom !== 'Toi (test)') {
         setSellerProfile(profileResult.data);
       }
@@ -375,10 +378,15 @@ export default function ProductDetailScreen({ route, navigation }) {
             )}
           </View>
           <Text style={styles.sellerMeta}>
+            {listingRating.count > 0
+              ? `★ ${listingRating.average.toFixed(1)} (${listingRating.count} avis sur cet article)`
+              : "Pas encore d'avis sur cet article"}
+          </Text>
+          <Text style={styles.sellerSubMeta}>
             {sellerStats.count > 0
-              ? `★ ${sellerStats.average.toFixed(1)} (${sellerStats.count} avis) · ${sellerStats.completedSales} ventes`
+              ? `Vendeur : ★ ${sellerStats.average.toFixed(1)} (${sellerStats.count} avis) · ${sellerStats.completedSales} ventes`
               : listing.vendeur_id
-              ? "Pas encore d'avis"
+              ? 'Vendeur : pas encore de ventes'
               : 'Vendeur non identifié'}
           </Text>
         </View>
@@ -627,6 +635,7 @@ const styles = StyleSheet.create({
   sellerName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sellerMeta: { fontSize: 12, color: colors.textSecondary },
+  sellerSubMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   favoriteButton: { padding: spacing.xs },
   whatsappButton: { padding: spacing.xs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },

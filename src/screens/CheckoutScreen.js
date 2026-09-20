@@ -9,11 +9,13 @@ import {
   Alert,
   ActivityIndicator,
   Modal,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import PhoneInput from '../components/PhoneInput';
 
 const CRENEAUX = ['Matin (8h-12h)', 'Après-midi (12h-16h)', 'Soir (16h-19h)'];
 
@@ -46,7 +48,7 @@ export default function CheckoutScreen({ route, navigation }) {
   const isPickup = deliveryMethod?.id === 'pickup';
 
   const handleConfirm = async () => {
-    if (!nom.trim() || !telephone.trim() || (!isPickup && !quartier.trim())) {
+    if (!nom.trim() || telephone.replace(/\D/g, '').length < 7 || (!isPickup && !quartier.trim())) {
       Alert.alert(
         'Informations manquantes',
         isPickup ? 'Nom et numéro sont obligatoires.' : 'Nom, numéro et quartier sont obligatoires.'
@@ -145,6 +147,25 @@ export default function CheckoutScreen({ route, navigation }) {
       });
     }
 
+    // Ouvre la page de paiement PayDunya (Wave, Orange Money, etc. selon
+    // ce que la personne choisit sur cette page). Actuellement branché en
+    // mode test : aucun vrai argent ne bouge tant que les clés de
+    // production ne sont pas activées.
+    const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+      'create-payment',
+      { body: { orderId: order.id } }
+    );
+
+    if (paymentError || !paymentData?.redirectUrl) {
+      console.error('Erreur création paiement:', paymentError, paymentData);
+      Alert.alert(
+        'Paiement indisponible',
+        "Impossible d'ouvrir la page de paiement pour l'instant. La commande est bien enregistrée, réessaie le paiement depuis Mes commandes."
+      );
+    } else {
+      Linking.openURL(paymentData.redirectUrl);
+    }
+
     Alert.alert(
       'Commande enregistrée',
       isPickup
@@ -184,14 +205,7 @@ export default function CheckoutScreen({ route, navigation }) {
       />
 
       <Text style={styles.label}>Numéro à contacter</Text>
-      <TextInput
-        placeholder="+227 90 00 00 00"
-        placeholderTextColor={colors.textMuted}
-        value={telephone}
-        onChangeText={setTelephone}
-        keyboardType="phone-pad"
-        style={styles.input}
-      />
+      <PhoneInput value={telephone} onChangeValue={setTelephone} />
 
       {isPickup ? (
         <View style={styles.pickupNote}>
