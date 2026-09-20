@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
-import { getDeviceUserId } from '../lib/deviceUser';
+import { getDeviceUserId, resetIdentity } from '../lib/deviceUser';
 import { useMode } from '../context/ModeContext';
 
 const STATUS_LABELS = {
@@ -188,7 +188,7 @@ export default function ProfileScreen({ navigation }) {
           text: 'Changer',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.removeItem('zuno_device_user_id');
+            await resetIdentity();
             await loadData();
             Alert.alert('Fait', 'Tu es maintenant un nouvel utilisateur de test.');
           },

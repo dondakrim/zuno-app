@@ -137,12 +137,12 @@ export default function HomeScreen({ navigation }) {
   const loadSellerRatings = useCallback(async (currentListings) => {
     const vendeurIds = [...new Set(currentListings.map((l) => l.vendeur_id).filter(Boolean))];
     if (vendeurIds.length === 0) return;
-    const { data } = await supabase.from('reviews').select('vendeur_id, note').in('vendeur_id', vendeurIds);
+    const { data } = await supabase.from('reviews').select('cible_id, note').in('cible_id', vendeurIds);
     const totals = {};
     (data || []).forEach((r) => {
-      if (!totals[r.vendeur_id]) totals[r.vendeur_id] = { sum: 0, count: 0 };
-      totals[r.vendeur_id].sum += r.note;
-      totals[r.vendeur_id].count += 1;
+      if (!totals[r.cible_id]) totals[r.cible_id] = { sum: 0, count: 0 };
+      totals[r.cible_id].sum += r.note;
+      totals[r.cible_id].count += 1;
     });
     const averages = {};
     Object.keys(totals).forEach((id) => {

@@ -120,6 +120,8 @@
       <button class="tab-btn" data-tab="articles">Articles</button>
       <button class="tab-btn" data-tab="marchands">Marchands</button>
       <button class="tab-btn" data-tab="comptes">Comptes</button>
+      <button class="tab-btn" data-tab="commandes">Commandes</button>
+      <button class="tab-btn" data-tab="paniers">Paniers</button>
     </div>
 
     <div class="panel active" id="panel-litiges"><div class="loading">Chargement…</div></div>
@@ -147,6 +149,23 @@
         <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email)…" oninput="loadComptes()">
       </div>
       <div id="comptes-list"><div class="loading">Chargement…</div></div>
+    </div>
+    <div class="panel" id="panel-commandes">
+      <div class="card" style="margin-bottom: 16px;">
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:6px;">Filtrer par statut</label>
+        <select id="commandes-filter" onchange="loadCommandes()" style="width:100%; padding:9px; border-radius:8px; border:1px solid var(--border); font-size:14px;">
+          <option value="tous">Toutes</option>
+          <option value="a_traiter">À traiter</option>
+          <option value="pris_en_charge">Pris en charge</option>
+          <option value="en_cours">Expédiées / en cours</option>
+          <option value="livre">Livrées</option>
+          <option value="annulee">Annulées</option>
+        </select>
+      </div>
+      <div id="commandes-list"><div class="loading">Chargement…</div></div>
+    </div>
+    <div class="panel" id="panel-paniers">
+      <div id="paniers-list"><div class="loading">Chargement…</div></div>
     </div>
     <div class="panel" id="panel-publicites">
       <div class="card">
@@ -232,6 +251,8 @@ async function checkAdminAndInit() {
   loadArticles();
   loadMerchants();
   loadComptes();
+  loadCommandes();
+  loadPaniers();
 }
 
 async function loadLitiges() {
@@ -828,6 +849,7 @@ async function loadComptes() {
 
       <div class="actions">
         <button class="btn btn-approve" onclick="toggleCompteDetail('${u.id}', '${(u.id_document_url || '').replace(/'/g, "\\'")}', ${u.ban_reason ? "'" + u.ban_reason.replace(/'/g, "\\'") + "'" : 'null'})">Voir les détails</button>
+        <button class="btn btn-approve" onclick="sendNotificationTo('${u.id}', '')">Envoyer une notification</button>
       </div>
     </div>
   `).join('');
@@ -864,6 +886,122 @@ async function toggleCompteDetail(userId, idDocumentUrl, banReason) {
     ${banReason ? '<p class="card-meta"><strong>Motif de suspension :</strong> ' + banReason + '</p>' : ''}
     ${idPhotoHtml}
   `;
+}
+
+// ---------- Envoyer une notification (in-app + push automatique) ----------
+
+async function sendNotificationTo(userId, defaultTitle) {
+  const title = prompt('Titre de la notification :', defaultTitle || '');
+  if (!title) return;
+  const body = prompt('Message (facultatif) :', '') || '';
+
+  const { error } = await sb.from('notifications').insert({ user_id: userId, title, body, type: 'admin' });
+  if (error) { alert('Erreur : ' + error.message); return; }
+  alert('Notification envoyée.');
+}
+
+// ---------- Commandes (vue globale de la plateforme) ----------
+
+const COMMANDE_LABELS = {
+  a_traiter: 'À traiter',
+  pris_en_charge: 'Pris en charge',
+  en_cours: 'Expédiée / en cours',
+  livre: 'Livrée',
+  annulee: 'Annulée',
+};
+
+async function loadCommandes() {
+  const list = document.getElementById('commandes-list');
+  const filter = document.getElementById('commandes-filter')?.value || 'tous';
+
+  const { data, error } = await sb
+    .from('orders')
+    .select('*, listings(title, vendeur_id), deliveries(statut_livraison, nom_contact, telephone_contact)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data) { list.innerHTML = '<div class="empty">Aucune commande.</div>'; return; }
+
+  const acheteurIds = [...new Set(data.map((o) => o.acheteur_id).filter(Boolean))];
+  const vendeurIds = [...new Set(data.map((o) => o.listings?.vendeur_id).filter(Boolean))];
+  const allIds = [...new Set([...acheteurIds, ...vendeurIds])];
+  let profilesById = {};
+  if (allIds.length > 0) {
+    const { data: profiles } = await sb.from('users').select('id, nom, telephone').in('id', allIds);
+    (profiles || []).forEach((p) => { profilesById[p.id] = p; });
+  }
+
+  const filtered = data.filter((o) => {
+    const status = o.deliveries?.[0]?.statut_livraison;
+    return filter === 'tous' || status === filter;
+  });
+
+  if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucune commande ne correspond.</div>'; return; }
+
+  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' commande(s) (100 plus récentes max)</p>' + filtered.map((o) => {
+    const status = o.deliveries?.[0]?.statut_livraison;
+    const acheteur = profilesById[o.acheteur_id];
+    const vendeur = profilesById[o.listings?.vendeur_id];
+    return `
+    <div class="card" data-id="${o.id}">
+      <p class="card-title">${o.listings?.title || 'Annonce supprimée'}</p>
+      <p class="card-sub">Acheteur : ${acheteur?.nom || '—'} (${acheteur?.telephone || '—'})</p>
+      <p class="card-sub">Vendeur : ${vendeur?.nom || '—'} (${vendeur?.telephone || '—'})</p>
+      <span class="pill">${Number(o.montant).toLocaleString('fr-FR')} FCFA</span>
+      <span class="pill">${COMMANDE_LABELS[status] || status || '—'}</span>
+      <p class="card-meta">${new Date(o.created_at).toLocaleString('fr-FR')}</p>
+      <div class="actions">
+        <button class="btn btn-approve" onclick="sendNotificationTo('${o.acheteur_id}', 'À propos de ta commande')">Notifier l'acheteur</button>
+        ${o.listings?.vendeur_id ? '<button class="btn btn-approve" onclick="sendNotificationTo(\'' + o.listings.vendeur_id + '\', \'Au sujet d une commande recue\')">Notifier le vendeur</button>' : ''}
+      </div>
+    </div>
+  `;
+  }).join('');
+}
+
+// ---------- Paniers (repérer les paniers non finalisés) ----------
+
+async function loadPaniers() {
+  const list = document.getElementById('paniers-list');
+
+  const { data, error } = await sb
+    .from('cart_items')
+    .select('*, listings(title, price, photo_url)')
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Aucun panier en attente pour l\'instant.</div>'; return; }
+
+  const acheteurIds = [...new Set(data.map((c) => c.acheteur_id).filter(Boolean))];
+  let profilesById = {};
+  if (acheteurIds.length > 0) {
+    const { data: profiles } = await sb.from('users').select('id, nom, telephone').in('id', acheteurIds);
+    (profiles || []).forEach((p) => { profilesById[p.id] = p; });
+  }
+
+  // Regroupe par acheteur, pour proposer une seule notification par
+  // personne même si plusieurs articles dorment dans son panier.
+  const byAcheteur = {};
+  data.forEach((c) => {
+    if (!byAcheteur[c.acheteur_id]) byAcheteur[c.acheteur_id] = [];
+    byAcheteur[c.acheteur_id].push(c);
+  });
+
+  list.innerHTML = Object.entries(byAcheteur).map(([acheteurId, items]) => {
+    const acheteur = profilesById[acheteurId];
+    return `
+    <div class="card" data-id="${acheteurId}">
+      <p class="card-title">${acheteur?.nom || 'Acheteur inconnu'}</p>
+      <p class="card-sub">${acheteur?.telephone || ''}</p>
+      ${items.map((i) => '<p class="card-meta">' + (i.listings?.title || 'Annonce supprimée') + ' × ' + i.quantity + ' — ' + Number(i.listings?.price || 0).toLocaleString('fr-FR') + ' FCFA</p>').join('')}
+      <div class="actions">
+        <button class="btn btn-approve" onclick="sendNotificationTo('${acheteurId}', 'Ton panier t\\'attend sur Zuno')">Relancer avec une notification</button>
+      </div>
+    </div>
+  `;
+  }).join('');
 }
 </script>
 </body>

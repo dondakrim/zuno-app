@@ -45,7 +45,7 @@ export default function ProductDetailScreen({ route, navigation }) {
     Promise.all([
       getSellerRating(listing.vendeur_id),
       countCompletedSales(listing.vendeur_id),
-      supabase.from('users').select('nom, photo_url, whatsapp').eq('id', listing.vendeur_id).maybeSingle(),
+      supabase.from('public_profiles').select('nom, photo_url, whatsapp').eq('id', listing.vendeur_id).maybeSingle(),
     ]).then(([rating, completedSales, profileResult]) => {
       if (cancelled) return;
       setSellerStats({ ...rating, completedSales });

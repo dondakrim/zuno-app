@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, radius } from '../theme/colors';
-import { getDeviceUserId, deleteAccountAndReset } from '../lib/deviceUser';
+import { getDeviceUserId, deleteAccountAndReset, resetIdentity } from '../lib/deviceUser';
 
 const PRIVACY_URL = 'https://claude.ai/artifact/W693o2tq7NtU93GffZanyM';
 const TERMS_URL = 'https://claude.ai/artifact/REfBbZLXoVGSHUzu1FD7DW';
@@ -29,8 +29,7 @@ export default function SettingsScreen({ navigation }) {
           text: 'Changer',
           style: 'destructive',
           onPress: async () => {
-            await AsyncStorage.removeItem('zuno_device_user_id');
-            await getDeviceUserId();
+            await resetIdentity();
             Alert.alert('Fait', 'Tu es maintenant un nouvel utilisateur de test.');
           },
         },

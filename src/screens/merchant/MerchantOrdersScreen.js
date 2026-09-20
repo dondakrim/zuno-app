@@ -65,10 +65,22 @@ export default function MerchantOrdersScreen({ navigation }) {
     const myId = await getDeviceUserId();
     const { data } = await supabase
       .from('orders')
-      .select('*, listings!inner(vendeur_id, title, photo_url, vendeur_id), deliveries(*), acheteur:users!orders_acheteur_id_fkey(nom)')
+      .select('*, listings!inner(vendeur_id, title, photo_url, vendeur_id), deliveries(*)')
       .eq('listings.vendeur_id', myId)
       .order('created_at', { ascending: false });
-    setOrders(data || []);
+
+    const acheteurIds = [...new Set((data || []).map((o) => o.acheteur_id).filter(Boolean))];
+    let acheteurById = {};
+    if (acheteurIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('public_profiles')
+        .select('id, nom')
+        .in('id', acheteurIds);
+      (profiles || []).forEach((p) => {
+        acheteurById[p.id] = p;
+      });
+    }
+    setOrders((data || []).map((o) => ({ ...o, acheteur: acheteurById[o.acheteur_id] || null })));
 
     const orderIds = (data || []).map((o) => o.id);
     if (orderIds.length > 0) {

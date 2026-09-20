@@ -98,10 +98,22 @@ export default function MyOrdersScreen({ navigation }) {
 
     const { data: favData } = await supabase
       .from('favorite_shops')
-      .select('id, vendeur_id, users!favorite_shops_vendeur_id_fkey(nom, boutique_nom)')
+      .select('id, vendeur_id')
       .eq('acheteur_id', myId)
       .order('created_at', { ascending: false });
-    setFavorites(favData || []);
+
+    const vendeurIds = [...new Set((favData || []).map((f) => f.vendeur_id).filter(Boolean))];
+    let profilesById = {};
+    if (vendeurIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('public_profiles')
+        .select('id, nom, boutique_nom')
+        .in('id', vendeurIds);
+      (profiles || []).forEach((p) => {
+        profilesById[p.id] = p;
+      });
+    }
+    setFavorites((favData || []).map((f) => ({ ...f, users: profilesById[f.vendeur_id] || null })));
 
     setLoading(false);
   }, []);

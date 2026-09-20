@@ -2,30 +2,46 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import { supabase } from './supabase';
 
-const STORAGE_KEY = 'zuno_device_user_id';
+// Chaque appareil a maintenant une vraie session Supabase (connexion
+// anonyme), au lieu d'un simple identifiant généré localement. Ça ne
+// change rien pour la personne qui utilise l'appli (aucun mot de passe,
+// aucun code à saisir), mais ça permet enfin à la base de données de
+// savoir, de façon fiable, qui fait chaque demande — indispensable pour
+// que les règles de sécurité (RLS) protègent vraiment les données de
+// chacun.
+let sessionPromise = null;
 
-function generateUuid() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-// Tant que la connexion par téléphone est désactivée (voir src/config.js),
-// on donne à chaque appareil une identité stable et unique, pour que les
-// annonces et les messages puissent être rattachés à quelqu'un. Une fois
-// PHONE_AUTH_ENABLED remis à true, cette identité sera remplacée par le
-// vrai compte de l'utilisateur.
-export async function getDeviceUserId() {
-  let id = await AsyncStorage.getItem(STORAGE_KEY);
-  if (!id) {
-    id = generateUuid();
-    await AsyncStorage.setItem(STORAGE_KEY, id);
+async function getOrCreateSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    return session.user;
   }
 
-  // S'assure qu'une ligne existe dans la table `users` pour cette identité,
-  // sinon les liaisons vers les annonces et les messages échoueraient.
+  // Si plusieurs écrans démarrent en même temps, on ne veut surtout pas
+  // déclencher plusieurs connexions anonymes en parallèle (elles
+  // pourraient se marcher dessus) : tout le monde attend la même
+  // tentative, une seule fois.
+  if (!sessionPromise) {
+    sessionPromise = supabase.auth.signInAnonymously().finally(() => {
+      sessionPromise = null;
+    });
+  }
+
+  const { data, error } = await sessionPromise;
+  if (error) {
+    console.error('Erreur connexion anonyme:', error);
+    throw error;
+  }
+  return data.user;
+}
+
+export async function getDeviceUserId() {
+  const user = await getOrCreateSession();
+  const id = user.id;
+
+  // S'assure qu'une ligne existe dans la table `users` pour cette
+  // identité, sinon les liaisons vers les annonces et les messages
+  // échoueraient.
   const { error } = await supabase
     .from('users')
     .upsert(
@@ -34,21 +50,30 @@ export async function getDeviceUserId() {
     );
 
   if (error) {
-    console.error('Erreur création identité de test:', error);
+    console.error('Erreur création identité:', error, 'id utilisé :', id);
   }
 
   return id;
 }
 
+// Remplace l'identité actuelle par une toute nouvelle — utile uniquement
+// pour tester la messagerie et les commandes seul, sans deuxième
+// téléphone (Profil > Paramètres > Changer d'identité de test).
+export async function resetIdentity() {
+  await supabase.auth.signOut();
+  return getDeviceUserId();
+}
+
 // Supprime le compte : rend les informations personnelles anonymes côté
 // Supabase (nom, photo, ville, pièce d'identité, centres d'intérêt...) et
-// efface l'identité de l'appareil, pour repartir de zéro. Les annonces,
-// messages et commandes déjà liés à cet identifiant restent en base sous
-// forme anonyme (pour la cohérence des commandes passées côté acheteurs),
+// déconnecte la session, pour repartir de zéro. Les annonces, messages et
+// commandes déjà liés à cet identifiant restent en base sous forme
+// anonyme (pour la cohérence des commandes passées côté acheteurs),
 // plutôt que d'être supprimés d'un coup, ce qui risquerait de casser des
 // commandes en cours avec d'autres utilisateurs.
 export async function deleteAccountAndReset() {
-  const id = await AsyncStorage.getItem(STORAGE_KEY);
+  const { data: { session } } = await supabase.auth.getSession();
+  const id = session?.user?.id;
   if (!id) return;
 
   // Tente de retirer la pièce d'identité du stockage, si elle existe.
@@ -66,6 +91,8 @@ export async function deleteAccountAndReset() {
     .update({
       nom: 'Compte supprimé',
       telephone: `deleted-${id.slice(0, 8)}`,
+      whatsapp: null,
+      email: null,
       ville: null,
       photo_url: null,
       boutique_nom: null,
@@ -78,11 +105,12 @@ export async function deleteAccountAndReset() {
   await supabase.from('push_tokens').delete().eq('user_id', id);
 
   await AsyncStorage.multiRemove([
-    STORAGE_KEY,
     'zuno_onboarding_done',
     'zuno_user_mode',
     'zuno_merchant_suggestion_dismissed',
   ]);
+
+  await supabase.auth.signOut();
 }
 
 // Vérifie si le téléphone et le WhatsApp ont bien été renseignés (au-delà
