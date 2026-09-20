@@ -77,7 +77,7 @@ export default function ProfileScreen({ navigation }) {
 
     const { data: profileData } = await supabase
       .from('users')
-      .select('nom, ville, photo_url')
+      .select('nom, ville, photo_url, avatar_icon, avatar_color')
       .eq('id', myId)
       .maybeSingle();
     if (profileData) setProfile(profileData);
@@ -203,7 +203,11 @@ export default function ProfileScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.profileHeader}>
         <View style={styles.avatar}>
-          {profile.photo_url ? (
+          {profile.avatar_icon ? (
+            <View style={[styles.avatarIconWrap, { backgroundColor: profile.avatar_color }]}>
+              <Ionicons name={profile.avatar_icon} size={30} color={colors.white} />
+            </View>
+          ) : profile.photo_url ? (
             <Image source={{ uri: profile.photo_url }} style={styles.avatarImage} />
           ) : (
             <Text style={styles.avatarText}>
@@ -432,6 +436,7 @@ const styles = StyleSheet.create({
   name: { color: colors.white, fontSize: 15, fontWeight: '600' },
   deviceId: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 4 },
   avatarImage: { width: '100%', height: '100%', borderRadius: 28 },
+  avatarIconWrap: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   villeText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
   editProfileButton: {
     flexDirection: 'row',

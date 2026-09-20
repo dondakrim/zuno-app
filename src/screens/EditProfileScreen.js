@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  FlatList,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,6 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import { AVATAR_PALETTE } from '../components/Avatar';
 
 export default function EditProfileScreen({ navigation }) {
   const [nom, setNom] = useState('');
@@ -28,6 +31,9 @@ export default function EditProfileScreen({ navigation }) {
   const [boutiqueNom, setBoutiqueNom] = useState('');
   const [photoUrl, setPhotoUrl] = useState(null);
   const [newPhotoUri, setNewPhotoUri] = useState(null);
+  const [avatarIcon, setAvatarIcon] = useState(null);
+  const [avatarColor, setAvatarColor] = useState(null);
+  const [showPalette, setShowPalette] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -36,7 +42,7 @@ export default function EditProfileScreen({ navigation }) {
     const myId = await getDeviceUserId();
     const { data } = await supabase
       .from('users')
-      .select('nom, telephone, whatsapp, email, ville, boutique_nom, photo_url')
+      .select('nom, telephone, whatsapp, email, ville, boutique_nom, photo_url, avatar_icon, avatar_color')
       .eq('id', myId)
       .maybeSingle();
 
@@ -48,6 +54,8 @@ export default function EditProfileScreen({ navigation }) {
       setVille(data.ville || '');
       setBoutiqueNom(data.boutique_nom || '');
       setPhotoUrl(data.photo_url || null);
+      setAvatarIcon(data.avatar_icon || null);
+      setAvatarColor(data.avatar_color || null);
     }
     setLoading(false);
   }, []);
@@ -72,7 +80,17 @@ export default function EditProfileScreen({ navigation }) {
     });
     if (!result.canceled) {
       setNewPhotoUri(result.assets[0].uri);
+      setAvatarIcon(null);
+      setAvatarColor(null);
     }
+  };
+
+  const handlePickIcon = (choice) => {
+    setAvatarIcon(choice.icon);
+    setAvatarColor(choice.color);
+    setNewPhotoUri(null);
+    setPhotoUrl(null);
+    setShowPalette(false);
   };
 
   const handleSave = async () => {
@@ -106,7 +124,9 @@ export default function EditProfileScreen({ navigation }) {
           email: email.trim() || null,
           ville: ville.trim() || null,
           boutique_nom: boutiqueNom.trim() || null,
-          photo_url: finalPhotoUrl,
+          photo_url: avatarIcon ? null : finalPhotoUrl,
+          avatar_icon: avatarIcon,
+          avatar_color: avatarColor,
         })
         .eq('id', myId);
       if (error) throw error;
@@ -135,18 +155,65 @@ export default function EditProfileScreen({ navigation }) {
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
-          <TouchableOpacity style={styles.photoPicker} onPress={handlePickPhoto}>
-            {displayPhoto ? (
-              <Image source={{ uri: displayPhoto }} style={styles.photoImage} />
-            ) : (
-              <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera-outline" size={26} color={colors.textMuted} />
+          <View style={styles.photoPicker}>
+            {avatarIcon ? (
+              <View style={[styles.photoImage, styles.iconAvatar, { backgroundColor: avatarColor }]}>
+                <Ionicons name={avatarIcon} size={40} color={colors.white} />
               </View>
+            ) : displayPhoto ? (
+              <TouchableOpacity onPress={handlePickPhoto}>
+                <Image source={{ uri: displayPhoto }} style={styles.photoImage} />
+                <View style={styles.photoEditBadge}>
+                  <Ionicons name="pencil" size={12} color={colors.white} />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={handlePickPhoto}>
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="camera-outline" size={26} color={colors.textMuted} />
+                </View>
+                <View style={styles.photoEditBadge}>
+                  <Ionicons name="pencil" size={12} color={colors.white} />
+                </View>
+              </TouchableOpacity>
             )}
-            <View style={styles.photoEditBadge}>
-              <Ionicons name="pencil" size={12} color={colors.white} />
+          </View>
+
+          <View style={styles.photoActionsRow}>
+            <TouchableOpacity onPress={handlePickPhoto} style={styles.photoActionButton}>
+              <Ionicons name="image-outline" size={14} color={colors.purple} />
+              <Text style={styles.photoActionText}>Choisir une photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPalette(true)} style={styles.photoActionButton}>
+              <Ionicons name="color-palette-outline" size={14} color={colors.purple} />
+              <Text style={styles.photoActionText}>Choisir une icône</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Modal visible={showPalette} transparent animationType="fade" onRequestClose={() => setShowPalette(false)}>
+            <View style={styles.paletteOverlay}>
+              <View style={styles.paletteCard}>
+                <Text style={styles.paletteTitle}>Choisis un avatar</Text>
+                <FlatList
+                  data={AVATAR_PALETTE}
+                  numColumns={4}
+                  keyExtractor={(item) => item.icon}
+                  columnWrapperStyle={{ gap: spacing.sm, marginBottom: spacing.sm }}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[styles.paletteItem, { backgroundColor: item.color }]}
+                      onPress={() => handlePickIcon(item)}
+                    >
+                      <Ionicons name={item.icon} size={26} color={colors.white} />
+                    </TouchableOpacity>
+                  )}
+                />
+                <TouchableOpacity onPress={() => setShowPalette(false)} style={styles.paletteCancel}>
+                  <Text style={styles.paletteCancelText}>Annuler</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </TouchableOpacity>
+          </Modal>
 
           <Text style={styles.label}>Nom complet</Text>
           <TextInput
@@ -261,6 +328,28 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.background,
   },
+  iconAvatar: { alignItems: 'center', justifyContent: 'center' },
+  photoActionsRow: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg, marginBottom: spacing.lg },
+  photoActionButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  photoActionText: { fontSize: 12, fontWeight: '600', color: colors.purple },
+  paletteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  paletteCard: { width: '100%', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg },
+  paletteTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md, textAlign: 'center' },
+  paletteItem: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paletteCancel: { marginTop: spacing.sm, paddingVertical: spacing.sm, alignItems: 'center' },
+  paletteCancelText: { color: colors.textSecondary, fontWeight: '600' },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.sm },
   input: {
     backgroundColor: colors.surface,

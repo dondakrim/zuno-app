@@ -138,6 +138,7 @@
       <button class="tab-btn" data-tab="comptes">Comptes</button>
       <button class="tab-btn" data-tab="commandes">Commandes</button>
       <button class="tab-btn" data-tab="paniers">Paniers</button>
+      <button class="tab-btn" data-tab="campagnes">Campagnes</button>
     </div>
 
     <div class="panels">
@@ -183,6 +184,44 @@
     </div>
     <div class="panel" id="panel-paniers">
       <div id="paniers-list"><div class="loading">Chargement…</div></div>
+    </div>
+    <div class="panel" id="panel-campagnes">
+      <div class="card" style="margin-bottom: 16px;">
+        <p class="card-title" style="margin-bottom: 12px;">Envoyer une notification ciblée</p>
+        <input type="text" id="campagne-title" placeholder="Titre">
+        <textarea id="campagne-body" placeholder="Message (facultatif)" rows="3" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px; font:inherit; margin-bottom:10px; resize:vertical;"></textarea>
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Image (facultative, affichée dans l'appli)</label>
+        <input type="file" id="campagne-image" accept="image/*" style="margin-bottom:14px;">
+        <img id="campagne-image-preview" style="display:none; max-width:100%; max-height:160px; border-radius:8px; margin-bottom:14px;">
+
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:6px; font-weight:700;">À qui l'envoyer ?</label>
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:14px;">
+          <input type="checkbox" id="campagne-tous" onchange="toggleCampagneTous()"> Tous les utilisateurs
+        </label>
+        <div id="campagne-categories" style="margin-bottom:8px; padding-left:4px;">
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px;">
+            <input type="checkbox" class="campagne-cat" value="Mode et vêtements"> Mode et vêtements
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px;">
+            <input type="checkbox" class="campagne-cat" value="Électronique et téléphones"> Électronique et téléphones
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px;">
+            <input type="checkbox" class="campagne-cat" value="Maison et électroménager"> Maison et électroménager
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px;">
+            <input type="checkbox" class="campagne-cat" value="Véhicules et pièces"> Véhicules et pièces
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:14px;">
+            <input type="checkbox" class="campagne-cat" value="Autres"> Autres
+          </label>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; margin-bottom:14px; font-size:14px;">
+          <input type="checkbox" id="campagne-marchands"> Uniquement les marchands (au moins une annonce)
+        </label>
+
+        <button class="btn btn-approve" id="campagne-send-btn" style="width:100%; padding:11px;" onclick="submitCampagne()">Envoyer la campagne</button>
+      </div>
+      <div id="campagne-result"></div>
     </div>
     <div class="panel" id="panel-publicites">
       <div class="card">
@@ -1180,6 +1219,111 @@ async function loadPaniers() {
     </div>
   `;
   }).join('');
+}
+
+// ---------- Campagnes (notification ciblée par catégorie d'intérêt) ----------
+
+let campagneImageFile = null;
+
+document.getElementById('campagne-image').addEventListener('change', (e) => {
+  campagneImageFile = e.target.files[0] || null;
+  const preview = document.getElementById('campagne-image-preview');
+  if (campagneImageFile) {
+    preview.src = URL.createObjectURL(campagneImageFile);
+    preview.style.display = 'block';
+  } else {
+    preview.style.display = 'none';
+  }
+});
+
+function toggleCampagneTous() {
+  const tous = document.getElementById('campagne-tous').checked;
+  document.querySelectorAll('.campagne-cat').forEach((cb) => {
+    cb.disabled = tous;
+    if (tous) cb.checked = false;
+  });
+}
+
+async function submitCampagne() {
+  const title = document.getElementById('campagne-title').value.trim();
+  const body = document.getElementById('campagne-body').value.trim();
+  const tous = document.getElementById('campagne-tous').checked;
+  const marchandsSeuls = document.getElementById('campagne-marchands').checked;
+  const selectedCats = [...document.querySelectorAll('.campagne-cat:checked')].map((cb) => cb.value);
+
+  if (!title) { alert('Le titre est obligatoire.'); return; }
+  if (!tous && selectedCats.length === 0) {
+    alert('Choisis "Tous les utilisateurs" ou au moins une catégorie de centre d\'intérêt.');
+    return;
+  }
+
+  const btn = document.getElementById('campagne-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Envoi…';
+
+  let imageUrl = null;
+  if (campagneImageFile) {
+    const extension = campagneImageFile.name.split('.').pop().toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
+    const fileName = 'campagne-' + Date.now() + '.' + extension;
+    const { error: uploadError } = await sb.storage.from('ad-images').upload(fileName, campagneImageFile, {
+      contentType: campagneImageFile.type || 'image/jpeg',
+    });
+    if (uploadError) {
+      alert('Erreur upload image : ' + uploadError.message);
+      btn.disabled = false;
+      btn.textContent = 'Envoyer la campagne';
+      return;
+    }
+    const { data: pub } = sb.storage.from('ad-images').getPublicUrl(fileName);
+    imageUrl = pub.publicUrl;
+  }
+
+  // Détermine la liste des destinataires.
+  let query = sb.from('users').select('id, interets');
+  const { data: allUsers, error: usersError } = await query;
+  if (usersError) {
+    alert('Erreur : ' + usersError.message);
+    btn.disabled = false;
+    btn.textContent = 'Envoyer la campagne';
+    return;
+  }
+
+  let targets = allUsers || [];
+  if (!tous) {
+    targets = targets.filter((u) => (u.interets || []).some((cat) => selectedCats.includes(cat)));
+  }
+
+  if (marchandsSeuls) {
+    const { data: listings } = await sb.from('listings').select('vendeur_id');
+    const marchandIds = new Set((listings || []).map((l) => l.vendeur_id));
+    targets = targets.filter((u) => marchandIds.has(u.id));
+  }
+
+  if (targets.length === 0) {
+    alert('Aucun destinataire ne correspond à ces critères.');
+    btn.disabled = false;
+    btn.textContent = 'Envoyer la campagne';
+    return;
+  }
+
+  const rows = targets.map((u) => ({
+    user_id: u.id, title, body, image_url: imageUrl, type: 'campaign',
+  }));
+
+  const { error } = await sb.from('notifications').insert(rows);
+
+  btn.disabled = false;
+  btn.textContent = 'Envoyer la campagne';
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+
+  document.getElementById('campagne-result').innerHTML =
+    '<div class="card"><p class="card-title">Envoyée à ' + targets.length + ' personne(s)</p></div>';
+  document.getElementById('campagne-title').value = '';
+  document.getElementById('campagne-body').value = '';
+  document.getElementById('campagne-image').value = '';
+  document.getElementById('campagne-image-preview').style.display = 'none';
+  campagneImageFile = null;
 }
 </script>
 </body>

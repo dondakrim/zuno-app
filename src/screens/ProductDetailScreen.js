@@ -36,8 +36,15 @@ export default function ProductDetailScreen({ route, navigation }) {
   // encore de vendeur identifié, ou son profil n'a pas encore été rempli :
   // on affiche un repère temporaire dans ces cas-là.
   const seller = sellerProfile?.nom
-    ? { name: sellerProfile.nom, initials: sellerProfile.nom.slice(0, 2).toUpperCase(), photo: sellerProfile.photo_url, whatsapp: sellerProfile.whatsapp }
-    : { name: 'Vendeur Zuno', initials: 'VZ', photo: null, whatsapp: null };
+    ? {
+        name: sellerProfile.nom,
+        initials: sellerProfile.nom.slice(0, 2).toUpperCase(),
+        photo: sellerProfile.photo_url,
+        avatarIcon: sellerProfile.avatar_icon,
+        avatarColor: sellerProfile.avatar_color,
+        whatsapp: sellerProfile.whatsapp,
+      }
+    : { name: 'Vendeur Zuno', initials: 'VZ', photo: null, avatarIcon: null, avatarColor: null, whatsapp: null };
 
   useEffect(() => {
     if (!listing.vendeur_id) return;
@@ -45,7 +52,7 @@ export default function ProductDetailScreen({ route, navigation }) {
     Promise.all([
       getSellerRating(listing.vendeur_id),
       countCompletedSales(listing.vendeur_id),
-      supabase.from('public_profiles').select('nom, photo_url, whatsapp').eq('id', listing.vendeur_id).maybeSingle(),
+      supabase.from('public_profiles').select('nom, photo_url, whatsapp, avatar_icon, avatar_color').eq('id', listing.vendeur_id).maybeSingle(),
     ]).then(([rating, completedSales, profileResult]) => {
       if (cancelled) return;
       setSellerStats({ ...rating, completedSales });
@@ -350,7 +357,11 @@ export default function ProductDetailScreen({ route, navigation }) {
 
       <View style={styles.sellerRow}>
         <View style={styles.avatar}>
-          {seller.photo ? (
+          {seller.avatarIcon ? (
+            <View style={[styles.avatarIconWrap, { backgroundColor: seller.avatarColor }]}>
+              <Ionicons name={seller.avatarIcon} size={20} color={colors.white} />
+            </View>
+          ) : seller.photo ? (
             <Image source={{ uri: seller.photo }} style={styles.avatarImage} />
           ) : (
             <Text style={styles.avatarText}>{seller.initials}</Text>
@@ -612,6 +623,7 @@ const styles = StyleSheet.create({
   },
   avatarImage: { width: '100%', height: '100%' },
   avatarText: { color: colors.white, fontWeight: '600', fontSize: 13 },
+  avatarIconWrap: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
   sellerName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   sellerMeta: { fontSize: 12, color: colors.textSecondary },
