@@ -166,6 +166,7 @@
     <div class="panel" id="panel-comptes">
       <div class="card" style="margin-bottom: 16px;">
         <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email)…" oninput="loadComptes()">
+        <button class="btn btn-approve" style="width:100%; padding:10px; margin-top:10px;" onclick="exportAllAccountsCSV()">Exporter tous les comptes (CSV)</button>
       </div>
       <div id="comptes-list"><div class="loading">Chargement…</div></div>
     </div>
@@ -926,7 +927,7 @@ async function loadComptes() {
 
   const { data, error } = await sb
     .from('users')
-    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, id_document_url, is_banned, ban_reason, created_at')
+    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, id_document_url, is_banned, ban_reason, created_at, last_seen_at, last_city, last_region, last_country, device_model, os_info')
     .order('created_at', { ascending: false });
 
   if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
@@ -951,6 +952,11 @@ async function loadComptes() {
       <span class="pill">${u.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
       <p class="card-meta">Inscrit le ${new Date(u.created_at).toLocaleDateString('fr-FR')}</p>
+      <p class="card-meta">
+        ${u.last_seen_at ? 'Dernière connexion : ' + new Date(u.last_seen_at).toLocaleString('fr-FR') : 'Jamais reconnecté depuis'}
+        ${u.last_city ? ' · 📍 ' + u.last_city + (u.last_country ? ', ' + u.last_country : '') : ''}
+        ${u.device_model ? ' · 📱 ' + u.device_model : ''}
+      </p>
 
       <div id="compte-detail-${u.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
         <p class="card-meta">Chargement de l'activité…</p>
@@ -1484,6 +1490,35 @@ async function exportTransactionsCSV() {
   });
 
   downloadCsv('zuno-transactions-' + new Date().toISOString().slice(0, 10) + '.csv', headers, rows);
+}
+
+// ---------- Export CSV de tous les comptes (annuaire complet) ----------
+
+async function exportAllAccountsCSV() {
+  const { data, error } = await sb
+    .from('users')
+    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, is_banned, created_at, last_seen_at, last_city, last_region, last_country, device_model, os_info')
+    .order('created_at', { ascending: false });
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+  if (!data || data.length === 0) { alert('Aucun compte à exporter.'); return; }
+
+  const headers = [
+    'ID', 'Nom', 'Téléphone', 'WhatsApp', 'Email', 'Ville déclarée', 'Boutique',
+    'Statut identité', 'Suspendu', 'Inscrit le', 'Dernière connexion',
+    'Ville probable (IP)', 'Région probable', 'Pays probable', 'Appareil', 'Système',
+  ];
+
+  const rows = data.map((u) => [
+    u.id, u.nom || '', u.telephone || '', u.whatsapp || '', u.email || '', u.ville || '',
+    u.boutique_nom || '', u.identity_status || '', u.is_banned ? 'Oui' : 'Non',
+    new Date(u.created_at).toLocaleString('fr-FR'),
+    u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('fr-FR') : '',
+    u.last_city || '', u.last_region || '', u.last_country || '',
+    u.device_model || '', u.os_info || '',
+  ]);
+
+  downloadCsv('zuno-comptes-' + new Date().toISOString().slice(0, 10) + '.csv', headers, rows);
 }
 
 // ---------- Export de l'historique complet d'un compte (traçabilité,

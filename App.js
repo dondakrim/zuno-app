@@ -1,9 +1,10 @@
 import 'react-native-url-polyfill/auto';
 import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Device from 'expo-device';
 import { AuthProvider } from './src/context/AuthContext';
 import { ModeProvider } from './src/context/ModeContext';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -46,6 +47,23 @@ export default function App() {
         console.log('Erreur vérification bannissement, on continue quand même :', e.message);
         setBanInfo({ checked: true, banned: false, reason: '' });
       });
+
+    // Enregistre discrètement la dernière connexion (ville approximative
+    // déduite de l'adresse IP, modèle d'appareil) — utile pour le
+    // tableau de bord admin, sans jamais demander de permission à la
+    // personne. Ne bloque jamais l'ouverture de l'appli si ça échoue.
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      supabase.functions
+        .invoke('track-session', {
+          body: {
+            deviceModel: Device.modelName,
+            osName: Device.osName,
+            osVersion: Device.osVersion,
+          },
+        })
+        .catch((e) => console.log('Erreur enregistrement session (sans conséquence) :', e.message));
+    });
   }, [checkingOnboarding, onboardingDone]);
 
   if (checkingOnboarding || (onboardingDone && !banInfo.checked)) {

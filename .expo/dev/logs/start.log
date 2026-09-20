@@ -4134,3 +4134,10 @@
 {"_e":"metro:client_log","_t":1789939877085,"level":"error","data":["[Error: Uncaught (in promise, id: 0): \"AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname\"]"]}
 {"_e":"metro:client_log","_t":1789939877098,"level":"error","data":["[Error: Uncaught (in promise, id: 1): \"AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname\"]"]}
 {"_e":"metro:client_log","_t":1789940003021,"level":"error","data":["Erreur création paiement:","[FunctionsHttpError: Edge Function returned a non-2xx status code]","null"]}
+{"_e":"root:init","_t":1789948653378,"format":"v0-jsonl","version":"57.0.25"}
+{"_e":"env:mode","_t":1789948653379,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1789948653380,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1789948653638,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1789948653847,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1789948653979,"plugins":[]}
+{"_e":"metro:instantiate","_t":1789948654276,"atlas":false,"workers":7,"host":"::","port":8081}
