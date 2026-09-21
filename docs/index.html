@@ -175,7 +175,10 @@
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-boosts"><div class="loading">Chargement…</div></div>
-    <div class="panel" id="panel-utilisateurs"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-utilisateurs">
+      <div id="utilisateurs-grid"><div class="loading">Chargement…</div></div>
+      <div id="utilisateur-detail-page" class="detail-page"></div>
+    </div>
     <div class="panel" id="panel-articles">
       <div class="card" style="margin-bottom: 16px;">
         <input type="text" id="articles-search" placeholder="Rechercher un article (titre)…" oninput="loadArticles()" style="margin-bottom: 10px;">
@@ -188,7 +191,8 @@
           <option value="boosted">En vedette d'abord</option>
         </select>
       </div>
-      <div id="articles-list"><div class="loading">Chargement…</div></div>
+      <div id="articles-grid"><div class="loading">Chargement…</div></div>
+      <div id="article-detail-page" class="detail-page"></div>
     </div>
     <div class="panel" id="panel-marchands">
       <div id="marchands-grid"><div class="loading">Chargement…</div></div>
@@ -215,10 +219,12 @@
         </select>
         <button class="btn btn-approve" style="width:100%; padding:10px; margin-top:10px;" onclick="exportTransactionsCSV()">Exporter toutes les transactions (CSV)</button>
       </div>
-      <div id="commandes-list"><div class="loading">Chargement…</div></div>
+      <div id="commandes-grid"><div class="loading">Chargement…</div></div>
+      <div id="commande-detail-page" class="detail-page"></div>
     </div>
     <div class="panel" id="panel-paniers">
-      <div id="paniers-list"><div class="loading">Chargement…</div></div>
+      <div id="paniers-grid"><div class="loading">Chargement…</div></div>
+      <div id="panier-detail-page" class="detail-page"></div>
     </div>
     <div class="panel" id="panel-campagnes">
       <div class="card" style="margin-bottom: 16px;">
@@ -274,6 +280,7 @@
         <button class="btn btn-approve" style="width:100%; padding:11px;" onclick="createPromo()">Créer le code</button>
       </div>
       <div id="promos-list"><div class="loading">Chargement…</div></div>
+      <div id="promo-detail-page" class="detail-page"></div>
     </div>
     <div class="panel" id="panel-publicites">
       <div class="card">
@@ -664,12 +671,13 @@ async function rejectBoost(requestId, vendeurId, listingTitle) {
   loadBoosts();
 }
 
-async function loadUsers() {
-  const panel = document.getElementById('panel-utilisateurs');
+let utilisateursData = {};
 
-  const [{ data: blockedListings }, { data: disputes }, { data: users }] = await Promise.all([
+async function loadUsers() {
+  const grid = document.getElementById('utilisateurs-grid');
+
+  const [{ data: blockedListings }, { data: users }] = await Promise.all([
     sb.from('listings').select('vendeur_id').eq('moderation_status', 'blocked'),
-    sb.from('order_disputes').select('order_id, status').eq('status', 'ouvert'),
     sb.from('users').select('id, nom, telephone, whatsapp, email, is_banned, ban_reason'),
   ]);
 
@@ -687,26 +695,67 @@ async function loadUsers() {
     .filter((u) => u.blockedCount > 0 || u.is_banned)
     .sort((a, b) => b.blockedCount - a.blockedCount);
 
+  utilisateursData = {};
+  risky.forEach((u) => { utilisateursData[u.id] = u; });
+
   if (risky.length === 0) {
-    panel.innerHTML = '<div class="empty">Aucun compte signalé pour l\'instant.</div>';
+    grid.innerHTML = '<div class="empty">Aucun compte signalé pour l\'instant.</div>';
     return;
   }
 
-  panel.innerHTML = risky.map((u) => `
-    <div class="card" data-id="${u.id}">
+  grid.innerHTML = '<div class="grid-list">' + risky.map((u) => `
+    <div class="grid-card" data-id="${u.id}">
       <p class="card-title">${u.nom || 'Sans nom'}</p>
-      <p class="card-sub">📞 ${u.telephone || '—'} · 💬 ${u.whatsapp || '—'}${u.email ? ' · ✉️ ' + u.email : ''}</p>
+      <p class="card-sub">📞 ${u.telephone || '—'}</p>
       <span class="pill">${u.blockedCount} annonce(s) bloquée(s)</span>
-      ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Compte suspendu</span>' : ''}
-      ${u.ban_reason ? '<p class="card-meta">Motif : ' + u.ban_reason + '</p>' : ''}
+      ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
+      <button class="btn btn-approve voir-plus-btn" onclick="showUtilisateurDetail('${u.id}')">Voir plus</button>
+    </div>
+  `).join('') + '</div>';
+}
+
+function closeUtilisateurDetail() {
+  document.getElementById('utilisateur-detail-page').classList.remove('active');
+  document.getElementById('utilisateurs-grid').style.display = 'block';
+}
+
+function showUtilisateurDetail(userId) {
+  const u = utilisateursData[userId];
+  if (!u) return;
+
+  document.getElementById('utilisateurs-grid').style.display = 'none';
+  const page = document.getElementById('utilisateur-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closeUtilisateurDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      <p class="detail-title">${u.nom || 'Sans nom'}</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Coordonnées</h4>
+      <div class="detail-row"><span>Téléphone</span><span>${u.telephone || '—'}</span></div>
+      <div class="detail-row"><span>WhatsApp</span><span>${u.whatsapp || '—'}</span></div>
+      <div class="detail-row"><span>Email</span><span>${u.email || '—'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Signalement</h4>
+      <div class="detail-row"><span>Annonces bloquées</span><span>${u.blockedCount}</span></div>
+      <div class="detail-row"><span>Statut</span><span>${u.is_banned ? 'Suspendu' : 'Actif'}</span></div>
+      ${u.ban_reason ? '<div class="detail-row"><span>Motif</span><span>' + u.ban_reason + '</span></div>' : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
       <div class="actions">
         ${u.is_banned
-          ? `<button class="btn btn-approve" onclick="setBan('${u.id}', false, null)">Réactiver le compte</button>`
-          : `<button class="btn btn-reject" onclick="banUser('${u.id}')">Suspendre ce compte</button>`
+          ? `<button class="btn btn-approve" onclick="setBan('${u.id}', false, null); closeUtilisateurDetail();">Réactiver le compte</button>`
+          : `<button class="btn btn-reject" onclick="banUser('${u.id}'); closeUtilisateurDetail();">Suspendre ce compte</button>`
         }
       </div>
     </div>
-  `).join('');
+  `;
 }
 
 async function banUser(userId) {
@@ -736,8 +785,10 @@ sb.auth.getSession().then(({ data: { session } }) => {
 
 // ---------- Articles (toutes les annonces de l'appli) ----------
 
+let articlesData = {};
+
 async function loadArticles() {
-  const list = document.getElementById('articles-list');
+  const grid = document.getElementById('articles-grid');
   const search = (document.getElementById('articles-search')?.value || '').toLowerCase();
   const sortBy = document.getElementById('articles-sort')?.value || 'priority';
 
@@ -745,8 +796,8 @@ async function loadArticles() {
     .from('listings')
     .select('*, vendeur:users!listings_vendeur_id_fkey(nom, telephone, boutique_nom, ville)');
 
-  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
-  if (!data) { list.innerHTML = '<div class="empty">Aucun article.</div>'; return; }
+  if (error) { grid.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data) { grid.innerHTML = '<div class="empty">Aucun article.</div>'; return; }
 
   const now = new Date();
   let filtered = data.filter((l) => !search || l.title?.toLowerCase().includes(search));
@@ -763,67 +814,111 @@ async function loadArticles() {
     return new Date(b.created_at) - new Date(a.created_at);
   });
 
-  if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucun article ne correspond.</div>'; return; }
+  articlesData = {};
+  filtered.forEach((l) => { articlesData[l.id] = l; });
 
-  list.innerHTML = filtered.map((l) => {
+  if (filtered.length === 0) { grid.innerHTML = '<div class="empty">Aucun article ne correspond.</div>'; return; }
+
+  grid.innerHTML = '<div class="grid-list">' + filtered.map((l) => {
     const isBoosted = l.boost_until && new Date(l.boost_until) > now;
     const isHidden = l.moderation_status === 'blocked';
     return `
-    <div class="card" data-id="${l.id}">
-      ${l.photo_url ? '<img src="' + l.photo_url + '" style="width:100%; max-height:120px; object-fit:cover; border-radius:8px; margin-bottom:10px;">' : ''}
+    <div class="grid-card" data-id="${l.id}">
+      ${l.photo_url ? '<img src="' + l.photo_url + '" style="width:100%; height:110px; object-fit:cover; border-radius:8px; margin-bottom:8px;">' : ''}
       <p class="card-title">${l.title}</p>
-      <p class="card-sub">${l.vendeur?.boutique_nom || l.vendeur?.nom || 'Vendeur inconnu'} · ${l.city || ''}</p>
-      <span class="pill">${Number(l.price).toLocaleString('fr-FR')} FCFA</span>
-      <span class="pill">${l.category || ''}</span>
-      <span class="pill">${l.condition || ''}</span>
+      <p class="card-sub">${Number(l.price).toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span>
       ${isHidden ? '<span class="pill" style="background:var(--danger); color:#fff;">Masquée</span>' : ''}
       ${isBoosted ? '<span class="pill" style="background:var(--orange); color:#fff;">En vedette</span>' : ''}
+      <button class="btn btn-approve voir-plus-btn" onclick="showArticleDetail('${l.id}')">Voir plus</button>
+    </div>
+  `;
+  }).join('') + '</div>';
+}
 
-      <div id="article-detail-${l.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
-        <p class="card-meta"><strong>Description :</strong> ${l.description || '—'}</p>
-        <p class="card-meta"><strong>Lieu :</strong> ${l.city || '—'} · <strong>Délai livraison :</strong> ${l.delai_livraison || '—'}</p>
-        <p class="card-meta"><strong>Vendeur :</strong> ${l.vendeur?.nom || '—'} · ${l.vendeur?.telephone || '—'} · ${l.vendeur?.ville || ''}</p>
-        <p class="card-meta"><strong>Score de modération :</strong> ${l.moderation_score ?? 0}${l.moderation_flags?.length ? ' · signaux : ' + l.moderation_flags.map(f => f.matched || f).join(', ') : ''}</p>
-        <div id="article-history-${l.id}"><p class="card-meta">Chargement de l'historique…</p></div>
+function closeArticleDetail() {
+  document.getElementById('article-detail-page').classList.remove('active');
+  document.getElementById('articles-grid').style.display = 'block';
+}
+
+async function showArticleDetail(id) {
+  const l = articlesData[id];
+  if (!l) return;
+  const now = new Date();
+  const isBoosted = l.boost_until && new Date(l.boost_until) > now;
+  const isHidden = l.moderation_status === 'blocked';
+
+  document.getElementById('articles-grid').style.display = 'none';
+  const page = document.getElementById('article-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closeArticleDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      ${l.photo_url ? '<img src="' + l.photo_url + '" style="width:90px; height:90px; object-fit:cover; border-radius:10px;">' : ''}
+      <div>
+        <p class="detail-title">${l.title}</p>
+        <p class="card-sub">${Number(l.price).toLocaleString('fr-FR')} FCFA</p>
       </div>
+    </div>
 
-      <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+    <div class="detail-section">
+      <h4>Détails</h4>
+      <div class="detail-row"><span>Description</span><span>${l.description || '—'}</span></div>
+      <div class="detail-row"><span>Catégorie</span><span>${l.category || '—'}</span></div>
+      <div class="detail-row"><span>État</span><span>${l.condition || '—'}</span></div>
+      <div class="detail-row"><span>Lieu</span><span>${l.city || '—'}</span></div>
+      <div class="detail-row"><span>Délai livraison</span><span>${l.delai_livraison || '—'}</span></div>
+      <div class="detail-row"><span>Statut</span><span>${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Vendeur</h4>
+      <div class="detail-row"><span>Nom</span><span>${l.vendeur?.nom || '—'}</span></div>
+      <div class="detail-row"><span>Téléphone</span><span>${l.vendeur?.telephone || '—'}</span></div>
+      <div class="detail-row"><span>Ville</span><span>${l.vendeur?.ville || '—'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Modération</h4>
+      <div class="detail-row"><span>Score</span><span>${l.moderation_score ?? 0}</span></div>
+      ${l.moderation_flags?.length ? '<div class="detail-row"><span>Signaux</span><span>' + l.moderation_flags.map(f => f.matched || f).join(', ') + '</span></div>' : ''}
+      <div class="detail-row"><span>Masquée</span><span>${isHidden ? 'Oui' : 'Non'}</span></div>
+      <div class="detail-row"><span>En vedette</span><span>${isBoosted ? 'Oui, jusqu\'au ' + new Date(l.boost_until).toLocaleDateString('fr-FR') : 'Non'}</span></div>
+    </div>
+
+    <div class="detail-section" id="article-history">
+      <h4>Historique de modération</h4>
+      <p class="card-meta">Chargement…</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
         <label style="font-size:12px; color: var(--text-secondary);">Priorité :</label>
         <input type="number" value="${l.priority || 0}" style="width:70px; padding:6px; border:1px solid var(--border); border-radius:6px;"
           onchange="updatePriority('${l.id}', this.value)">
       </div>
       <div class="actions">
-        <button class="btn btn-approve" onclick="toggleArticleDetail('${l.id}')">Voir détails</button>
         <button class="btn btn-approve" onclick="boostFromAdmin('${l.id}')">${isBoosted ? 'Prolonger 3j' : 'Mettre en avant 3j'}</button>
-        <button class="btn ${isHidden ? 'btn-approve' : 'btn-reject'}" onclick="toggleArticleVisibility('${l.id}', ${isHidden})">${isHidden ? 'Afficher' : 'Masquer'}</button>
+        <button class="btn ${isHidden ? 'btn-approve' : 'btn-reject'}" onclick="toggleArticleVisibility('${l.id}', ${isHidden}); closeArticleDetail();">${isHidden ? 'Afficher' : 'Masquer'}</button>
         <button class="btn btn-reject" onclick="deleteArticleAdmin('${l.id}')">Supprimer</button>
       </div>
     </div>
   `;
-  }).join('');
-}
 
-async function toggleArticleDetail(id) {
-  const el = document.getElementById('article-detail-' + id);
-  if (!el) return;
-  const opening = el.style.display === 'none';
-  el.style.display = opening ? 'block' : 'none';
-  if (!opening) return;
-
-  const historyEl = document.getElementById('article-history-' + id);
-  const { data, error } = await sb
+  const { data: history, error } = await sb
     .from('moderation_logs')
     .select('*')
     .eq('listing_id', id)
     .order('created_at', { ascending: false });
 
-  if (error || !data || data.length === 0) {
-    historyEl.innerHTML = '<p class="card-meta">Aucun historique de modération.</p>';
+  const historyEl = document.getElementById('article-history');
+  if (error || !history || history.length === 0) {
+    historyEl.innerHTML = '<h4>Historique de modération</h4><p class="card-meta">Aucun historique.</p>';
     return;
   }
-  historyEl.innerHTML = '<p class="card-meta"><strong>Historique :</strong></p>' + data.map((h) =>
-    '<p class="card-meta">' + new Date(h.created_at).toLocaleString('fr-FR') + ' — ' + h.action + ' (' + h.actor_type + ')</p>'
+  historyEl.innerHTML = '<h4>Historique de modération</h4>' + history.map((h) =>
+    '<div class="detail-row"><span>' + new Date(h.created_at).toLocaleString('fr-FR') + '</span><span>' + h.action + ' (' + h.actor_type + ')</span></div>'
   ).join('');
 }
 
@@ -836,6 +931,7 @@ async function boostFromAdmin(id) {
   const boostUntil = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
   const { error } = await sb.from('listings').update({ boost_until: boostUntil }).eq('id', id);
   if (error) { alert('Erreur : ' + error.message); return; }
+  closeArticleDetail();
   loadArticles();
 }
 
@@ -851,6 +947,7 @@ async function deleteArticleAdmin(id) {
   if (!confirm('Supprimer définitivement cet article ? Cette action échouera si des commandes y sont déjà liées.')) return;
   const { error } = await sb.from('listings').delete().eq('id', id);
   if (error) { alert("Impossible de supprimer : " + error.message + " (probablement des commandes déjà liées à cet article — utilise \"Masquer\" à la place)"); return; }
+  closeArticleDetail();
   loadArticles();
 }
 
@@ -1272,18 +1369,20 @@ const COMMANDE_LABELS = {
   annulee: 'Annulée',
 };
 
+let commandesData = {};
+
 async function loadCommandes() {
-  const list = document.getElementById('commandes-list');
+  const grid = document.getElementById('commandes-grid');
   const filter = document.getElementById('commandes-filter')?.value || 'tous';
 
   const { data, error } = await sb
     .from('orders')
-    .select('*, listings(title, vendeur_id), deliveries(statut_livraison, nom_contact, telephone_contact)')
+    .select('*, listings(title, vendeur_id, photo_url), deliveries(statut_livraison, nom_contact, telephone_contact, quartier, heure_livraison)')
     .order('created_at', { ascending: false })
     .limit(100);
 
-  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
-  if (!data) { list.innerHTML = '<div class="empty">Aucune commande.</div>'; return; }
+  if (error) { grid.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data) { grid.innerHTML = '<div class="empty">Aucune commande.</div>'; return; }
 
   const acheteurIds = [...new Set(data.map((o) => o.acheteur_id).filter(Boolean))];
   const vendeurIds = [...new Set(data.map((o) => o.listings?.vendeur_id).filter(Boolean))];
@@ -1299,20 +1398,77 @@ async function loadCommandes() {
     return filter === 'tous' || status === filter;
   });
 
-  if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucune commande ne correspond.</div>'; return; }
+  commandesData = {};
+  filtered.forEach((o) => { commandesData[o.id] = { ...o, acheteur: profilesById[o.acheteur_id], vendeur: profilesById[o.listings?.vendeur_id] }; });
 
-  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' commande(s) (100 plus récentes max)</p>' + filtered.map((o) => {
+  if (filtered.length === 0) { grid.innerHTML = '<div class="empty">Aucune commande ne correspond.</div>'; return; }
+
+  grid.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' commande(s) (100 plus récentes max)</p>' +
+    '<div class="grid-list">' + filtered.map((o) => {
     const status = o.deliveries?.[0]?.statut_livraison;
-    const acheteur = profilesById[o.acheteur_id];
-    const vendeur = profilesById[o.listings?.vendeur_id];
     return `
-    <div class="card" data-id="${o.id}">
+    <div class="grid-card" data-id="${o.id}">
       <p class="card-title">${o.listings?.title || 'Annonce supprimée'}</p>
-      <p class="card-sub">Acheteur : ${acheteur?.nom || '—'} (${acheteur?.telephone || '—'})</p>
-      <p class="card-sub">Vendeur : ${vendeur?.nom || '—'} (${vendeur?.telephone || '—'})</p>
-      <span class="pill">${Number(o.montant).toLocaleString('fr-FR')} FCFA</span>
+      <p class="card-sub">${Number(o.montant).toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${COMMANDE_LABELS[status] || status || '—'}</span>
-      <p class="card-meta">${new Date(o.created_at).toLocaleString('fr-FR')}</p>
+      <p class="card-meta">${new Date(o.created_at).toLocaleDateString('fr-FR')}</p>
+      <button class="btn btn-approve voir-plus-btn" onclick="showCommandeDetail('${o.id}')">Voir plus</button>
+    </div>
+  `;
+  }).join('') + '</div>';
+}
+
+function closeCommandeDetail() {
+  document.getElementById('commande-detail-page').classList.remove('active');
+  document.getElementById('commandes-grid').style.display = 'block';
+}
+
+function showCommandeDetail(orderId) {
+  const o = commandesData[orderId];
+  if (!o) return;
+  const status = o.deliveries?.[0]?.statut_livraison;
+  const acheteur = o.acheteur;
+  const vendeur = o.vendeur;
+
+  document.getElementById('commandes-grid').style.display = 'none';
+  const page = document.getElementById('commande-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closeCommandeDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      ${o.listings?.photo_url ? '<img src="' + o.listings.photo_url + '" style="width:90px; height:90px; object-fit:cover; border-radius:10px;">' : ''}
+      <div>
+        <p class="detail-title">${o.listings?.title || 'Annonce supprimée'}</p>
+        <p class="card-sub">${new Date(o.created_at).toLocaleString('fr-FR')}</p>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Commande</h4>
+      <div class="detail-row"><span>Montant</span><span>${Number(o.montant).toLocaleString('fr-FR')} FCFA</span></div>
+      ${o.discount_amount > 0 ? '<div class="detail-row"><span>Réduction appliquée</span><span>-' + Number(o.discount_amount).toLocaleString('fr-FR') + ' FCFA (' + (o.promo_code || '') + ')</span></div>' : ''}
+      <div class="detail-row"><span>Statut livraison</span><span>${COMMANDE_LABELS[status] || status || '—'}</span></div>
+      <div class="detail-row"><span>Quartier</span><span>${o.deliveries?.[0]?.quartier || '—'}</span></div>
+      <div class="detail-row"><span>Créneau</span><span>${o.deliveries?.[0]?.heure_livraison || '—'}</span></div>
+      <div class="detail-row"><span>Moyen de paiement</span><span>${o.payment_provider || '—'}</span></div>
+      <div class="detail-row"><span>Référence paiement</span><span>${o.payment_reference || '—'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Acheteur</h4>
+      <div class="detail-row"><span>Nom</span><span>${acheteur?.nom || '—'}</span></div>
+      <div class="detail-row"><span>Téléphone</span><span>${acheteur?.telephone || '—'}</span></div>
+      <div class="detail-row"><span>Contact livraison</span><span>${o.deliveries?.[0]?.nom_contact || '—'} (${o.deliveries?.[0]?.telephone_contact || '—'})</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Vendeur</h4>
+      <div class="detail-row"><span>Nom</span><span>${vendeur?.nom || '—'}</span></div>
+      <div class="detail-row"><span>Téléphone</span><span>${vendeur?.telephone || '—'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
       <div class="actions">
         <button class="btn btn-approve" onclick="sendNotificationTo('${o.acheteur_id}', 'À propos de ta commande')">Notifier l'acheteur</button>
         ${acheteur?.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + acheteur.email + '\', \'À propos de ta commande\')">Emailer l\'acheteur</button>' : ''}
@@ -1321,13 +1477,14 @@ async function loadCommandes() {
       </div>
     </div>
   `;
-  }).join('');
 }
 
 // ---------- Paniers (repérer les paniers non finalisés) ----------
 
+let paniersData = {};
+
 async function loadPaniers() {
-  const list = document.getElementById('paniers-list');
+  const grid = document.getElementById('paniers-grid');
 
   const { data, error } = await sb
     .from('cart_items')
@@ -1335,8 +1492,8 @@ async function loadPaniers() {
     .order('created_at', { ascending: false })
     .limit(100);
 
-  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
-  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Aucun panier en attente pour l\'instant.</div>'; return; }
+  if (error) { grid.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { grid.innerHTML = '<div class="empty">Aucun panier en attente pour l\'instant.</div>'; return; }
 
   const acheteurIds = [...new Set(data.map((c) => c.acheteur_id).filter(Boolean))];
   let profilesById = {};
@@ -1353,20 +1510,67 @@ async function loadPaniers() {
     byAcheteur[c.acheteur_id].push(c);
   });
 
-  list.innerHTML = Object.entries(byAcheteur).map(([acheteurId, items]) => {
+  paniersData = {};
+  Object.entries(byAcheteur).forEach(([acheteurId, items]) => {
+    paniersData[acheteurId] = { acheteur: profilesById[acheteurId], items };
+  });
+
+  grid.innerHTML = '<div class="grid-list">' + Object.entries(byAcheteur).map(([acheteurId, items]) => {
     const acheteur = profilesById[acheteurId];
+    const total = items.reduce((sum, i) => sum + Number(i.listings?.price || 0) * (i.quantity || 1), 0);
     return `
-    <div class="card" data-id="${acheteurId}">
+    <div class="grid-card" data-id="${acheteurId}">
       <p class="card-title">${acheteur?.nom || 'Acheteur inconnu'}</p>
-      <p class="card-sub">${acheteur?.telephone || ''}</p>
-      ${items.map((i) => '<p class="card-meta">' + (i.listings?.title || 'Annonce supprimée') + ' × ' + i.quantity + ' — ' + Number(i.listings?.price || 0).toLocaleString('fr-FR') + ' FCFA</p>').join('')}
+      <p class="card-sub">${items.length} article(s) — ${total.toLocaleString('fr-FR')} FCFA</p>
+      <button class="btn btn-approve voir-plus-btn" onclick="showPanierDetail('${acheteurId}')">Voir plus</button>
+    </div>
+  `;
+  }).join('') + '</div>';
+}
+
+function closePanierDetail() {
+  document.getElementById('panier-detail-page').classList.remove('active');
+  document.getElementById('paniers-grid').style.display = 'block';
+}
+
+function showPanierDetail(acheteurId) {
+  const p = paniersData[acheteurId];
+  if (!p) return;
+  const { acheteur, items } = p;
+
+  document.getElementById('paniers-grid').style.display = 'none';
+  const page = document.getElementById('panier-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closePanierDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      <p class="detail-title">${acheteur?.nom || 'Acheteur inconnu'}</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Coordonnées</h4>
+      <div class="detail-row"><span>Téléphone</span><span>${acheteur?.telephone || '—'}</span></div>
+      <div class="detail-row"><span>Email</span><span>${acheteur?.email || '—'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Articles en attente (${items.length})</h4>
+      ${items.map((i) => `
+        <div class="detail-row">
+          <span>${i.listings?.title || 'Annonce supprimée'} × ${i.quantity}</span>
+          <span>${Number(i.listings?.price || 0).toLocaleString('fr-FR')} FCFA</span>
+        </div>
+      `).join('')}
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
       <div class="actions">
-        <button class="btn btn-approve" onclick="sendNotificationTo('${acheteurId}', 'Ton panier t\\'attend sur Zuno')">Relancer avec une notification</button>
+        <button class="btn btn-approve" onclick="sendNotificationTo('${acheteurId}', 'Ton panier t\'attend sur Zuno')">Relancer avec une notification</button>
         ${acheteur?.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + acheteur.email + '\', \'Ton panier t attend sur Zuno\')">Relancer par email</button>' : ''}
       </div>
     </div>
   `;
-  }).join('');
 }
 
 // ---------- Campagnes (notification ciblée par catégorie d'intérêt) ----------
@@ -1476,66 +1680,104 @@ async function submitCampagne() {
 
 // ---------- Promos (codes de réduction) ----------
 
+let promosData = {};
+
 async function loadPromos() {
-  const list = document.getElementById('promos-list');
+  const grid = document.getElementById('promos-list');
   const { data, error } = await sb.from('promo_codes').select('*').order('created_at', { ascending: false });
 
-  if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
-  if (!data || data.length === 0) { list.innerHTML = '<div class="empty">Aucun code promo pour l\'instant.</div>'; return; }
+  if (error) { grid.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { grid.innerHTML = '<div class="empty">Aucun code promo pour l\'instant.</div>'; return; }
 
-  list.innerHTML = data.map((p) => {
+  promosData = {};
+  data.forEach((p) => { promosData[p.id] = p; });
+
+  grid.innerHTML = '<div class="grid-list">' + data.map((p) => {
     const valueLabel = p.discount_type === 'percentage' ? p.discount_value + '%' : Number(p.discount_value).toLocaleString('fr-FR') + ' FCFA';
-    const usesLabel = p.max_uses !== null ? p.uses_count + ' / ' + p.max_uses + ' utilisations' : p.uses_count + ' utilisation(s)';
-    const expired = p.expires_at && new Date(p.expires_at) < new Date();
     return `
-    <div class="card" data-id="${p.id}">
+    <div class="grid-card" data-id="${p.id}">
       <p class="card-title">${p.code}</p>
-      <span class="pill">-${valueLabel}</span>
-      <span class="pill">${usesLabel}</span>
-      ${p.min_amount > 0 ? '<span class="pill">Min. ' + Number(p.min_amount).toLocaleString('fr-FR') + ' FCFA</span>' : ''}
-      ${p.expires_at ? '<span class="pill">' + (expired ? 'Expiré le ' : 'Expire le ') + new Date(p.expires_at).toLocaleDateString('fr-FR') + '</span>' : ''}
-      ${!p.active ? '<span class="pill" style="background:var(--danger); color:#fff;">Désactivé</span>' : ''}
+      <p class="card-sub">-${valueLabel} — ${p.uses_count} utilisation(s)</p>
+      ${!p.active ? '<span class="pill" style="background:var(--danger); color:#fff;">Désactivé</span>' : '<span class="pill">Actif</span>'}
+      <button class="btn btn-approve voir-plus-btn" onclick="showPromoDetail('${p.id}')">Voir plus</button>
+    </div>
+  `;
+  }).join('') + '</div>';
+}
+
+function closePromoDetail() {
+  document.getElementById('promo-detail-page').classList.remove('active');
+  document.getElementById('promos-list').style.display = 'block';
+}
+
+async function showPromoDetail(id) {
+  const p = promosData[id];
+  if (!p) return;
+  const valueLabel = p.discount_type === 'percentage' ? p.discount_value + '%' : Number(p.discount_value).toLocaleString('fr-FR') + ' FCFA';
+  const expired = p.expires_at && new Date(p.expires_at) < new Date();
+
+  document.getElementById('promos-list').style.display = 'none';
+  const page = document.getElementById('promo-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closePromoDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      <p class="detail-title">${p.code}</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Paramètres</h4>
+      <div class="detail-row"><span>Réduction</span><span>-${valueLabel}</span></div>
+      <div class="detail-row"><span>Montant minimum</span><span>${p.min_amount > 0 ? Number(p.min_amount).toLocaleString('fr-FR') + ' FCFA' : 'Aucun'}</span></div>
+      <div class="detail-row"><span>Limite d'utilisation</span><span>${p.max_uses !== null ? p.uses_count + ' / ' + p.max_uses : p.uses_count + ' (illimité)'}</span></div>
+      <div class="detail-row"><span>Expiration</span><span>${p.expires_at ? new Date(p.expires_at).toLocaleDateString('fr-FR') + (expired ? ' (expiré)' : '') : 'Aucune'}</span></div>
+      <div class="detail-row"><span>Statut</span><span>${p.active ? 'Actif' : 'Désactivé'}</span></div>
+    </div>
+
+    <div class="detail-section" id="promo-usages">
+      <h4>Qui l'a utilisé</h4>
+      <p class="card-meta">Chargement…</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
       <div class="actions">
-        <button class="btn ${p.active ? 'btn-reject' : 'btn-approve'}" onclick="togglePromo('${p.id}', ${!p.active})">${p.active ? 'Désactiver' : 'Activer'}</button>
+        <button class="btn ${p.active ? 'btn-reject' : 'btn-approve'}" onclick="togglePromo('${p.id}', ${!p.active}); closePromoDetail();">${p.active ? 'Désactiver' : 'Activer'}</button>
         <button class="btn btn-reject" onclick="deletePromo('${p.id}')">Supprimer</button>
       </div>
     </div>
   `;
+
+  const { data: orders, error } = await sb
+    .from('orders')
+    .select('created_at, acheteur_id, discount_amount, listings(title)')
+    .eq('promo_code', p.code)
+    .order('created_at', { ascending: false });
+
+  const usagesEl = document.getElementById('promo-usages');
+  if (error || !orders || orders.length === 0) {
+    usagesEl.innerHTML = '<h4>Qui l\'a utilisé</h4><p class="card-meta">Ce code n\'a encore jamais été utilisé.</p>';
+    return;
+  }
+
+  const acheteurIds = [...new Set(orders.map((o) => o.acheteur_id).filter(Boolean))];
+  let profilesById = {};
+  if (acheteurIds.length > 0) {
+    const { data: profiles } = await sb.from('users').select('id, nom, telephone').in('id', acheteurIds);
+    (profiles || []).forEach((pr) => { profilesById[pr.id] = pr; });
+  }
+
+  usagesEl.innerHTML = '<h4>Qui l\'a utilisé (' + orders.length + ' fois)</h4>' + orders.map((o) => {
+    const acheteur = profilesById[o.acheteur_id];
+    return `
+      <div class="detail-row">
+        <span>${new Date(o.created_at).toLocaleDateString('fr-FR')} — ${acheteur?.nom || 'Inconnu'} (${acheteur?.telephone || ''})</span>
+        <span>${o.listings?.title || 'Annonce supprimée'} · -${Number(o.discount_amount || 0).toLocaleString('fr-FR')} FCFA</span>
+      </div>
+    `;
   }).join('');
 }
 
-async function createPromo() {
-  const code = document.getElementById('promo-code').value.trim().toUpperCase();
-  const discountType = document.getElementById('promo-type').value;
-  const discountValue = parseFloat(document.getElementById('promo-value').value);
-  const minAmount = parseFloat(document.getElementById('promo-min').value) || 0;
-  const maxUsesRaw = document.getElementById('promo-max-uses').value;
-  const maxUses = maxUsesRaw ? parseInt(maxUsesRaw, 10) : null;
-  const expiresRaw = document.getElementById('promo-expires').value;
-  const expiresAt = expiresRaw ? new Date(expiresRaw + 'T23:59:59').toISOString() : null;
-
-  if (!code || !discountValue) { alert('Code et valeur de la réduction sont obligatoires.'); return; }
-
-  const { error } = await sb.from('promo_codes').insert({
-    code, discount_type: discountType, discount_value: discountValue,
-    min_amount: minAmount, max_uses: maxUses, expires_at: expiresAt,
-  });
-
-  if (error) { alert('Erreur : ' + error.message); return; }
-
-  document.getElementById('promo-code').value = '';
-  document.getElementById('promo-value').value = '';
-  document.getElementById('promo-min').value = '';
-  document.getElementById('promo-max-uses').value = '';
-  document.getElementById('promo-expires').value = '';
-  loadPromos();
-}
-
-async function togglePromo(id, active) {
-  const { error } = await sb.from('promo_codes').update({ active }).eq('id', id);
-  if (error) { alert('Erreur : ' + error.message); return; }
-  loadPromos();
-}
 
 async function deletePromo(id) {
   if (!confirm('Supprimer définitivement ce code promo ?')) return;
