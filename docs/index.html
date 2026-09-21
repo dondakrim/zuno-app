@@ -93,11 +93,39 @@
     display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px;
     border-radius: 999px; background: var(--bg); color: var(--text-secondary); margin-right: 6px;
   }
-  .actions { display: flex; gap: 8px; margin-top: 10px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .btn {
     padding: 7px 14px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer;
   }
   .btn-approve { background: var(--success); color: #fff; }
+
+  /* Grille alignée pour les listes de comptes/marchands, plutôt qu'une
+     colonne unique de cartes empilées. */
+  .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .grid-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; display: flex; flex-direction: column; min-height: 0;
+  }
+  .grid-card .card-title { margin-bottom: 2px; }
+  .grid-card .card-sub { margin-bottom: 6px; }
+  .grid-card .voir-plus-btn { margin-top: auto; padding-top: 10px; }
+
+  /* Page de détail plein écran, affichée par-dessus la grille au clic
+     sur "Voir plus". */
+  .detail-page { display: none; }
+  .detail-page.active { display: block; }
+  .detail-back {
+    display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+    color: var(--purple); font-weight: 700; font-size: 13px; cursor: pointer; margin-bottom: 16px; padding: 0;
+  }
+  .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .detail-title { font-size: 20px; font-weight: 800; color: var(--text); margin: 0; }
+  .detail-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+  .detail-section h4 { margin: 0 0 10px; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+  .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg); font-size: 13px; }
+  .detail-row:last-child { border-bottom: none; }
+  .detail-row span:first-child { color: var(--text-secondary); }
+  .detail-row span:last-child { font-weight: 600; text-align: right; }
   .btn-reject { background: var(--danger); color: #fff; }
   .empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 30px; }
   .id-photo { max-width: 220px; border-radius: 8px; border: 1px solid var(--border); display: block; margin-bottom: 10px; }
@@ -162,13 +190,17 @@
       </div>
       <div id="articles-list"><div class="loading">Chargement…</div></div>
     </div>
-    <div class="panel" id="panel-marchands"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-marchands">
+      <div id="marchands-grid"><div class="loading">Chargement…</div></div>
+      <div id="marchand-detail-page" class="detail-page"></div>
+    </div>
     <div class="panel" id="panel-comptes">
       <div class="card" style="margin-bottom: 16px;">
         <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email)…" oninput="loadComptes()">
         <button class="btn btn-approve" style="width:100%; padding:10px; margin-top:10px;" onclick="exportAllAccountsCSV()">Exporter tous les comptes (CSV)</button>
       </div>
       <div id="comptes-list"><div class="loading">Chargement…</div></div>
+      <div id="compte-detail-page" class="detail-page"></div>
     </div>
     <div class="panel" id="panel-commandes">
       <div class="card" style="margin-bottom: 16px;">
@@ -827,15 +859,15 @@ async function deleteArticleAdmin(id) {
 let merchantsData = {};
 
 async function loadMerchants() {
-  const panel = document.getElementById('panel-marchands');
+  const grid = document.getElementById('marchands-grid');
 
   const [{ data: users }, { data: listings }, { data: orders }] = await Promise.all([
-    sb.from('users').select('id, nom, telephone, whatsapp, email, ville, photo_url, boutique_nom, is_banned, ban_reason, identity_status'),
+    sb.from('users').select('id, nom, telephone, whatsapp, email, ville, photo_url, boutique_nom, is_banned, ban_reason, identity_status, last_seen_at, last_city, last_country, device_model'),
     sb.from('listings').select('id, vendeur_id, status, moderation_status'),
     sb.from('orders').select('montant, listing_id, deliveries(statut_livraison), listings!inner(vendeur_id)'),
   ]);
 
-  if (!users || !listings) { panel.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
+  if (!users || !listings) { grid.innerHTML = '<div class="empty">Erreur de chargement.</div>'; return; }
 
   const sellerIds = new Set(listings.map((l) => l.vendeur_id).filter(Boolean));
   const merchants = users.filter((u) => sellerIds.has(u.id));
@@ -869,46 +901,95 @@ async function loadMerchants() {
   merchantsData = {};
   sorted.forEach((m) => { merchantsData[m.id] = { ...m, stats: stats[m.id] }; });
 
-  if (sorted.length === 0) { panel.innerHTML = '<div class="empty">Aucun marchand pour l\'instant.</div>'; return; }
+  if (sorted.length === 0) { grid.innerHTML = '<div class="empty">Aucun marchand pour l\'instant.</div>'; return; }
 
-  panel.innerHTML = sorted.map((m) => {
+  grid.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + sorted.length + ' marchand(s)</p>' +
+    '<div class="grid-list">' + sorted.map((m) => {
     const s = stats[m.id];
     return `
-    <div class="card" data-id="${m.id}">
+    <div class="grid-card" data-id="${m.id}">
       <p class="card-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
-      <p class="card-sub">📞 ${m.telephone || '—'} · 💬 ${m.whatsapp || '—'}${m.ville ? ' · ' + m.ville : ''}</p>
-      ${m.email ? '<p class="card-sub">✉️ ' + m.email + '</p>' : ''}
-      <span class="pill">Solde : ${s.revenue.toLocaleString('fr-FR')} FCFA</span>
+      <p class="card-sub">Solde : ${s.revenue.toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${s.soldListings} vendu(s)</span>
       <span class="pill">${s.activeListings} en ligne</span>
-      ${s.hiddenListings > 0 ? '<span class="pill">' + s.hiddenListings + ' masquée(s)</span>' : ''}
-      <span class="pill">${m.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${m.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
+      <button class="btn btn-approve voir-plus-btn" onclick="showMerchantDetail('${m.id}')">Voir plus</button>
+    </div>
+  `;
+  }).join('') + '</div>';
+}
 
-      <div id="merchant-detail-${m.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
-        <p class="card-meta">Commandes — À traiter : ${s.aTraiter} · Pris en charge : ${s.prisEnCharge} · Expédiées : ${s.enCours} · Livrées : ${s.livre} · Annulées : ${s.annulee}</p>
-        ${m.is_banned && m.ban_reason ? '<p class="card-meta">Motif de suspension : ' + m.ban_reason + '</p>' : ''}
+function closeMerchantDetail() {
+  document.getElementById('marchand-detail-page').classList.remove('active');
+  document.getElementById('marchands-grid').style.display = 'block';
+}
+
+function showMerchantDetail(id) {
+  const m = merchantsData[id];
+  if (!m) return;
+  const s = m.stats;
+
+  document.getElementById('marchands-grid').style.display = 'none';
+  const page = document.getElementById('marchand-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closeMerchantDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      <div>
+        <p class="detail-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
+        <p class="card-sub">${m.identity_status === 'verifiee' ? 'Identifié ✅' : 'Non identifié'}</p>
       </div>
+    </div>
 
+    <div class="detail-section">
+      <h4>Coordonnées</h4>
+      <div class="detail-row"><span>Téléphone</span><span>${m.telephone || '—'}</span></div>
+      <div class="detail-row"><span>WhatsApp</span><span>${m.whatsapp || '—'}</span></div>
+      <div class="detail-row"><span>Email</span><span>${m.email || '—'}</span></div>
+      <div class="detail-row"><span>Ville déclarée</span><span>${m.ville || '—'}</span></div>
+      ${m.is_banned ? '<div class="detail-row"><span>Suspendu</span><span style="color:var(--danger);">Oui' + (m.ban_reason ? ' — ' + m.ban_reason : '') + '</span></div>' : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>Connexion</h4>
+      <div class="detail-row"><span>Dernière connexion</span><span>${m.last_seen_at ? new Date(m.last_seen_at).toLocaleString('fr-FR') : 'Jamais reconnecté'}</span></div>
+      <div class="detail-row"><span>Localisation probable</span><span>${[m.last_city, m.last_country].filter(Boolean).join(', ') || '—'}</span></div>
+      <div class="detail-row"><span>Appareil</span><span>${m.device_model || '—'}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Boutique</h4>
+      <div class="detail-row"><span>Solde (commandes livrées)</span><span>${s.revenue.toLocaleString('fr-FR')} FCFA</span></div>
+      <div class="detail-row"><span>Articles en ligne</span><span>${s.activeListings}</span></div>
+      <div class="detail-row"><span>Articles vendus</span><span>${s.soldListings}</span></div>
+      <div class="detail-row"><span>Articles masqués</span><span>${s.hiddenListings}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Commandes</h4>
+      <div class="detail-row"><span>À traiter</span><span>${s.aTraiter}</span></div>
+      <div class="detail-row"><span>Pris en charge</span><span>${s.prisEnCharge}</span></div>
+      <div class="detail-row"><span>Expédiées / en cours</span><span>${s.enCours}</span></div>
+      <div class="detail-row"><span>Livrées</span><span>${s.livre}</span></div>
+      <div class="detail-row"><span>Annulées</span><span>${s.annulee}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
       <div class="actions">
-        <button class="btn btn-approve" onclick="toggleMerchantDetail('${m.id}')">Voir le profil</button>
         <button class="btn ${s.hiddenListings === s.totalListings && s.totalListings > 0 ? 'btn-approve' : 'btn-reject'}"
-          onclick="toggleShopVisibility('${m.id}', ${s.hiddenListings === s.totalListings && s.totalListings > 0})">
+          onclick="toggleShopVisibility('${m.id}', ${s.hiddenListings === s.totalListings && s.totalListings > 0}); closeMerchantDetail();">
           ${s.hiddenListings === s.totalListings && s.totalListings > 0 ? 'Afficher la boutique' : 'Masquer la boutique'}
         </button>
         ${m.is_banned
-          ? `<button class="btn btn-approve" onclick="setBan('${m.id}', false, null)">Réactiver</button>`
-          : `<button class="btn btn-reject" onclick="banUser('${m.id}')">Suspendre</button>`
+          ? `<button class="btn btn-approve" onclick="setBan('${m.id}', false, null); closeMerchantDetail();">Réactiver</button>`
+          : `<button class="btn btn-reject" onclick="banUser('${m.id}'); closeMerchantDetail();">Suspendre</button>`
         }
+        <button class="btn btn-approve" onclick="sendNotificationTo('${m.id}', '')">Envoyer une notification</button>
+        ${m.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + m.email + '\', \'\')">Envoyer un email</button>' : ''}
       </div>
     </div>
   `;
-  }).join('');
-}
-
-function toggleMerchantDetail(id) {
-  const el = document.getElementById('merchant-detail-' + id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 async function toggleShopVisibility(vendeurId, currentlyHidden) {
@@ -920,6 +1001,8 @@ async function toggleShopVisibility(vendeurId, currentlyHidden) {
 }
 
 // ---------- Comptes (tous les inscrits, acheteurs comme vendeurs) ----------
+
+let comptesData = {};
 
 async function loadComptes() {
   const list = document.getElementById('comptes-list');
@@ -941,45 +1024,82 @@ async function loadComptes() {
       || (u.email || '').toLowerCase().includes(search);
   });
 
+  comptesData = {};
+  data.forEach((u) => { comptesData[u.id] = u; });
+
   if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucun compte ne correspond.</div>'; return; }
 
-  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)</p>' + filtered.map((u) => `
-    <div class="card" data-id="${u.id}">
+  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)</p>' +
+    '<div class="grid-list">' + filtered.map((u) => `
+    <div class="grid-card" data-id="${u.id}">
       <p class="card-title">${u.boutique_nom || u.nom || 'Sans nom'}</p>
-      <p class="card-sub">📞 ${u.telephone || '—'} · 💬 WhatsApp : ${u.whatsapp || '—'}</p>
-      ${u.email ? '<p class="card-sub">✉️ ' + u.email + '</p>' : ''}
-      <span class="pill">${u.ville || 'Ville non renseignée'}</span>
+      <p class="card-sub">📞 ${u.telephone || '—'}</p>
       <span class="pill">${u.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
-      <p class="card-meta">Inscrit le ${new Date(u.created_at).toLocaleDateString('fr-FR')}</p>
-      <p class="card-meta">
-        ${u.last_seen_at ? 'Dernière connexion : ' + new Date(u.last_seen_at).toLocaleString('fr-FR') : 'Jamais reconnecté depuis'}
-        ${u.last_city ? ' · 📍 ' + u.last_city + (u.last_country ? ', ' + u.last_country : '') : ''}
-        ${u.device_model ? ' · 📱 ' + u.device_model : ''}
-      </p>
+      <p class="card-meta">${u.last_seen_at ? 'Vu le ' + new Date(u.last_seen_at).toLocaleDateString('fr-FR') : 'Jamais reconnecté'}</p>
+      <button class="btn btn-approve voir-plus-btn" onclick="showCompteDetail('${u.id}')">Voir plus</button>
+    </div>
+  `).join('') + '</div>';
+}
 
-      <div id="compte-detail-${u.id}" style="display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
-        <p class="card-meta">Chargement de l'activité…</p>
+function closeCompteDetail() {
+  document.getElementById('compte-detail-page').classList.remove('active');
+  document.getElementById('comptes-list').style.display = 'block';
+}
+
+async function showCompteDetail(userId) {
+  const u = comptesData[userId];
+  if (!u) return;
+
+  document.getElementById('comptes-list').style.display = 'none';
+  const page = document.getElementById('compte-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closeCompteDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      <div>
+        <p class="detail-title">${u.boutique_nom || u.nom || 'Sans nom'}</p>
+        <p class="card-sub">Inscrit le ${new Date(u.created_at).toLocaleDateString('fr-FR')}</p>
       </div>
+    </div>
 
+    <div class="detail-section">
+      <h4>Coordonnées</h4>
+      <div class="detail-row"><span>Téléphone</span><span>${u.telephone || '—'}</span></div>
+      <div class="detail-row"><span>WhatsApp</span><span>${u.whatsapp || '—'}</span></div>
+      <div class="detail-row"><span>Email</span><span>${u.email || '—'}</span></div>
+      <div class="detail-row"><span>Ville déclarée</span><span>${u.ville || '—'}</span></div>
+      <div class="detail-row"><span>Statut d'identité</span><span>${u.identity_status === 'verifiee' ? 'Identifié ✅' : 'Non identifié'}</span></div>
+      ${u.is_banned ? '<div class="detail-row"><span>Suspendu</span><span style="color:var(--danger);">Oui' + (u.ban_reason ? ' — ' + u.ban_reason : '') + '</span></div>' : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>Connexion</h4>
+      <div class="detail-row"><span>Dernière connexion</span><span>${u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('fr-FR') : 'Jamais reconnecté'}</span></div>
+      <div class="detail-row"><span>Localisation probable</span><span>${[u.last_city, u.last_region, u.last_country].filter(Boolean).join(', ') || '—'}</span></div>
+      <div class="detail-row"><span>Appareil</span><span>${u.device_model || '—'}</span></div>
+      <div class="detail-row"><span>Système</span><span>${u.os_info || '—'}</span></div>
+    </div>
+
+    <div class="detail-section" id="compte-detail-activity">
+      <h4>Activité sur la plateforme</h4>
+      <p class="card-meta">Chargement…</p>
+    </div>
+
+    <div class="detail-section" id="compte-detail-identity">
+      <h4>Pièce d'identité</h4>
+      <p class="card-meta">Chargement…</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Actions</h4>
       <div class="actions">
-        <button class="btn btn-approve" onclick="toggleCompteDetail('${u.id}', '${(u.id_document_url || '').replace(/'/g, "\\'")}', ${u.ban_reason ? "'" + u.ban_reason.replace(/'/g, "\\'") + "'" : 'null'})">Voir les détails</button>
         <button class="btn btn-approve" onclick="sendNotificationTo('${u.id}', '')">Envoyer une notification</button>
         ${u.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + u.email + '\', \'\')">Envoyer un email</button>' : ''}
         <button class="btn btn-approve" onclick="exportAccountHistory('${u.id}', '${(u.nom || 'compte').replace(/'/g, "\\'")}')">Exporter l'historique</button>
       </div>
     </div>
-  `).join('');
-}
-
-async function toggleCompteDetail(userId, idDocumentUrl, banReason) {
-  const el = document.getElementById('compte-detail-' + userId);
-  if (!el) return;
-  const opening = el.style.display === 'none';
-  el.style.display = opening ? 'block' : 'none';
-  if (!opening) return;
-
-  el.innerHTML = '<p class="card-meta">Chargement de l\'activité…</p>';
+  `;
 
   const [{ count: nbAnnonces }, { count: nbAchats }, { count: nbSignalements }, { count: nbLitiges }] = await Promise.all([
     sb.from('listings').select('id', { count: 'exact', head: true }).eq('vendeur_id', userId),
@@ -987,22 +1107,23 @@ async function toggleCompteDetail(userId, idDocumentUrl, banReason) {
     sb.from('moderation_queue').select('id', { count: 'exact', head: true }).eq('reporter_id', userId),
     sb.from('order_disputes').select('id', { count: 'exact', head: true }).eq('opened_by', userId),
   ]);
-
-  let idPhotoHtml = '<p class="card-meta">Aucune pièce d\'identité fournie.</p>';
-  if (idDocumentUrl) {
-    const { data: signed } = await sb.storage.from('identity-documents').createSignedUrl(idDocumentUrl, 3600);
-    if (signed?.signedUrl) {
-      idPhotoHtml = '<p class="card-meta"><strong>Pièce d\'identité :</strong></p><img class="id-photo" src="' + signed.signedUrl + '">';
-    }
-  }
-
-  el.innerHTML = `
-    <p class="card-meta"><strong>Activité sur la plateforme :</strong></p>
-    <p class="card-meta">${nbAnnonces || 0} annonce(s) publiée(s) · ${nbAchats || 0} achat(s) effectué(s)</p>
-    <p class="card-meta">${nbSignalements || 0} signalement(s) fait(s) · ${nbLitiges || 0} litige(s) ouvert(s)</p>
-    ${banReason ? '<p class="card-meta"><strong>Motif de suspension :</strong> ' + banReason + '</p>' : ''}
-    ${idPhotoHtml}
+  document.getElementById('compte-detail-activity').innerHTML = `
+    <h4>Activité sur la plateforme</h4>
+    <div class="detail-row"><span>Annonces publiées</span><span>${nbAnnonces || 0}</span></div>
+    <div class="detail-row"><span>Achats effectués</span><span>${nbAchats || 0}</span></div>
+    <div class="detail-row"><span>Signalements faits</span><span>${nbSignalements || 0}</span></div>
+    <div class="detail-row"><span>Litiges ouverts</span><span>${nbLitiges || 0}</span></div>
   `;
+
+  const identityBlock = document.getElementById('compte-detail-identity');
+  if (!u.id_document_url) {
+    identityBlock.innerHTML = '<h4>Pièce d\'identité</h4><p class="card-meta">Aucune pièce fournie.</p>';
+  } else {
+    const { data: signed } = await sb.storage.from('identity-documents').createSignedUrl(u.id_document_url, 3600);
+    identityBlock.innerHTML = signed?.signedUrl
+      ? '<h4>Pièce d\'identité</h4><img class="id-photo" src="' + signed.signedUrl + '">'
+      : '<h4>Pièce d\'identité</h4><p class="card-meta">Impossible de charger l\'image.</p>';
+  }
 }
 
 // ---------- Envoyer une notification (in-app + push automatique) ----------
