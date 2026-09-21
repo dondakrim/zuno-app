@@ -1779,6 +1779,39 @@ async function showPromoDetail(id) {
 }
 
 
+async function createPromo() {
+  const code = document.getElementById('promo-code').value.trim().toUpperCase();
+  const discountType = document.getElementById('promo-type').value;
+  const discountValue = parseFloat(document.getElementById('promo-value').value);
+  const minAmount = parseFloat(document.getElementById('promo-min').value) || 0;
+  const maxUsesRaw = document.getElementById('promo-max-uses').value;
+  const maxUses = maxUsesRaw ? parseInt(maxUsesRaw, 10) : null;
+  const expiresRaw = document.getElementById('promo-expires').value;
+  const expiresAt = expiresRaw ? new Date(expiresRaw + 'T23:59:59').toISOString() : null;
+
+  if (!code || !discountValue) { alert('Code et valeur de la réduction sont obligatoires.'); return; }
+
+  const { error } = await sb.from('promo_codes').insert({
+    code, discount_type: discountType, discount_value: discountValue,
+    min_amount: minAmount, max_uses: maxUses, expires_at: expiresAt,
+  });
+
+  if (error) { alert('Erreur : ' + error.message); return; }
+
+  document.getElementById('promo-code').value = '';
+  document.getElementById('promo-value').value = '';
+  document.getElementById('promo-min').value = '';
+  document.getElementById('promo-max-uses').value = '';
+  document.getElementById('promo-expires').value = '';
+  loadPromos();
+}
+
+async function togglePromo(id, active) {
+  const { error } = await sb.from('promo_codes').update({ active }).eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  loadPromos();
+}
+
 async function deletePromo(id) {
   if (!confirm('Supprimer définitivement ce code promo ?')) return;
   const { error } = await sb.from('promo_codes').delete().eq('id', id);
