@@ -168,6 +168,7 @@
       <button class="tab-btn" data-tab="paniers">Paniers</button>
       <button class="tab-btn" data-tab="campagnes">Campagnes</button>
       <button class="tab-btn" data-tab="promos">Promos</button>
+      <button class="tab-btn" data-tab="reversements">Reversements</button>
     </div>
 
     <div class="panels">
@@ -281,6 +282,19 @@
       </div>
       <div id="promos-list"><div class="loading">Chargement…</div></div>
       <div id="promo-detail-page" class="detail-page"></div>
+    </div>
+    <div class="panel" id="panel-reversements">
+      <div class="card" style="margin-bottom: 16px;">
+        <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:6px;">Filtrer par statut</label>
+        <select id="reversements-filter" onchange="loadReversements()" style="width:100%; padding:9px; border-radius:8px; border:1px solid var(--border); font-size:14px;">
+          <option value="en_attente">En attente</option>
+          <option value="tous">Tous</option>
+          <option value="traite">Traités</option>
+          <option value="refuse">Refusés</option>
+        </select>
+      </div>
+      <div id="reversements-grid"><div class="loading">Chargement…</div></div>
+      <div id="reversement-detail-page" class="detail-page"></div>
     </div>
     <div class="panel" id="panel-publicites">
       <div class="card">
@@ -402,6 +416,7 @@ async function checkAdminAndInit() {
   loadCommandes();
   loadPaniers();
   loadPromos();
+  loadReversements();
 }
 
 async function loadLitiges() {
@@ -1996,6 +2011,123 @@ async function exportAccountHistory(userId, userName) {
     ['Date', 'Type', 'Détail', 'Montant / Note', 'Statut'],
     formattedRows
   );
+}
+
+// ---------- Reversements (paiement aux marchands) ----------
+
+const REVERSEMENT_LABELS = { en_attente: 'En attente', traite: 'Traité', refuse: 'Refusé' };
+let reversementsData = {};
+
+async function loadReversements() {
+  const grid = document.getElementById('reversements-grid');
+  const filter = document.getElementById('reversements-filter')?.value || 'en_attente';
+
+  let query = sb.from('payout_requests').select('*').order('created_at', { ascending: false });
+  if (filter !== 'tous') query = query.eq('status', filter);
+  const { data, error } = await query;
+
+  if (error) { grid.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
+  if (!data || data.length === 0) { grid.innerHTML = '<div class="empty">Aucune demande ne correspond.</div>'; return; }
+
+  const vendeurIds = [...new Set(data.map((p) => p.vendeur_id).filter(Boolean))];
+  let profilesById = {};
+  if (vendeurIds.length > 0) {
+    const { data: profiles } = await sb.from('users').select('id, nom, boutique_nom, telephone').in('id', vendeurIds);
+    (profiles || []).forEach((p) => { profilesById[p.id] = p; });
+  }
+
+  reversementsData = {};
+  data.forEach((p) => { reversementsData[p.id] = { ...p, vendeur: profilesById[p.vendeur_id] }; });
+
+  grid.innerHTML = '<div class="grid-list">' + data.map((p) => {
+    const vendeur = profilesById[p.vendeur_id];
+    return `
+    <div class="grid-card" data-id="${p.id}">
+      <p class="card-title">${vendeur?.boutique_nom || vendeur?.nom || 'Marchand inconnu'}</p>
+      <p class="card-sub">${Number(p.amount_to_pay).toLocaleString('fr-FR')} FCFA via ${p.payout_channel_label}</p>
+      <span class="pill">${REVERSEMENT_LABELS[p.status] || p.status}</span>
+      <p class="card-meta">${new Date(p.created_at).toLocaleDateString('fr-FR')}</p>
+      <button class="btn btn-approve voir-plus-btn" onclick="showReversementDetail('${p.id}')">Voir plus</button>
+    </div>
+  `;
+  }).join('') + '</div>';
+}
+
+function closeReversementDetail() {
+  document.getElementById('reversement-detail-page').classList.remove('active');
+  document.getElementById('reversements-grid').style.display = 'block';
+}
+
+function showReversementDetail(id) {
+  const p = reversementsData[id];
+  if (!p) return;
+  const vendeur = p.vendeur;
+
+  document.getElementById('reversements-grid').style.display = 'none';
+  const page = document.getElementById('reversement-detail-page');
+  page.classList.add('active');
+  page.innerHTML = `
+    <button class="detail-back" onclick="closeReversementDetail()">← Retour à la liste</button>
+    <div class="detail-header">
+      <p class="detail-title">${vendeur?.boutique_nom || vendeur?.nom || 'Marchand inconnu'}</p>
+    </div>
+
+    <div class="detail-section">
+      <h4>Demande</h4>
+      <div class="detail-row"><span>Montant demandé</span><span>${Number(p.amount_requested).toLocaleString('fr-FR')} FCFA</span></div>
+      <div class="detail-row"><span>Frais Zuno (2%)</span><span>-${Number(p.fee_amount).toLocaleString('fr-FR')} FCFA</span></div>
+      <div class="detail-row"><span>À envoyer</span><span style="font-weight:800;">${Number(p.amount_to_pay).toLocaleString('fr-FR')} FCFA</span></div>
+      <div class="detail-row"><span>Canal</span><span>${p.payout_channel_label}</span></div>
+      <div class="detail-row"><span>Numéro destinataire</span><span>${p.payout_phone}</span></div>
+      <div class="detail-row"><span>Demandé le</span><span>${new Date(p.created_at).toLocaleString('fr-FR')}</span></div>
+      <div class="detail-row"><span>Statut</span><span>${REVERSEMENT_LABELS[p.status] || p.status}</span></div>
+      ${p.processed_at ? '<div class="detail-row"><span>Traité le</span><span>' + new Date(p.processed_at).toLocaleString('fr-FR') + '</span></div>' : ''}
+      ${p.admin_note ? '<div class="detail-row"><span>Note</span><span>' + p.admin_note + '</span></div>' : ''}
+    </div>
+
+    <div class="detail-section">
+      <h4>Marchand</h4>
+      <div class="detail-row"><span>Nom</span><span>${vendeur?.nom || '—'}</span></div>
+      <div class="detail-row"><span>Téléphone</span><span>${vendeur?.telephone || '—'}</span></div>
+    </div>
+
+    ${p.status === 'en_attente' ? `
+    <div class="detail-section">
+      <h4>Actions</h4>
+      <div class="actions">
+        <button class="btn btn-approve" onclick="processReversement('${p.id}', 'traite')">Marquer comme traité</button>
+        <button class="btn btn-reject" onclick="processReversement('${p.id}', 'refuse')">Refuser</button>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+async function processReversement(id, status) {
+  let note = null;
+  if (status === 'refuse') {
+    note = prompt('Motif du refus (visible par le marchand) :');
+    if (note === null) return;
+  }
+  const { error } = await sb.from('payout_requests')
+    .update({ status, admin_note: note, processed_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+
+  const p = reversementsData[id];
+  if (p) {
+    await sb.from('notifications').insert({
+      user_id: p.vendeur_id,
+      title: status === 'traite' ? 'Reversement effectué' : 'Reversement refusé',
+      body: status === 'traite'
+        ? `${Number(p.amount_to_pay).toLocaleString('fr-FR')} FCFA t'ont été envoyés via ${p.payout_channel_label}.`
+        : (note || 'Ta demande de reversement a été refusée.'),
+      type: 'payout',
+    });
+  }
+
+  closeReversementDetail();
+  loadReversements();
 }
 </script>
 </body>

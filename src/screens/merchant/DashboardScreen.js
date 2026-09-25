@@ -8,6 +8,9 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Modal,
+  TextInput,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,6 +19,9 @@ import { supabase } from '../../lib/supabase';
 import { getDeviceUserId } from '../../lib/deviceUser';
 import { useMode } from '../../context/ModeContext';
 import { getSellerRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../../lib/reputation';
+import { COUNTRIES } from '../../data/countries';
+
+const PAYOUT_FEE_RATE = 0.02; // 2% prélevés par Zuno sur chaque reversement
 
 function StarRating({ average, count }) {
   if (!count) {
@@ -46,6 +52,14 @@ export default function MerchantDashboardScreen({ navigation }) {
   const [boostByListing, setBoostByListing] = useState({});
   const [stats, setStats] = useState({ actives: 0, enAttente: 0, chiffreAffaires: 0, favoris: 0 });
   const [solde, setSolde] = useState(0);
+  const [dejaDemande, setDejaDemande] = useState(0);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [payoutChannels, setPayoutChannels] = useState([]);
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const [payoutPhone, setPayoutPhone] = useState('');
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [submittingPayout, setSubmittingPayout] = useState(false);
+  const [myTelephone, setMyTelephone] = useState('');
   const [recentOrders, setRecentOrders] = useState([]);
   const [rating, setRating] = useState({ average: null, count: 0 });
   const [completedSales, setCompletedSales] = useState(0);
@@ -94,11 +108,21 @@ export default function MerchantDashboardScreen({ navigation }) {
 
     const { data: userRow } = await supabase
       .from('users')
-      .select('identity_status, boutique_nom')
+      .select('identity_status, boutique_nom, telephone')
       .eq('id', myId)
       .maybeSingle();
     setIdentityStatus(userRow?.identity_status || 'non_soumise');
     setBoutiqueNom(userRow?.boutique_nom || '');
+    setMyTelephone(userRow?.telephone?.startsWith('local-') ? '' : userRow?.telephone || '');
+    setPayoutPhone(userRow?.telephone?.startsWith('local-') ? '' : userRow?.telephone || '');
+
+    const { data: payoutsExistants } = await supabase
+      .from('payout_requests')
+      .select('amount_requested')
+      .eq('vendeur_id', myId)
+      .neq('status', 'refuse');
+    const totalDejaDemande = (payoutsExistants || []).reduce((sum, p) => sum + Number(p.amount_requested || 0), 0);
+    setDejaDemande(totalDejaDemande);
 
     const allOrders = (orders || []).filter((o) => o.deliveries?.[0]?.statut_livraison !== 'annulee');
     const enAttente = allOrders.filter(
@@ -122,6 +146,83 @@ export default function MerchantDashboardScreen({ navigation }) {
     setCompletedSales(completedResult);
     setLoading(false);
   }, []);
+
+  const netSolde = Math.max(solde - dejaDemande, 0);
+
+  const openPayoutModal = async () => {
+    if (netSolde <= 0) {
+      Alert.alert('Aucun solde disponible', "Tu n'as pas encore de solde disponible pour un reversement.");
+      return;
+    }
+
+    // Déduit le pays probable depuis l'indicatif du téléphone, pour ne
+    // proposer que les canaux pertinents (Wave au Sénégal, MyNITA au
+    // Niger...). Si rien ne correspond, propose tout, par sécurité.
+    const country = COUNTRIES.find((c) => myTelephone.startsWith(c.dialCode));
+    let query = supabase.from('payment_methods').select('*').eq('active', true).order('display_order');
+    if (country) query = query.eq('country_code', country.code);
+    const { data } = await query;
+
+    let channels = data || [];
+    if (channels.length === 0) {
+      const { data: allChannels } = await supabase.from('payment_methods').select('*').eq('active', true).order('display_order');
+      channels = allChannels || [];
+    }
+
+    setPayoutChannels(channels);
+    setSelectedChannel(channels[0] || null);
+    setPayoutAmount(String(netSolde));
+    setShowPayoutModal(true);
+  };
+
+  const submitPayout = async () => {
+    const amount = Number(payoutAmount);
+    if (!selectedChannel) {
+      Alert.alert('Choisis un canal', 'Sélectionne un moyen pour recevoir ton reversement.');
+      return;
+    }
+    if (!payoutPhone.trim()) {
+      Alert.alert('Numéro manquant', 'Indique le numéro sur lequel recevoir le reversement.');
+      return;
+    }
+    if (!amount || amount <= 0) {
+      Alert.alert('Montant invalide', 'Indique un montant valide.');
+      return;
+    }
+    if (amount > netSolde) {
+      Alert.alert('Montant trop élevé', `Ton solde disponible est de ${netSolde.toLocaleString('fr-FR')} FCFA.`);
+      return;
+    }
+
+    setSubmittingPayout(true);
+    const myId = await getDeviceUserId();
+    const feeAmount = Math.round(amount * PAYOUT_FEE_RATE);
+    const amountToPay = amount - feeAmount;
+
+    const { error } = await supabase.from('payout_requests').insert({
+      vendeur_id: myId,
+      amount_requested: amount,
+      fee_amount: feeAmount,
+      amount_to_pay: amountToPay,
+      payout_channel: selectedChannel.provider_key,
+      payout_channel_label: selectedChannel.provider_name,
+      payout_phone: payoutPhone.trim(),
+    });
+
+    setSubmittingPayout(false);
+
+    if (error) {
+      Alert.alert('Erreur', "Impossible d'envoyer la demande : " + error.message);
+      return;
+    }
+
+    setShowPayoutModal(false);
+    Alert.alert(
+      'Demande envoyée',
+      `Tu recevras ${amountToPay.toLocaleString('fr-FR')} FCFA via ${selectedChannel.provider_name} (2% de frais Zuno déduits). Traitement sous quelques jours.`
+    );
+    loadDashboard();
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -234,10 +335,16 @@ export default function MerchantDashboardScreen({ navigation }) {
             <View>
               <View style={styles.soldeCard}>
                 <Text style={styles.soldeLabel}>Solde disponible</Text>
-                <Text style={styles.soldeValue}>{solde.toLocaleString('fr-FR')} FCFA</Text>
+                <Text style={styles.soldeValue}>{netSolde.toLocaleString('fr-FR')} FCFA</Text>
                 <Text style={styles.soldeHint}>
-                  Basé sur les ventes déjà livrées ou récupérées
+                  {dejaDemande > 0
+                    ? `${dejaDemande.toLocaleString('fr-FR')} FCFA déjà en cours de reversement`
+                    : 'Basé sur les ventes déjà livrées ou récupérées'}
                 </Text>
+                <TouchableOpacity style={styles.payoutButton} onPress={openPayoutModal}>
+                  <Ionicons name="cash-outline" size={16} color={colors.purple} />
+                  <Text style={styles.payoutButtonText}>Demander un reversement</Text>
+                </TouchableOpacity>
               </View>
 
               <View style={styles.statsGrid}>
@@ -363,6 +470,84 @@ export default function MerchantDashboardScreen({ navigation }) {
           )}
         />
       )}
+
+      <Modal visible={showPayoutModal} transparent animationType="slide" onRequestClose={() => setShowPayoutModal(false)}>
+        <View style={styles.payoutOverlay}>
+          <View style={styles.payoutCard}>
+            <ScrollView>
+              <Text style={styles.payoutTitle}>Demander un reversement</Text>
+              <Text style={styles.payoutSubtitle}>
+                Solde disponible : {netSolde.toLocaleString('fr-FR')} FCFA
+              </Text>
+
+              <Text style={styles.payoutLabel}>Montant à reverser</Text>
+              <TextInput
+                style={styles.payoutInput}
+                keyboardType="numeric"
+                value={payoutAmount}
+                onChangeText={setPayoutAmount}
+                placeholder="Montant en FCFA"
+              />
+
+              <Text style={styles.payoutLabel}>Canal de reversement</Text>
+              {payoutChannels.length === 0 ? (
+                <Text style={styles.payoutHint}>Aucun canal disponible pour l'instant.</Text>
+              ) : (
+                <View style={styles.channelsWrap}>
+                  {payoutChannels.map((c) => (
+                    <TouchableOpacity
+                      key={c.id}
+                      style={[styles.channelChip, selectedChannel?.id === c.id && styles.channelChipActive]}
+                      onPress={() => setSelectedChannel(c)}
+                    >
+                      <Text style={[styles.channelChipText, selectedChannel?.id === c.id && styles.channelChipTextActive]}>
+                        {c.provider_name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              <Text style={styles.payoutLabel}>Numéro pour recevoir l'argent</Text>
+              <TextInput
+                style={styles.payoutInput}
+                keyboardType="phone-pad"
+                value={payoutPhone}
+                onChangeText={setPayoutPhone}
+                placeholder="+227 90 00 00 00"
+              />
+
+              {Number(payoutAmount) > 0 && (
+                <View style={styles.feePreview}>
+                  <Text style={styles.feePreviewText}>
+                    Frais Zuno (2%) : -{Math.round(Number(payoutAmount) * PAYOUT_FEE_RATE).toLocaleString('fr-FR')} FCFA
+                  </Text>
+                  <Text style={styles.feePreviewTotal}>
+                    Tu recevras : {(Number(payoutAmount) - Math.round(Number(payoutAmount) * PAYOUT_FEE_RATE)).toLocaleString('fr-FR')} FCFA
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.payoutActionsRow}>
+                <TouchableOpacity style={styles.payoutCancelBtn} onPress={() => setShowPayoutModal(false)}>
+                  <Text style={styles.payoutCancelText}>Annuler</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.payoutSubmitBtn}
+                  onPress={submitPayout}
+                  disabled={submittingPayout}
+                >
+                  {submittingPayout ? (
+                    <ActivityIndicator color={colors.white} size="small" />
+                  ) : (
+                    <Text style={styles.payoutSubmitText}>Envoyer la demande</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -434,6 +619,45 @@ const styles = StyleSheet.create({
   soldeLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
   soldeValue: { color: colors.white, fontSize: 26, fontWeight: '700', marginTop: 4 },
   soldeHint: { color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 4, textAlign: 'center' },
+  payoutButton: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white,
+    borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 16, marginTop: 12,
+  },
+  payoutButtonText: { color: colors.purple, fontWeight: '700', fontSize: 13 },
+  payoutOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  payoutCard: {
+    backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: spacing.lg, maxHeight: '85%',
+  },
+  payoutTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  payoutSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: spacing.md },
+  payoutLabel: { fontSize: 12, fontWeight: '700', color: colors.textSecondary, marginTop: spacing.md, marginBottom: 6 },
+  payoutInput: {
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
+    paddingHorizontal: spacing.md, paddingVertical: 10, fontSize: 14, backgroundColor: colors.surface,
+  },
+  payoutHint: { fontSize: 13, color: colors.textMuted },
+  channelsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  channelChip: {
+    paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999,
+    borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
+  },
+  channelChipActive: { backgroundColor: colors.purple, borderColor: colors.purple },
+  channelChipText: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  channelChipTextActive: { color: colors.white },
+  feePreview: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+  feePreviewText: { fontSize: 12, color: colors.textSecondary },
+  feePreviewTotal: { fontSize: 15, fontWeight: '800', color: colors.success, marginTop: 4 },
+  payoutActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, marginBottom: spacing.lg },
+  payoutCancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: radius.md, borderWidth: 1,
+    borderColor: colors.border, alignItems: 'center',
+  },
+  payoutCancelText: { color: colors.textSecondary, fontWeight: '700' },
+  payoutSubmitBtn: {
+    flex: 2, paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.purple, alignItems: 'center',
+  },
+  payoutSubmitText: { color: colors.white, fontWeight: '700' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   statCard: {
     width: '48%',
