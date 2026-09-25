@@ -119,6 +119,12 @@
     color: var(--purple); font-weight: 700; font-size: 13px; cursor: pointer; margin-bottom: 16px; padding: 0;
   }
   .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+  .detail-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+  .detail-avatar-icon {
+    width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 26px; font-weight: 800;
+  }
   .detail-title { font-size: 20px; font-weight: 800; color: var(--text); margin: 0; }
   .detail-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 14px; }
   .detail-section h4 { margin: 0 0 10px; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -975,7 +981,7 @@ async function loadMerchants() {
   const grid = document.getElementById('marchands-grid');
 
   const [{ data: users }, { data: listings }, { data: orders }] = await Promise.all([
-    sb.from('users').select('id, nom, telephone, whatsapp, email, ville, photo_url, boutique_nom, is_banned, ban_reason, identity_status, last_seen_at, last_city, last_country, device_model'),
+    sb.from('users').select('id, nom, telephone, whatsapp, email, ville, photo_url, avatar_icon, avatar_color, boutique_nom, is_banned, ban_reason, identity_status, last_seen_at, last_city, last_country, device_model'),
     sb.from('listings').select('id, vendeur_id, status, moderation_status'),
     sb.from('orders').select('montant, listing_id, deliveries(statut_livraison), listings!inner(vendeur_id)'),
   ]);
@@ -1021,7 +1027,8 @@ async function loadMerchants() {
     const s = stats[m.id];
     return `
     <div class="grid-card" data-id="${m.id}">
-      <p class="card-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
+      ${renderAvatarHtml(m, 40)}
+      <p class="card-title" style="margin-top:8px;">${m.boutique_nom || m.nom || 'Sans nom'}</p>
       <p class="card-sub">Solde : ${s.revenue.toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${s.soldListings} vendu(s)</span>
       <span class="pill">${s.activeListings} en ligne</span>
@@ -1048,6 +1055,7 @@ function showMerchantDetail(id) {
   page.innerHTML = `
     <button class="detail-back" onclick="closeMerchantDetail()">← Retour à la liste</button>
     <div class="detail-header">
+      ${renderAvatarHtml(m)}
       <div>
         <p class="detail-title">${m.boutique_nom || m.nom || 'Sans nom'}</p>
         <p class="card-sub">${m.identity_status === 'verifiee' ? 'Identifié ✅' : 'Non identifié'}</p>
@@ -1123,7 +1131,7 @@ async function loadComptes() {
 
   const { data, error } = await sb
     .from('users')
-    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, id_document_url, is_banned, ban_reason, created_at, last_seen_at, last_city, last_region, last_country, device_model, os_info')
+    .select('id, nom, telephone, whatsapp, email, ville, boutique_nom, identity_status, id_document_url, is_banned, ban_reason, created_at, last_seen_at, last_city, last_region, last_country, device_model, os_info, photo_url, avatar_icon, avatar_color')
     .order('created_at', { ascending: false });
 
   if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
@@ -1145,7 +1153,8 @@ async function loadComptes() {
   list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)</p>' +
     '<div class="grid-list">' + filtered.map((u) => `
     <div class="grid-card" data-id="${u.id}">
-      <p class="card-title">${u.boutique_nom || u.nom || 'Sans nom'}</p>
+      ${renderAvatarHtml(u, 40)}
+      <p class="card-title" style="margin-top:8px;">${u.boutique_nom || u.nom || 'Sans nom'}</p>
       <p class="card-sub">📞 ${u.telephone || '—'}</p>
       <span class="pill">${u.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
@@ -1170,6 +1179,7 @@ async function showCompteDetail(userId) {
   page.innerHTML = `
     <button class="detail-back" onclick="closeCompteDetail()">← Retour à la liste</button>
     <div class="detail-header">
+      ${renderAvatarHtml(u)}
       <div>
         <p class="detail-title">${u.boutique_nom || u.nom || 'Sans nom'}</p>
         <p class="card-sub">Inscrit le ${new Date(u.created_at).toLocaleDateString('fr-FR')}</p>
@@ -1841,6 +1851,16 @@ async function deletePromo(id) {
 
 // Fonctions partagées, réutilisées par tous les exports CSV du tableau
 // de bord (transactions, historique de compte...).
+function renderAvatarHtml(u, size) {
+  size = size || 64;
+  if (u.photo_url) {
+    return '<img class="detail-avatar" src="' + u.photo_url + '" style="width:' + size + 'px; height:' + size + 'px;">';
+  }
+  const initiale = (u.boutique_nom || u.nom || '?').charAt(0).toUpperCase();
+  const bg = u.avatar_color || '#2E0B8C';
+  return '<div class="detail-avatar-icon" style="width:' + size + 'px; height:' + size + 'px; background:' + bg + '; font-size:' + Math.round(size * 0.4) + 'px;">' + initiale + '</div>';
+}
+
 function escapeCsv(value) {
   const str = String(value ?? '');
   return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;

@@ -46,12 +46,14 @@ export default function CheckoutScreen({ route, navigation }) {
   const total = Math.max(sousTotal + fraisLivraison - promoDiscount, 0);
 
   const isPickup = deliveryMethod?.id === 'pickup';
+  const isNegotiated = deliveryMethod?.id === 'a_negocier';
+  const skipAddress = isPickup || isNegotiated;
 
   const handleConfirm = async () => {
-    if (!nom.trim() || telephone.replace(/\D/g, '').length < 7 || (!isPickup && !quartier.trim())) {
+    if (!nom.trim() || telephone.replace(/\D/g, '').length < 7 || (!skipAddress && !quartier.trim())) {
       Alert.alert(
         'Informations manquantes',
-        isPickup ? 'Nom et numéro sont obligatoires.' : 'Nom, numéro et quartier sont obligatoires.'
+        skipAddress ? 'Nom et numéro sont obligatoires.' : 'Nom, numéro et quartier sont obligatoires.'
       );
       return;
     }
@@ -112,11 +114,11 @@ export default function CheckoutScreen({ route, navigation }) {
 
     const { error: deliveryError } = await supabase.from('deliveries').insert({
       order_id: order.id,
-      adresse: isPickup ? 'Retrait en main propre' : quartier.trim(),
-      quartier: isPickup ? null : quartier.trim(),
+      adresse: isPickup ? 'Retrait en main propre' : isNegotiated ? 'À négocier avec le vendeur' : quartier.trim(),
+      quartier: skipAddress ? null : quartier.trim(),
       nom_contact: nom.trim(),
       telephone_contact: telephone.trim(),
-      heure_livraison: isPickup ? 'À convenir avec le vendeur' : heureLivraison,
+      heure_livraison: skipAddress ? 'À convenir avec le vendeur' : heureLivraison,
       statut_livraison: 'a_traiter',
     });
 
@@ -134,7 +136,9 @@ export default function CheckoutScreen({ route, navigation }) {
 
     // Un premier message est envoyé automatiquement au vendeur, pour que la
     // conversation démarre avec tout le contexte de la commande déjà dedans.
-    const recap = isPickup
+    const recap = isNegotiated
+      ? `Bonjour, je viens de commander « ${listing.title} » (x${quantity}). Cet article étant volumineux/lourd, peux-tu me proposer un mode et un prix de livraison, ou convenir d'un lieu de retrait ?`
+      : isPickup
       ? `Bonjour, je viens de commander « ${listing.title} » (x${quantity}) en retrait en main propre. On se met d'accord sur le lieu et l'heure ?`
       : `Bonjour, je viens de commander « ${listing.title} » (x${quantity}). Livraison : ${deliveryMethod?.label}, quartier ${quartier.trim()}, créneau ${heureLivraison}.`;
 
@@ -207,12 +211,13 @@ export default function CheckoutScreen({ route, navigation }) {
       <Text style={styles.label}>Numéro à contacter</Text>
       <PhoneInput value={telephone} onChangeValue={setTelephone} />
 
-      {isPickup ? (
+      {skipAddress ? (
         <View style={styles.pickupNote}>
           <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.purple} />
           <Text style={styles.pickupNoteText}>
-            Pas d'adresse à donner : une fois la commande validée, mets-toi d'accord avec le
-            vendeur sur le lieu et l'heure du retrait via la messagerie.
+            {isNegotiated
+              ? "Pas d'adresse à donner ici : une fois la commande validée, discute avec le vendeur du mode et du prix de livraison via la messagerie."
+              : "Pas d'adresse à donner : une fois la commande validée, mets-toi d'accord avec le vendeur sur le lieu et l'heure du retrait via la messagerie."}
           </Text>
         </View>
       ) : (
@@ -250,7 +255,7 @@ export default function CheckoutScreen({ route, navigation }) {
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>
-            {isPickup ? 'Retrait en main propre' : `Livraison (${deliveryMethod?.label})`}
+            {isPickup ? 'Retrait en main propre' : isNegotiated ? 'Livraison à négocier' : `Livraison (${deliveryMethod?.label})`}
           </Text>
           <Text style={styles.summaryValue}>{fraisLivraison.toLocaleString('fr-FR')} FCFA</Text>
         </View>

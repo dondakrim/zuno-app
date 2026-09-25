@@ -4141,3 +4141,53 @@
 {"_e":"metro:config","_t":1789948653847,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
 {"_e":"expo:dev-tools-plugin:load","_t":1789948653979,"plugins":[]}
 {"_e":"metro:instantiate","_t":1789948654276,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"root:init","_t":1790354008034,"format":"v0-jsonl","version":"57.0.25"}
+{"_e":"env:mode","_t":1790354008035,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790354008036,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1790354008313,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790354008532,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790354008680,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790354009080,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:bundling:started","_t":1790354019465,"id":"2","platform":"android","environment":null,"entry":"node_modules/expo/AppEntry.js"}
+{"_e":"metro:bundling:progress","_t":1790354019466,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790354019469,"id":"2","progress":0,"total":1,"current":0}
+{"_e":"metro:bundling:progress","_t":1790354019810,"id":"2","progress":0.010000000000000002,"total":1,"current":1}
+{"_e":"metro:bundling:progress","_t":1790354019911,"id":"2","progress":0.012345679012345678,"total":18,"current":2}
+{"_e":"metro:bundling:progress","_t":1790354020015,"id":"2","progress":0.012345679012345678,"total":119,"current":6}
+{"_e":"metro:bundling:progress","_t":1790354020116,"id":"2","progress":0.012345679012345678,"total":153,"current":11}
+{"_e":"metro:bundling:progress","_t":1790354020216,"id":"2","progress":0.012345679012345678,"total":171,"current":18}
+{"_e":"metro:bundling:progress","_t":1790354020316,"id":"2","progress":0.03168772785833721,"total":191,"current":34}
+{"_e":"metro:bundling:progress","_t":1790354020416,"id":"2","progress":0.06310532334476884,"total":207,"current":52}
+{"_e":"metro:bundling:progress","_t":1790354020516,"id":"2","progress":0.13986383766276686,"total":246,"current":92}
+{"_e":"metro:bundling:progress","_t":1790354020616,"id":"2","progress":0.16254976064499874,"total":315,"current":127}
+{"_e":"metro:bundling:progress","_t":1790354020717,"id":"2","progress":0.1890359168241966,"total":322,"current":140}
+{"_e":"metro:bundling:progress","_t":1790354020820,"id":"2","progress":0.20682517743992415,"total":387,"current":176}
+{"_e":"metro:bundling:progress","_t":1790354020920,"id":"2","progress":0.26793165013875686,"total":454,"current":235}
+{"_e":"metro:bundling:progress","_t":1790354021021,"id":"2","progress":0.26793165013875686,"total":583,"current":291}
+{"_e":"metro:bundling:progress","_t":1790354021121,"id":"2","progress":0.2759880226804561,"total":651,"current":342}
+{"_e":"metro:bundling:progress","_t":1790354021227,"id":"2","progress":0.3147731882098432,"total":688,"current":386}
+{"_e":"metro:bundling:progress","_t":1790354021329,"id":"2","progress":0.36725683697178185,"total":698,"current":423}
+{"_e":"metro:bundling:progress","_t":1790354021431,"id":"2","progress":0.4268203809407527,"total":724,"current":473}
+{"_e":"metro:bundling:progress","_t":1790354021531,"id":"2","progress":0.5055948482360847,"total":751,"current":534}
+{"_e":"metro:bundling:progress","_t":1790354021631,"id":"2","progress":0.6192558417702593,"total":765,"current":602}
+{"_e":"metro:bundling:progress","_t":1790354021733,"id":"2","progress":0.6192558417702593,"total":841,"current":657}
+{"_e":"metro:bundling:progress","_t":1790354021833,"id":"2","progress":0.6249543462381301,"total":888,"current":702}
+{"_e":"metro:bundling:progress","_t":1790354021938,"id":"2","progress":0.6780944617574638,"total":912,"current":751}
+{"_e":"metro:bundling:progress","_t":1790354022056,"id":"2","progress":0.7468833605826397,"total":928,"current":802}
+{"_e":"metro:bundling:progress","_t":1790354022156,"id":"2","progress":0.7830340044511155,"total":973,"current":861}
+{"_e":"metro:bundling:progress","_t":1790354022256,"id":"2","progress":0.8198806960223757,"total":1005,"current":910}
+{"_e":"metro:bundling:progress","_t":1790354022356,"id":"2","progress":0.8800399567509324,"total":1034,"current":970}
+{"_e":"metro:bundling:progress","_t":1790354022456,"id":"2","progress":0.8931681875573921,"total":1056,"current":998}
+{"_e":"metro:bundling:progress","_t":1790354022557,"id":"2","progress":0.8976875918924595,"total":1104,"current":1046}
+{"_e":"metro:bundling:progress","_t":1790354022657,"id":"2","progress":0.9257926203366572,"total":1137,"current":1094}
+{"_e":"metro:bundling:progress","_t":1790354022757,"id":"2","progress":0.974327130447556,"total":1161,"current":1146}
+{"_e":"metro:bundling:progress","_t":1790354022858,"id":"2","progress":0.9982869382159631,"total":1167,"current":1166}
+{"_e":"metro:bundling:progress","_t":1790354023265,"id":"2","progress":0.999,"total":1167,"current":1167}
+{"_e":"metro:bundling:progress","_t":1790354023366,"id":"2","progress":0.999,"total":1178,"current":1178}
+{"_e":"metro:bundling:done","_t":1790354023440,"id":"2","total":1178,"ms":3974.298875}
+{"_e":"metro:client_log","_t":1790354734107,"level":"error","data":["Erreur connexion anonyme:","[AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname]"]}
+{"_e":"metro:client_log","_t":1790354734294,"level":"error","data":["Erreur connexion anonyme:","[AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname]"]}
+{"_e":"metro:client_log","_t":1790354734297,"level":"error","data":["Erreur connexion anonyme:","[AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname]"]}
+{"_e":"metro:client_log","_t":1790354734321,"level":"log","data":["Erreur vérification bannissement, on continue quand même :","fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname"]}
+{"_e":"metro:client_log","_t":1790354736332,"level":"error","data":["[Error: Uncaught (in promise, id: 0): \"AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname\"]"]}
+{"_e":"metro:client_log","_t":1790354736340,"level":"error","data":["[Error: Uncaught (in promise, id: 1): \"AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname\"]"]}

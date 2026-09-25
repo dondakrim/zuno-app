@@ -341,6 +341,12 @@ export default function ProductDetailScreen({ route, navigation }) {
       <View style={styles.badge}>
         <Text style={styles.badgeText}>{listing.condition}</Text>
       </View>
+      {listing.is_heavy && (
+        <View style={[styles.badge, styles.heavyBadge]}>
+          <Ionicons name="cube-outline" size={12} color={colors.purple} />
+          <Text style={[styles.badgeText, { color: colors.purple }]}> Livraison à négocier</Text>
+        </View>
+      )}
 
       {listing.description ? (
         <View style={styles.presentationSection}>
@@ -595,6 +601,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   badgeText: { color: colors.success, fontSize: 12, fontWeight: '600' },
+  heavyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, marginTop: -spacing.sm },
   presentationSection: { marginBottom: spacing.sm },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
   description: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },

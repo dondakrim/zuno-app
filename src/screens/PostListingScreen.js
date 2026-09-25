@@ -31,6 +31,7 @@ export default function PostListingScreen({ navigation }) {
   const [price, setPrice] = useState('');
   const [city, setCity] = useState('');
   const [category, setCategory] = useState(categories[0]);
+  const [isHeavyManual, setIsHeavyManual] = useState(false);
   const [condition, setCondition] = useState(conditions[1]);
   const [delaiLivraison, setDelaiLivraison] = useState(delais[0]);
   const [showPromo, setShowPromo] = useState(false);
@@ -175,6 +176,7 @@ export default function PostListingScreen({ navigation }) {
         moderation_status: moderationStatus,
         moderation_score: analysis.score,
         moderation_flags: analysis.flags,
+        is_heavy: category === 'Véhicules et pièces' || isHeavyManual,
       })
       .select()
       .single();
@@ -334,6 +336,27 @@ export default function PostListingScreen({ navigation }) {
         ))}
       </View>
 
+      {category === 'Véhicules et pièces' ? (
+        <View style={styles.heavyNotice}>
+          <Ionicons name="information-circle-outline" size={16} color={colors.purple} />
+          <Text style={styles.heavyNoticeText}>
+            La livraison de cet article sera à négocier directement avec l'acheteur après l'achat
+            (au lieu des options de livraison habituelles).
+          </Text>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.promoToggle} onPress={() => setIsHeavyManual((v) => !v)}>
+          <Ionicons
+            name={isHeavyManual ? 'checkbox' : 'square-outline'}
+            size={18}
+            color={isHeavyManual ? colors.orange : colors.textMuted}
+          />
+          <Text style={styles.promoToggleText}>
+            Article lourd ou encombrant (+50kg) — livraison à négocier avec l'acheteur
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <Text style={styles.label}>État</Text>
       <View style={styles.pillRow}>
         {conditions.map((c) => (
@@ -476,6 +499,11 @@ const styles = StyleSheet.create({
   publishButtonDisabled: { opacity: 0.5 },
   publishButtonText: { color: colors.white, fontWeight: '600' },
   promoToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  heavyNotice: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.surface,
+    borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.md,
+  },
+  heavyNoticeText: { flex: 1, fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
   promoToggleText: { fontSize: 13, color: colors.textSecondary },
   certifyRow: {
     flexDirection: 'row',

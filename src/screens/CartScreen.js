@@ -113,6 +113,9 @@ export default function CartScreen({ route, navigation }) {
 
   const handleBuyPress = () => {
     setShowDeliveryOptions(true);
+    if (listing.is_heavy) {
+      setDeliveryMethod({ id: 'a_negocier', label: 'À négocier avec le vendeur', price: 0 });
+    }
   };
 
   const handleSelectDelivery = (option) => {
@@ -249,24 +252,35 @@ export default function CartScreen({ route, navigation }) {
         {showDeliveryOptions && (
           <View style={styles.deliverySection}>
             <Text style={styles.sectionTitle}>Mode de livraison</Text>
-            {DELIVERY_OPTIONS.map((option) => {
-              const active = deliveryMethod?.id === option.id;
-              return (
-                <TouchableOpacity
-                  key={option.id}
-                  style={[styles.deliveryOption, active && styles.deliveryOptionActive]}
-                  onPress={() => handleSelectDelivery(option)}
-                >
-                  <View style={styles.radioOuter}>
-                    {active && <View style={styles.radioInner} />}
-                  </View>
-                  <Text style={styles.deliveryOptionLabel}>{option.label}</Text>
-                  <Text style={styles.deliveryOptionPrice}>
-                    {option.price.toLocaleString('fr-FR')} FCFA
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            {listing.is_heavy ? (
+              <View style={styles.heavyDeliveryNotice}>
+                <Ionicons name="cube-outline" size={20} color={colors.purple} />
+                <Text style={styles.heavyDeliveryText}>
+                  Cet article est volumineux ou lourd (véhicule, gros électroménager...). La
+                  livraison n'est pas incluse dans le prix affiché — tu en discuteras
+                  directement avec le vendeur dans la messagerie, une fois la commande passée.
+                </Text>
+              </View>
+            ) : (
+              DELIVERY_OPTIONS.map((option) => {
+                const active = deliveryMethod?.id === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    style={[styles.deliveryOption, active && styles.deliveryOptionActive]}
+                    onPress={() => handleSelectDelivery(option)}
+                  >
+                    <View style={styles.radioOuter}>
+                      {active && <View style={styles.radioInner} />}
+                    </View>
+                    <Text style={styles.deliveryOptionLabel}>{option.label}</Text>
+                    <Text style={styles.deliveryOptionPrice}>
+                      {option.price.toLocaleString('fr-FR')} FCFA
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
 
             {deliveryMethod && (
               <TouchableOpacity style={styles.payButton} onPress={handlePayNow}>
@@ -392,6 +406,11 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: colors.white, fontWeight: '600' },
   deliverySection: { marginTop: spacing.sm },
+  heavyDeliveryNotice: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.surface,
+    borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md,
+  },
+  heavyDeliveryText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
   deliveryOption: {
     flexDirection: 'row',
