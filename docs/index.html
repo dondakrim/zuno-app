@@ -432,6 +432,7 @@ async function loadLitiges() {
 
   panel.innerHTML = data.map((d) => `
     <div class="card" data-id="${d.id}">
+      <p class="card-meta" style="font-weight:700; color:var(--purple);">ZN-LIT-${String(d.reference_number).padStart(6, '0')}</p>
       <p class="card-title">${d.orders?.listings?.title || 'Annonce'}</p>
       <p class="card-sub">Acheteur : ${d.orders?.acheteur?.nom || '—'} · ${d.orders?.acheteur?.telephone || ''}</p>
       <span class="pill">${DISPUTE_LABELS[d.category] || d.category}</span>
@@ -1392,7 +1393,7 @@ async function loadCommandes() {
 
   const { data, error } = await sb
     .from('orders')
-    .select('*, listings(title, vendeur_id, photo_url), deliveries(statut_livraison, nom_contact, telephone_contact, quartier, heure_livraison)')
+    .select('*, reference_number, listings(title, vendeur_id, photo_url), deliveries(statut_livraison, nom_contact, telephone_contact, quartier, heure_livraison)')
     .order('created_at', { ascending: false })
     .limit(100);
 
@@ -1423,6 +1424,7 @@ async function loadCommandes() {
     const status = o.deliveries?.[0]?.statut_livraison;
     return `
     <div class="grid-card" data-id="${o.id}">
+      <p class="card-meta" style="font-weight:700; color:var(--purple);">ZN-CMD-${String(o.reference_number).padStart(6, '0')}</p>
       <p class="card-title">${o.listings?.title || 'Annonce supprimée'}</p>
       <p class="card-sub">${Number(o.montant).toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${COMMANDE_LABELS[status] || status || '—'}</span>
@@ -1453,6 +1455,7 @@ function showCommandeDetail(orderId) {
     <div class="detail-header">
       ${o.listings?.photo_url ? '<img src="' + o.listings.photo_url + '" style="width:90px; height:90px; object-fit:cover; border-radius:10px;">' : ''}
       <div>
+        <p class="card-meta" style="font-weight:700; color:var(--purple);">ZN-CMD-${String(o.reference_number).padStart(6, '0')}</p>
         <p class="detail-title">${o.listings?.title || 'Annonce supprimée'}</p>
         <p class="card-sub">${new Date(o.created_at).toLocaleString('fr-FR')}</p>
       </div>
@@ -1875,7 +1878,7 @@ async function exportTransactionsCSV() {
   }
 
   const headers = [
-    'ID commande', 'Date', 'Article', 'Acheteur', 'Téléphone acheteur',
+    'N° commande', 'ID commande', 'Date', 'Article', 'Acheteur', 'Téléphone acheteur',
     'Vendeur', 'Téléphone vendeur', 'Montant (FCFA)', 'Réduction (FCFA)',
     'Code promo', 'Statut livraison', 'Moyen de paiement', 'Référence paiement',
   ];
@@ -1884,6 +1887,7 @@ async function exportTransactionsCSV() {
     const acheteur = profilesById[o.acheteur_id];
     const vendeur = profilesById[o.listings?.vendeur_id];
     return [
+      'ZN-CMD-' + String(o.reference_number).padStart(6, '0'),
       o.id,
       new Date(o.created_at).toLocaleString('fr-FR'),
       o.listings?.title || 'Annonce supprimée',
@@ -2043,6 +2047,7 @@ async function loadReversements() {
     const vendeur = profilesById[p.vendeur_id];
     return `
     <div class="grid-card" data-id="${p.id}">
+      <p class="card-meta" style="font-weight:700; color:var(--purple);">ZN-REV-${String(p.reference_number).padStart(6, '0')}</p>
       <p class="card-title">${vendeur?.boutique_nom || vendeur?.nom || 'Marchand inconnu'}</p>
       <p class="card-sub">${Number(p.amount_to_pay).toLocaleString('fr-FR')} FCFA via ${p.payout_channel_label}</p>
       <span class="pill">${REVERSEMENT_LABELS[p.status] || p.status}</span>
@@ -2071,6 +2076,7 @@ function showReversementDetail(id) {
     <div class="detail-header">
       <p class="detail-title">${vendeur?.boutique_nom || vendeur?.nom || 'Marchand inconnu'}</p>
     </div>
+    <p class="card-meta" style="font-weight:700; color:var(--purple); margin-top:-14px; margin-bottom:14px;">ZN-REV-${String(p.reference_number).padStart(6, '0')}</p>
 
     <div class="detail-section">
       <h4>Demande</h4>

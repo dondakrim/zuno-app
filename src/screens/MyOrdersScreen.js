@@ -237,6 +237,7 @@ export default function MyOrdersScreen({ navigation }) {
             )}
           </View>
           <View style={{ flex: 1 }}>
+            <Text style={styles.orderRef}>ZN-CMD-{String(order.reference_number).padStart(6, '0')}</Text>
             <Text style={styles.cardTitle} numberOfLines={1}>{order.listings?.title}</Text>
             <Text style={styles.cardSubtitle}>
               {Number(order.montant).toLocaleString('fr-FR')} FCFA
@@ -514,6 +515,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cardTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+  orderRef: { fontSize: 10, fontWeight: '700', color: colors.purple, marginBottom: 2 },
   cardSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   statusBadge: {
     alignSelf: 'flex-start',
