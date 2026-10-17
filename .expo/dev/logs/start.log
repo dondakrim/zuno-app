@@ -4191,3 +4191,11 @@
 {"_e":"metro:client_log","_t":1790354734321,"level":"log","data":["Erreur vérification bannissement, on continue quand même :","fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname"]}
 {"_e":"metro:client_log","_t":1790354736332,"level":"error","data":["[Error: Uncaught (in promise, id: 0): \"AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname\"]"]}
 {"_e":"metro:client_log","_t":1790354736340,"level":"error","data":["[Error: Uncaught (in promise, id: 1): \"AuthRetryableFetchError: fetch failed: java.net.UnknownHostException: Unable to resolve host \"votre-projet.supabase.co\": No address associated with hostname\"]"]}
+{"_e":"root:init","_t":1790355755468,"format":"v0-jsonl","version":"57.0.25"}
+{"_e":"env:mode","_t":1790355755469,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1790355755470,"mode":"development","files":[],"env":{}}
+{"_e":"devserver:start","_t":1790355755725,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":false,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1790355755949,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":false,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"expo:dev-tools-plugin:load","_t":1790355756081,"plugins":[]}
+{"_e":"metro:instantiate","_t":1790355756430,"atlas":false,"workers":7,"host":"::","port":8081}
+{"_e":"metro:server_log","_t":1790361925660,"level":"error","data":["[timeout] connection terminated with Device for app='%s' on device='%s' after not responding for %s seconds.","host.exp.exponent","22101316UP - 13 - API 33","60"]}
