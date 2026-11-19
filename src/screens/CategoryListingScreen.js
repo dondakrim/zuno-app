@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
+import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 
 export default function CategoryListingScreen({ route, navigation }) {
@@ -35,13 +36,13 @@ export default function CategoryListingScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title || category}</Text>
         <View style={{ width: 22 }} />
-      </View>
+      </GradientHeader>
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
@@ -93,6 +94,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTitle: { color: colors.white, fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },

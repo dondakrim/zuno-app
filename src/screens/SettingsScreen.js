@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, Linking } from 'react-
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, radius } from '../theme/colors';
+import GradientHeader from '../components/GradientHeader';
 import { getDeviceUserId, deleteAccountAndReset, resetIdentity } from '../lib/deviceUser';
 
 const PRIVACY_URL = 'https://claude.ai/artifact/W693o2tq7NtU93GffZanyM';
@@ -77,13 +78,13 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+          <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Paramètres</Text>
         <View style={{ width: 22 }} />
-      </View>
+      </GradientHeader>
 
       <View style={styles.body}>
         <Text style={styles.groupTitle}>Compte</Text>
@@ -157,11 +158,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.purple,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.white },
   body: { padding: spacing.lg },
   groupTitle: { fontSize: 12, fontWeight: '700', color: colors.textMuted, marginBottom: spacing.xs, marginTop: spacing.md },
   group: {

@@ -18,6 +18,7 @@ import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
+import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 import { AVATAR_PALETTE } from '../components/Avatar';
@@ -144,13 +145,13 @@ export default function EditProfileScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Modifier mon profil</Text>
         <View style={{ width: 22 }} />
-      </View>
+      </GradientHeader>
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
@@ -287,6 +288,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTitle: { color: colors.white, fontSize: 16, fontWeight: '700' },
   body: { padding: spacing.lg },

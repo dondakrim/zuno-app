@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
+import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 
@@ -104,7 +105,7 @@ export default function ChatScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={80}
     >
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
@@ -112,7 +113,7 @@ export default function ChatScreen({ route, navigation }) {
           {listingTitle}
         </Text>
         <View style={{ width: 22 }} />
-      </View>
+      </GradientHeader>
 
       {activeOffer && activeOffer.status === 'en_attente' && (
         <View style={styles.offerBanner}>

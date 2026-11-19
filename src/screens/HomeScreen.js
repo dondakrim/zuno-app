@@ -24,6 +24,7 @@ import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import MasonrySection from '../components/MasonrySection';
+import GradientHeader from '../components/GradientHeader';
 
 const CATEGORY_ICONS = {
   'Mode et vêtements': 'shirt-outline',
@@ -74,6 +75,7 @@ export default function HomeScreen({ navigation }) {
       .from('ads')
       .select('*')
       .eq('active', true)
+      .in('placement', ['tous', 'accueil'])
       .order('position', { ascending: true });
     if (data && data.length > 0) setAds(data);
   }, []);
@@ -92,6 +94,7 @@ export default function HomeScreen({ navigation }) {
   }, [ads.length]);
   const [countryModalVisible, setCountryModalVisible] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [menuProfile, setMenuProfile] = useState(null);
   const [adIndex, setAdIndex] = useState(0);
   const [wishlistIds, setWishlistIds] = useState(new Set());
   const [sellerRatings, setSellerRatings] = useState({});
@@ -226,6 +229,35 @@ export default function HomeScreen({ navigation }) {
     setCountryModalVisible(false);
   };
 
+  const openMenu = async () => {
+    setMenuVisible(true);
+    try {
+      const myId = await getDeviceUserId();
+      const { data } = await supabase
+        .from('users')
+        .select('nom, photo_url, avatar_icon, avatar_color, merchant_status')
+        .eq('id', myId)
+        .maybeSingle();
+      if (data) setMenuProfile(data);
+    } catch (e) {
+      // on garde le menu sans photo si le chargement échoue
+    }
+  };
+
+  const goToAccount = () => {
+    setMenuVisible(false);
+    navigation.navigate('Moi', { screen: 'Account' });
+  };
+
+  const onMerchantMenu = () => {
+    setMenuVisible(false);
+    if (menuProfile?.merchant_status === 'actif') {
+      switchMode('marchand');
+    } else {
+      navigation.navigate('Moi', { screen: 'BecomeMerchant' });
+    }
+  };
+
   const goToMenuItem = (screen) => {
     setMenuVisible(false);
     navigation.navigate(screen);
@@ -252,6 +284,7 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <GradientHeader>
       <View style={styles.header}>
         <View style={styles.brandRow}>
           <Image source={require('../../assets/icon.png')} style={styles.logo} />
@@ -268,7 +301,7 @@ export default function HomeScreen({ navigation }) {
             <Ionicons name="notifications-outline" size={22} color={colors.white} />
             {hasUnreadNotifications && <View style={styles.notificationDot} />}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.headerIconButton}>
+          <TouchableOpacity onPress={openMenu} style={styles.headerIconButton}>
             <Ionicons name="menu-outline" size={24} color={colors.white} />
           </TouchableOpacity>
         </View>
@@ -287,6 +320,8 @@ export default function HomeScreen({ navigation }) {
           style={styles.searchInput}
         />
       </View>
+
+      </GradientHeader>
 
       <View style={styles.body}>
         {loading ? (
@@ -454,7 +489,7 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </Modal>
 
-      {/* Menu Profil / Paramètres / Déconnexion */}
+      {/* Menu principal */}
       <Modal
         visible={menuVisible}
         transparent
@@ -462,46 +497,94 @@ export default function HomeScreen({ navigation }) {
         onRequestClose={() => setMenuVisible(false)}
       >
         <TouchableOpacity
-          style={styles.modalOverlay}
+          style={styles.menuOverlay}
           activeOpacity={1}
           onPress={() => setMenuVisible(false)}
         >
-          <View style={styles.menuSheet}>
-            <TouchableOpacity style={styles.menuRow} onPress={() => goToMenuItem('PostListing')}>
-              <Ionicons name="add-circle-outline" size={18} color={colors.orange} />
-              <Text style={[styles.menuLabel, { color: colors.orange, fontWeight: '700' }]}>
-                Déposer une annonce
-              </Text>
-            </TouchableOpacity>
-            <View style={styles.menuDivider} />
+          <TouchableOpacity activeOpacity={1} style={styles.menuPanel}>
+            <GradientHeader style={styles.menuHead}>
+              <View style={styles.menuAvatar}>
+                {menuProfile?.avatar_icon ? (
+                  <View style={[styles.menuAvatarFill, { backgroundColor: menuProfile.avatar_color }]}>
+                    <Ionicons name={menuProfile.avatar_icon} size={22} color={colors.white} />
+                  </View>
+                ) : menuProfile?.photo_url ? (
+                  <Image source={{ uri: menuProfile.photo_url }} style={styles.menuAvatarImg} />
+                ) : (
+                  <Ionicons name="person" size={22} color={colors.white} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuName} numberOfLines={1}>
+                  {menuProfile?.nom && menuProfile.nom !== 'Toi (test)' ? menuProfile.nom : 'Bienvenue sur Zuno'}
+                </Text>
+                <Text style={styles.menuSub}>
+                  {menuProfile?.merchant_status === 'actif' ? 'Compte marchand' : 'Compte particulier'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setMenuVisible(false)} hitSlop={10}>
+                <Ionicons name="close" size={22} color="rgba(255,255,255,0.85)" />
+              </TouchableOpacity>
+            </GradientHeader>
+
             <TouchableOpacity
-              style={styles.menuRow}
-              onPress={() => {
-                setMenuVisible(false);
-                switchMode('marchand');
-              }}
+              style={styles.menuCta}
+              activeOpacity={0.85}
+              onPress={() => goToMenuItem('PostListing')}
             >
-              <Ionicons name="storefront-outline" size={18} color={colors.purple} />
-              <Text style={styles.menuLabel}>Passer en mode marchand</Text>
+              <Ionicons name="add-circle" size={20} color={colors.white} />
+              <Text style={styles.menuCtaText}>Déposer une annonce</Text>
             </TouchableOpacity>
-            <View style={styles.menuDivider} />
-            <TouchableOpacity style={styles.menuRow} onPress={() => goToMenuItem('MessagesList')}>
-              <Ionicons name="mail-outline" size={18} color={colors.textPrimary} />
-              <Text style={styles.menuLabel}>Messages</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={() => goToMenuItem('Moi')}>
-              <Ionicons name="person-outline" size={18} color={colors.textPrimary} />
-              <Text style={styles.menuLabel}>Profil</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={() => goToMenuItem('Settings')}>
-              <Ionicons name="settings-outline" size={18} color={colors.textPrimary} />
-              <Text style={styles.menuLabel}>Paramètres</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.menuRow} onPress={handleLogout}>
+
+            <View style={styles.menuList}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => goToMenuItem('MessagesList')}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={18} color={colors.orange} />
+                </View>
+                <Text style={styles.menuItemLabel}>Messages</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => goToMenuItem('Moi')}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="person-outline" size={18} color={colors.orange} />
+                </View>
+                <Text style={styles.menuItemLabel}>Mon profil</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={onMerchantMenu}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="storefront-outline" size={18} color={colors.orange} />
+                </View>
+                <Text style={styles.menuItemLabel}>
+                  {menuProfile?.merchant_status === 'actif'
+                    ? 'Passer en mode marchand'
+                    : menuProfile?.merchant_status === 'demande'
+                    ? 'Demande marchand en cours'
+                    : 'Devenir marchand'}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={goToAccount}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="apps-outline" size={18} color={colors.orange} />
+                </View>
+                <Text style={styles.menuItemLabel}>Compte, aide et infos</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => goToMenuItem('Settings')}>
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="settings-outline" size={18} color={colors.orange} />
+                </View>
+                <Text style={styles.menuItemLabel}>Paramètres</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.menuLogout} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={18} color={colors.danger} />
-              <Text style={[styles.menuLabel, { color: colors.danger }]}>Déconnexion</Text>
+              <Text style={styles.menuLogoutText}>Déconnexion</Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
@@ -511,7 +594,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
-    backgroundColor: colors.purple,
+    backgroundColor: 'transparent',
     paddingTop: 50,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.lg,
@@ -536,7 +619,7 @@ const styles = StyleSheet.create({
     borderColor: colors.purple,
   },
   subHeader: {
-    backgroundColor: colors.purple,
+    backgroundColor: 'transparent',
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -683,18 +766,80 @@ const styles = StyleSheet.create({
   countryName: { flex: 1, fontSize: 14, color: colors.textPrimary },
   countryNameDisabled: { color: colors.textMuted },
   comingSoon: { fontSize: 10, color: colors.textMuted },
-  menuSheet: {
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(15,5,50,0.45)' },
+  menuPanel: {
     position: 'absolute',
-    top: 95,
-    right: spacing.lg,
+    top: 56,
+    right: spacing.md,
+    width: 292,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingVertical: spacing.xs,
-    width: 190,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: 22,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  menuDivider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
-  menuLabel: { fontSize: 14, color: colors.textPrimary },
+  menuHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+  },
+  menuAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.orange,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  menuAvatarImg: { width: '100%', height: '100%' },
+  menuAvatarFill: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  menuName: { color: colors.white, fontSize: 15, fontWeight: '800' },
+  menuSub: { color: 'rgba(255,255,255,0.75)', fontSize: 11.5, marginTop: 1 },
+  menuCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.orange,
+    borderRadius: radius.pill,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    paddingVertical: 12,
+  },
+  menuCtaText: { color: colors.white, fontSize: 14, fontWeight: '800' },
+  menuList: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.xs,
+  },
+  menuItemIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: '#FFF1E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuItemLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  menuLogout: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: spacing.xs,
+    paddingVertical: 14,
+  },
+  menuLogoutText: { color: colors.danger, fontSize: 14, fontWeight: '700' },
 });

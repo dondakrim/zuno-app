@@ -3,7 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
   StyleSheet,
   Image,
   ActivityIndicator,
@@ -14,10 +14,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import { getUserInterests, fetchRecommended } from '../lib/recommendations';
+import useWishlist from '../lib/useWishlist';
+import GradientHeader from '../components/GradientHeader';
+import MasonrySection from '../components/MasonrySection';
 
 export default function MyCartScreen({ navigation }) {
   const [items, setItems] = useState([]);
+  const [recommended, setRecommended] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { wishlistIds, loadWishlist, toggleWishlist } = useWishlist(navigation);
 
   const loadCart = useCallback(async () => {
     setLoading(true);
@@ -28,14 +34,21 @@ export default function MyCartScreen({ navigation }) {
       .eq('acheteur_id', myId)
       .order('created_at', { ascending: false });
 
-    if (!error && data) setItems(data.filter((i) => i.listings));
+    const cart = !error && data ? data.filter((i) => i.listings) : [];
+    setItems(cart);
     setLoading(false);
+
+    // « Vous aimerez aussi » : selon les centres d'intérêt, sans reproposer
+    // ce qui est déjà dans le panier.
+    const interests = await getUserInterests();
+    setRecommended(await fetchRecommended({ interests, excludeIds: cart.map((i) => i.listings.id), limit: 8 }));
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadCart();
-    }, [loadCart])
+      loadWishlist();
+    }, [loadCart, loadWishlist])
   );
 
   const handleRemove = async (id) => {
@@ -51,51 +64,72 @@ export default function MyCartScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <Text style={styles.headerTitle}>Mon panier</Text>
-      </View>
+        {items.length > 0 ? (
+          <Text style={styles.headerSub}>{items.length} article{items.length > 1 ? 's' : ''}</Text>
+        ) : null}
+      </GradientHeader>
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
       ) : (
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: spacing.lg }}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              Ton panier est vide. Ajoute un article depuis sa fiche produit.
-            </Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() =>
-                navigation.navigate('ProductDetail', { listing: item.listings })
-              }
-            >
-              <View style={styles.thumb}>
-                {item.listings.photo_url ? (
-                  <Image source={{ uri: item.listings.photo_url }} style={styles.thumbImage} />
-                ) : (
-                  <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                )}
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
+          {items.length === 0 ? (
+            <View style={styles.empty}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="cart-outline" size={44} color={colors.purple} />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle} numberOfLines={1}>
-                  {item.listings.title}
-                </Text>
-                <Text style={styles.cardSubtitle}>
-                  Qté {item.quantity} ·{' '}
-                  {(item.listings.price * item.quantity).toLocaleString('fr-FR')} FCFA
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => handleRemove(item.id)} style={styles.removeButton}>
-                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+              <Text style={styles.emptyTitle}>Pas encore d’articles ?</Text>
+              <Text style={styles.emptyText}>Continuez de scroller pour en trouver.</Text>
+              <TouchableOpacity
+                style={styles.browseButton}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('Boutique')}
+              >
+                <Text style={styles.browseText}>Parcourir les articles</Text>
               </TouchableOpacity>
-            </TouchableOpacity>
+            </View>
+          ) : (
+            items.map((item) => (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.card}
+                onPress={() => navigation.navigate('ProductDetail', { listing: item.listings })}
+              >
+                <View style={styles.thumb}>
+                  {item.listings.photo_url ? (
+                    <Image source={{ uri: item.listings.photo_url }} style={styles.thumbImage} />
+                  ) : (
+                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.cardTitle} numberOfLines={1}>{item.listings.title}</Text>
+                  <Text style={styles.cardSubtitle}>
+                    Qté {item.quantity} · {(item.listings.price * item.quantity).toLocaleString('fr-FR')} FCFA
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => handleRemove(item.id)} style={styles.removeButton}>
+                  <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))
           )}
-        />
+
+          {recommended.length > 0 && (
+            <View style={{ marginTop: spacing.lg }}>
+              <MasonrySection
+                title="Vous aimerez aussi"
+                items={recommended}
+                getSellerRating={() => undefined}
+                wishlistIds={wishlistIds}
+                onToggleWishlist={toggleWishlist}
+                onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
+              />
+            </View>
+          )}
+        </ScrollView>
       )}
 
       {items.length > 0 && (
@@ -110,14 +144,15 @@ export default function MyCartScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    backgroundColor: colors.purple,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
+  header: { paddingTop: 50, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },
+  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
+  empty: { alignItems: 'center', paddingVertical: spacing.xl },
+  emptyIcon: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#ECE8FB', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  emptyText: { fontSize: 14, color: colors.textSecondary, marginTop: 4, textAlign: 'center' },
+  browseButton: { marginTop: spacing.lg, backgroundColor: colors.orange, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: spacing.xl },
+  browseText: { color: colors.white, fontSize: 15, fontWeight: '700' },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

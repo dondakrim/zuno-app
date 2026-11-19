@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, resetIdentity } from '../lib/deviceUser';
 import { useMode } from '../context/ModeContext';
+import GradientHeader from '../components/GradientHeader';
 
 const STATUS_LABELS = {
   a_traiter: 'À traiter',
@@ -43,7 +44,7 @@ function getStatusLabel(status, modeLivraison) {
   return STATUS_LABELS[status] || status;
 }
 
-const SALES_THRESHOLD = 3;
+const SALES_THRESHOLD = 5;
 const DISMISS_KEY = 'zuno_merchant_suggestion_dismissed';
 
 function StatusBadge({ status, modeLivraison }) {
@@ -54,6 +55,26 @@ function StatusBadge({ status, modeLivraison }) {
         {getStatusLabel(status, modeLivraison)}
       </Text>
     </View>
+  );
+}
+
+// Une ligne du bloc de menu (icône dans une pastille, titre, flèche).
+function MenuRow({ icon, label, hint, onPress, last }) {
+  return (
+    <TouchableOpacity
+      style={[styles.menuRow, !last && styles.menuRowBorder]}
+      onPress={onPress}
+      activeOpacity={0.6}
+    >
+      <View style={styles.menuIcon}>
+        <Ionicons name={icon} size={18} color={colors.orange} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.menuLabel}>{label}</Text>
+        {hint ? <Text style={styles.menuHint}>{hint}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </TouchableOpacity>
   );
 }
 
@@ -77,7 +98,7 @@ export default function ProfileScreen({ navigation }) {
 
     const { data: profileData } = await supabase
       .from('users')
-      .select('nom, ville, photo_url, avatar_icon, avatar_color')
+      .select('nom, ville, photo_url, avatar_icon, avatar_color, merchant_status')
       .eq('id', myId)
       .maybeSingle();
     if (profileData) setProfile(profileData);
@@ -91,10 +112,10 @@ export default function ProfileScreen({ navigation }) {
       .order('created_at', { ascending: false });
     setMyListings(listings || []);
 
-    // Une fois 3 ventes atteintes, on propose une seule fois de passer en
-    // mode marchand (sauf si la personne a déjà décliné, ou y est déjà).
+    // Après SALES_THRESHOLD ventes, on propose une seule fois de demander un
+    // compte marchand (sauf si la personne a déjà décliné, ou l'a déjà).
     const salesCount = (listings || []).reduce((sum, l) => sum + (l.orders?.length || 0), 0);
-    if (salesCount >= SALES_THRESHOLD && mode !== 'marchand') {
+    if (salesCount >= SALES_THRESHOLD && mode !== 'marchand' && profileData?.merchant_status === 'aucun') {
       const dismissed = await AsyncStorage.getItem(DISMISS_KEY);
       if (dismissed !== 'true') {
         Alert.alert(
@@ -106,7 +127,7 @@ export default function ProfileScreen({ navigation }) {
               style: 'cancel',
               onPress: () => AsyncStorage.setItem(DISMISS_KEY, 'true'),
             },
-            { text: 'Passer en mode marchand', onPress: () => switchMode('marchand') },
+            { text: 'Demander un compte marchand', onPress: () => navigation.navigate('BecomeMerchant') },
           ]
         );
       }
@@ -197,64 +218,130 @@ export default function ProfileScreen({ navigation }) {
     );
   };
 
+  const salesCount = useMemo(
+    () => myListings.reduce((sum, l) => sum + (l.orders?.length || 0), 0),
+    [myListings]
+  );
+
+  const hasName = profile.nom && profile.nom !== 'Toi (test)';
   const listingsData = tab === 'annonces' ? myListings : myOrders;
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.profileHeader}>
-        <View style={styles.avatar}>
-          {profile.avatar_icon ? (
-            <View style={[styles.avatarIconWrap, { backgroundColor: profile.avatar_color }]}>
-              <Ionicons name={profile.avatar_icon} size={30} color={colors.white} />
-            </View>
-          ) : profile.photo_url ? (
-            <Image source={{ uri: profile.photo_url }} style={styles.avatarImage} />
-          ) : (
-            <Text style={styles.avatarText}>
-              {profile.nom && profile.nom !== 'Toi (test)' ? profile.nom.slice(0, 2).toUpperCase() : 'TU'}
-            </Text>
-          )}
+  // Carte « marchand » : le texte dépend de l'état du compte.
+  const merchantStatus = profile.merchant_status;
+  let merchantTitle = 'Devenir marchand';
+  let merchantSub = 'Un tableau de bord pour vendre plus';
+  let merchantIcon = 'storefront-outline';
+  if (mode === 'marchand') {
+    merchantTitle = 'Repasser en mode visiteur';
+    merchantSub = 'Tu es en mode marchand';
+    merchantIcon = 'swap-horizontal-outline';
+  } else if (merchantStatus === 'actif') {
+    merchantTitle = 'Passer en mode marchand';
+    merchantSub = 'Statistiques, annonces et commandes';
+  } else if (merchantStatus === 'demande') {
+    merchantTitle = 'Demande en cours d’examen';
+    merchantSub = 'On te prévient dès que c’est validé';
+    merchantIcon = 'time-outline';
+  }
+
+  const onMerchantPress = () => {
+    if (mode === 'marchand') return switchMode('visiteur');
+    if (merchantStatus === 'actif') return switchMode('marchand');
+    navigation.navigate('BecomeMerchant');
+  };
+
+  const renderHeader = () => (
+    <View>
+      <GradientHeader style={styles.profileHeader}>
+        <View style={styles.avatarRing}>
+          <View style={styles.avatar}>
+            {profile.avatar_icon ? (
+              <View style={[styles.avatarIconWrap, { backgroundColor: profile.avatar_color }]}>
+                <Ionicons name={profile.avatar_icon} size={36} color={colors.white} />
+              </View>
+            ) : profile.photo_url ? (
+              <Image source={{ uri: profile.photo_url }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>
+                {hasName ? profile.nom.slice(0, 2).toUpperCase() : 'TU'}
+              </Text>
+            )}
+          </View>
         </View>
-        <Text style={styles.name}>
-          {profile.nom && profile.nom !== 'Toi (test)' ? profile.nom : 'Complète ton profil'}
-        </Text>
-        {profile.ville ? <Text style={styles.villeText}>{profile.ville}</Text> : null}
+        <Text style={styles.name}>{hasName ? profile.nom : 'Complète ton profil'}</Text>
+        {profile.ville ? (
+          <View style={styles.villeRow}>
+            <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.villeText}>{profile.ville}</Text>
+          </View>
+        ) : null}
         <TouchableOpacity
           style={styles.editProfileButton}
           onPress={() => navigation.navigate('EditProfile')}
+          activeOpacity={0.8}
         >
-          <Ionicons name="pencil-outline" size={12} color={colors.white} />
+          <Ionicons name="pencil-outline" size={13} color={colors.white} />
           <Text style={styles.editProfileButtonText}>Modifier mon profil</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleResetIdentity} style={styles.resetButton}>
-          <Text style={styles.resetButtonText}>Changer d'identité (test messagerie)</Text>
-        </TouchableOpacity>
+        {__DEV__ ? (
+          <TouchableOpacity onPress={handleResetIdentity} style={styles.resetButton}>
+            <Text style={styles.resetButtonText}>Changer d'identité (test)</Text>
+          </TouchableOpacity>
+        ) : null}
+      </GradientHeader>
+
+      {/* Chiffres clés, posés à cheval sur le bandeau */}
+      <View style={styles.statsCard}>
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{myListings.length}</Text>
+          <Text style={styles.statLabel}>Annonces</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{salesCount}</Text>
+          <Text style={styles.statLabel}>Ventes</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.stat}>
+          <Text style={styles.statValue}>{myOrders.length}</Text>
+          <Text style={styles.statLabel}>Achats</Text>
+        </View>
       </View>
 
-      <TouchableOpacity
-        style={styles.merchantButton}
-        onPress={() => switchMode(mode === 'marchand' ? 'visiteur' : 'marchand')}
-      >
-        <Ionicons name="storefront-outline" size={20} color={colors.white} />
-        <Text style={styles.merchantButtonText}>
-          {mode === 'marchand' ? 'Repasser en mode visiteur' : 'Passer en mode marchand'}
-        </Text>
-        <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.7)" />
+      <TouchableOpacity activeOpacity={0.85} onPress={onMerchantPress}>
+        <GradientHeader style={styles.merchantCard}>
+          <View style={styles.merchantIcon}>
+            <Ionicons name={merchantIcon} size={22} color={colors.white} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.merchantTitle}>{merchantTitle}</Text>
+            <Text style={styles.merchantSub}>{merchantSub}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.8)" />
+        </GradientHeader>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.ordersButton}
-        onPress={() => navigation.navigate('MyOrders')}
-      >
-        <Ionicons name="receipt-outline" size={20} color={colors.orange} />
-        <Text style={styles.ordersButtonText}>Mes commandes</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-      </TouchableOpacity>
+      <View style={styles.menuCard}>
+        <MenuRow
+          icon="receipt-outline"
+          label="Mes commandes"
+          hint="Suivi de tes achats et ventes"
+          onPress={() => navigation.navigate('MyOrders')}
+        />
+        <MenuRow
+          icon="apps-outline"
+          label="Compte, aide et informations"
+          hint="Paramètres, favoris, service client…"
+          onPress={() => navigation.navigate('Account')}
+          last
+        />
+      </View>
 
       <View style={styles.tabRow}>
         <TouchableOpacity
           style={[styles.tabButton, tab === 'annonces' && styles.tabButtonActive]}
           onPress={() => setTab('annonces')}
+          activeOpacity={0.8}
         >
           <Text style={[styles.tabText, tab === 'annonces' && styles.tabTextActive]}>
             Mes annonces
@@ -263,104 +350,156 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity
           style={[styles.tabButton, tab === 'achats' && styles.tabButtonActive]}
           onPress={() => setTab('achats')}
+          activeOpacity={0.8}
         >
           <Text style={[styles.tabText, tab === 'achats' && styles.tabTextActive]}>
             Mes achats
           </Text>
         </TouchableOpacity>
       </View>
+    </View>
+  );
 
-      {loading ? (
-        <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
-      ) : (
-        <FlatList
-          data={listingsData}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: spacing.lg }}
-          ListEmptyComponent={
-            <Text style={styles.empty}>
-              {tab === 'annonces'
-                ? "Tu n'as pas encore publié d'annonce."
-                : "Tu n'as encore rien acheté."}
-            </Text>
+  const renderEmpty = () => {
+    if (loading) {
+      return <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />;
+    }
+    const isAnnonces = tab === 'annonces';
+    return (
+      <View style={styles.emptyWrap}>
+        <View style={styles.emptyCircle}>
+          <Ionicons
+            name={isAnnonces ? 'pricetag-outline' : 'bag-handle-outline'}
+            size={30}
+            color={colors.orange}
+          />
+        </View>
+        <Text style={styles.emptyTitle}>
+          {isAnnonces ? "Pas encore d'annonce" : 'Aucun achat pour le moment'}
+        </Text>
+        <Text style={styles.emptyText}>
+          {isAnnonces
+            ? 'Publie ton premier article en moins de deux minutes.'
+            : 'Découvre les articles près de chez toi.'}
+        </Text>
+        <TouchableOpacity
+          style={styles.emptyButton}
+          activeOpacity={0.85}
+          onPress={() =>
+            isAnnonces
+              ? navigation.navigate('Accueil', { screen: 'PostListing' })
+              : navigation.navigate('Boutique')
           }
-          renderItem={({ item }) => {
-            if (tab === 'annonces') {
-              const order = item.orders?.[0];
-              const delivery = order?.deliveries?.[0];
-              return (
-                <View style={styles.card}>
-                  <View style={styles.cardRow}>
-                    <View style={styles.thumb}>
-                      <Ionicons name="image-outline" size={18} color={colors.textMuted} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle}>{item.title}</Text>
-                      <Text style={styles.cardSubtitle}>
-                        {item.status === 'disponible' ? 'En vente' : 'Vendu'} ·{' '}
-                        {Number(item.price).toLocaleString('fr-FR')} FCFA
-                      </Text>
-                    </View>
-                  </View>
-                  {delivery && (
-                    <View style={styles.deliveryRow}>
-                      <StatusBadge status={delivery.statut_livraison} modeLivraison={order.mode_livraison} />
-                      {NEXT_STATUS[delivery.statut_livraison] && (
-                        <TouchableOpacity
-                          onPress={() => handleAdvanceDelivery(delivery)}
-                          style={styles.advanceButton}
-                        >
-                          <Text style={styles.advanceButtonText}>
-                            Marquer « {getStatusLabel(NEXT_STATUS[delivery.statut_livraison], order.mode_livraison)} »
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
-                </View>
-              );
-            }
+        >
+          <Ionicons
+            name={isAnnonces ? 'add-circle-outline' : 'search-outline'}
+            size={16}
+            color={colors.white}
+          />
+          <Text style={styles.emptyButtonText}>
+            {isAnnonces ? 'Publier une annonce' : 'Parcourir les articles'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
-            const delivery = item.deliveries?.[0];
-            return (
-              <View style={styles.card}>
-                <View style={styles.cardRow}>
-                  <View style={styles.thumb}>
-                    <Ionicons name="cube-outline" size={18} color={colors.textMuted} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle}>{item.listings?.title}</Text>
-                    <Text style={styles.cardSubtitle}>
-                      {Number(item.montant).toLocaleString('fr-FR')} FCFA
-                    </Text>
-                  </View>
-                </View>
-                {delivery && (
-                  <View style={styles.deliveryRow}>
-                    <StatusBadge status={delivery.statut_livraison} modeLivraison={item.mode_livraison} />
-                    <Text style={styles.deliveryAddress} numberOfLines={1}>
-                      {delivery.adresse}
-                    </Text>
-                  </View>
-                )}
-                {delivery?.statut_livraison === 'livre' && (
-                  reviewedOrderIds.includes(item.id) ? (
-                    <Text style={styles.alreadyReviewedText}>Avis envoyé, merci !</Text>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.reviewButton}
-                      onPress={() => openReviewModal(item)}
-                    >
-                      <Ionicons name="star-outline" size={14} color={colors.orange} />
-                      <Text style={styles.reviewButtonText}>Laisser un avis</Text>
-                    </TouchableOpacity>
-                  )
-                )}
-              </View>
-            );
-          }}
-        />
-      )}
+  const renderItem = ({ item }) => {
+    if (tab === 'annonces') {
+      const order = item.orders?.[0];
+      const delivery = order?.deliveries?.[0];
+      const onSale = item.status === 'disponible';
+      return (
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.cardRow}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('ProductDetail', { listing: item })}
+          >
+            <View style={styles.thumb}>
+              {item.photo_url ? (
+                <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
+              ) : (
+                <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {item.title}
+              </Text>
+              <Text style={styles.cardPrice}>{Number(item.price).toLocaleString('fr-FR')} FCFA</Text>
+            </View>
+            <View style={[styles.saleChip, onSale ? styles.saleChipOn : styles.saleChipSold]}>
+              <Text style={[styles.saleChipText, onSale ? styles.saleChipTextOn : styles.saleChipTextSold]}>
+                {onSale ? 'En vente' : 'Vendu'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          {delivery && (
+            <View style={styles.deliveryRow}>
+              <StatusBadge status={delivery.statut_livraison} modeLivraison={order.mode_livraison} />
+              {NEXT_STATUS[delivery.statut_livraison] && (
+                <TouchableOpacity
+                  onPress={() => handleAdvanceDelivery(delivery)}
+                  style={styles.advanceButton}
+                >
+                  <Text style={styles.advanceButtonText}>
+                    Marquer « {getStatusLabel(NEXT_STATUS[delivery.statut_livraison], order.mode_livraison)} »
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    const delivery = item.deliveries?.[0];
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardRow}>
+          <View style={styles.thumb}>
+            <Ionicons name="cube-outline" size={20} color={colors.textMuted} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {item.listings?.title}
+            </Text>
+            <Text style={styles.cardPrice}>{Number(item.montant).toLocaleString('fr-FR')} FCFA</Text>
+          </View>
+        </View>
+        {delivery && (
+          <View style={styles.deliveryRow}>
+            <StatusBadge status={delivery.statut_livraison} modeLivraison={item.mode_livraison} />
+            <Text style={styles.deliveryAddress} numberOfLines={1}>
+              {delivery.adresse}
+            </Text>
+          </View>
+        )}
+        {delivery?.statut_livraison === 'livre' &&
+          (reviewedOrderIds.includes(item.id) ? (
+            <Text style={styles.alreadyReviewedText}>Avis envoyé, merci !</Text>
+          ) : (
+            <TouchableOpacity style={styles.reviewButton} onPress={() => openReviewModal(item)}>
+              <Ionicons name="star-outline" size={14} color={colors.orange} />
+              <Text style={styles.reviewButtonText}>Laisser un avis</Text>
+            </TouchableOpacity>
+          ))}
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <FlatList
+        data={loading ? [] : listingsData}
+        keyExtractor={(item) => item.id}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: spacing.xl * 2 }}
+      />
 
       <Modal
         visible={!!reviewModal}
@@ -414,106 +553,210 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
+const shadow = {
+  shadowColor: '#1B0A5C',
+  shadowOpacity: 0.1,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 4 },
+  elevation: 3,
+};
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+
+  // ----- En-tête
   profileHeader: {
-    backgroundColor: colors.purple,
     alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: spacing.lg,
+    paddingTop: 64,
+    paddingBottom: 54,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  avatarRing: {
+    width: 92,
+    height: 92,
+    borderRadius: 46,
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.9)',
+    padding: 2,
+    marginBottom: spacing.sm,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    flex: 1,
+    borderRadius: 44,
     backgroundColor: colors.orange,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
     overflow: 'hidden',
   },
-  avatarText: { color: colors.white, fontWeight: '700', fontSize: 16 },
-  name: { color: colors.white, fontSize: 15, fontWeight: '600' },
-  deviceId: { color: 'rgba(255,255,255,0.6)', fontSize: 11, marginTop: 4 },
-  avatarImage: { width: '100%', height: '100%', borderRadius: 28 },
+  avatarText: { color: colors.white, fontWeight: '800', fontSize: 24 },
+  avatarImage: { width: '100%', height: '100%' },
   avatarIconWrap: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  villeText: { color: 'rgba(255,255,255,0.75)', fontSize: 12, marginTop: 2 },
+  name: { color: colors.white, fontSize: 20, fontWeight: '800' },
+  villeRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  villeText: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
   editProfileButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
     backgroundColor: colors.orange,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    marginTop: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 9,
+    marginTop: spacing.md,
   },
-  editProfileButtonText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  editProfileButtonText: { color: colors.white, fontSize: 12, fontWeight: '700' },
   resetButton: {
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.35)',
   },
-  resetButtonText: { color: colors.white, fontSize: 11 },
-  ordersButton: {
+  resetButtonText: { color: 'rgba(255,255,255,0.8)', fontSize: 10 },
+
+  // ----- Chiffres clés
+  statsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: 18,
+    marginHorizontal: spacing.lg,
+    marginTop: -32,
+    paddingVertical: spacing.md,
+    ...shadow,
+  },
+  stat: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 20, fontWeight: '800', color: colors.purple },
+  statLabel: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  statDivider: { width: 1, height: 28, backgroundColor: colors.border },
+
+  // ----- Carte marchand
+  merchantCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    borderRadius: 18,
     marginHorizontal: spacing.lg,
     marginTop: spacing.md,
-    padding: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
   },
-  ordersButtonText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.textPrimary },
-  merchantButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.purple,
-    borderRadius: radius.md,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    padding: spacing.md,
-  },
-  merchantButtonText: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.white },
-  tabRow: { flexDirection: 'row', gap: spacing.sm, padding: spacing.lg, paddingBottom: 0 },
-  tabButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  tabButtonActive: { backgroundColor: colors.orange, borderColor: colors.orange },
-  tabText: { fontSize: 13, color: colors.textPrimary, fontWeight: '600' },
-  tabTextActive: { color: colors.white },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  cardRow: { flexDirection: 'row', gap: spacing.sm },
-  thumb: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
+  merchantIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.orange,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  cardSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  empty: { textAlign: 'center', color: colors.textMuted, marginTop: spacing.xl },
+  merchantTitle: { fontSize: 15, fontWeight: '800', color: colors.white },
+  merchantSub: { fontSize: 11.5, color: 'rgba(255,255,255,0.78)', marginTop: 2 },
+
+  // ----- Bloc de menu
+  menuCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    overflow: 'hidden',
+    ...shadow,
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+  },
+  menuRowBorder: { borderBottomWidth: 1, borderBottomColor: colors.border },
+  menuIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFF1E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  menuHint: { fontSize: 11.5, color: colors.textMuted, marginTop: 1 },
+
+  // ----- Onglets
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#ECEAF3',
+    borderRadius: radius.pill,
+    padding: 4,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+  },
+  tabButtonActive: { backgroundColor: colors.orange },
+  tabText: { fontSize: 13, color: colors.textSecondary, fontWeight: '700' },
+  tabTextActive: { color: colors.white },
+
+  // ----- Cartes d'annonces / d'achats
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    ...shadow,
+  },
+  cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  thumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  thumbImage: { width: '100%', height: '100%' },
+  cardTitle: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  cardPrice: { fontSize: 13, fontWeight: '700', color: colors.orange, marginTop: 3 },
+  saleChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  saleChipOn: { backgroundColor: colors.successBg },
+  saleChipSold: { backgroundColor: '#ECEAF3' },
+  saleChipText: { fontSize: 11, fontWeight: '700' },
+  saleChipTextOn: { color: colors.success },
+  saleChipTextSold: { color: colors.textSecondary },
+
+  // ----- État vide
+  emptyWrap: { alignItems: 'center', paddingHorizontal: spacing.xl, paddingVertical: spacing.xl },
+  emptyCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFF1E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  emptyText: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 4 },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.orange,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 11,
+    marginTop: spacing.md,
+  },
+  emptyButtonText: { color: colors.white, fontSize: 13, fontWeight: '700' },
+
+  // ----- Livraison
   deliveryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -560,6 +803,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
+
+  // ----- Fenêtre d'avis
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

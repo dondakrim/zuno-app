@@ -5,13 +5,20 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   StyleSheet,
+  Image,
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
+import { getUserInterests, matchesInterest } from '../lib/recommendations';
+import useWishlist from '../lib/useWishlist';
+import GradientHeader from '../components/GradientHeader';
+import MasonrySection from '../components/MasonrySection';
 
 export default function SearchScreen({ navigation }) {
   const [search, setSearch] = useState('');
@@ -23,6 +30,39 @@ export default function SearchScreen({ navigation }) {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // Parcours par catégorie et par centre d'intérêt (quand aucune recherche n'est lancée)
+  const [allListings, setAllListings] = useState([]);
+  const [interests, setInterests] = useState([]);
+  const [browseCat, setBrowseCat] = useState(null);
+  const [browseLoading, setBrowseLoading] = useState(true);
+  const { wishlistIds, loadWishlist, toggleWishlist } = useWishlist(navigation);
+
+  const loadBrowse = useCallback(async () => {
+    setBrowseLoading(true);
+    const { data } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('status', 'disponible')
+      .eq('moderation_status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(150);
+    setAllListings(data || []);
+    setInterests(await getUserInterests());
+    setBrowseLoading(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadBrowse();
+      loadWishlist();
+    }, [loadBrowse, loadWishlist])
+  );
+
+  const openProduct = (item) => navigation.navigate('ProductDetail', { listing: item });
+  const forYou = allListings.filter((l) => matchesInterest(l.category, interests)).slice(0, 8);
+  const sections = categories
+    .map((cat) => ({ name: cat, items: allListings.filter((l) => l.category === cat) }))
+    .filter((sec) => sec.items.length > 0);
 
   const activeFilterCount =
     (category ? 1 : 0) + (city.trim() ? 1 : 0) + (minPrice ? 1 : 0) + (maxPrice ? 1 : 0);
@@ -54,9 +94,10 @@ export default function SearchScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Rechercher</Text>
-      </View>
+      <GradientHeader style={styles.header}>
+        <Text style={styles.headerTitle}>Boutiques</Text>
+        <Text style={styles.headerSub}>Par catégorie et selon tes centres d'intérêt</Text>
+      </GradientHeader>
 
       <View style={styles.body}>
         <View style={styles.searchRow}>
@@ -64,7 +105,7 @@ export default function SearchScreen({ navigation }) {
             placeholder="Nom de l'article"
             placeholderTextColor={colors.textMuted}
             value={search}
-            onChangeText={setSearch}
+            onChangeText={(t) => { setSearch(t); if (!t.trim()) setSearched(false); }}
             onSubmitEditing={runSearch}
             style={styles.searchInput}
           />
@@ -149,7 +190,63 @@ export default function SearchScreen({ navigation }) {
           </TouchableOpacity>
         )}
 
-        {loading ? (
+        {!searched && !loading ? (
+          browseLoading ? (
+            <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: spacing.md, paddingBottom: spacing.xl }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }} contentContainerStyle={{ gap: spacing.xs }}>
+                {[null, ...categories].map((c) => {
+                  const active = c === browseCat;
+                  return (
+                    <TouchableOpacity key={c || 'all'} onPress={() => setBrowseCat(c)} style={[styles.chip, active && styles.chipActive]}>
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{c || 'Tout'}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {browseCat ? (
+                <MasonrySection
+                  title={browseCat}
+                  items={allListings.filter((l) => l.category === browseCat)}
+                  getSellerRating={() => undefined}
+                  wishlistIds={wishlistIds}
+                  onToggleWishlist={toggleWishlist}
+                  onPressItem={openProduct}
+                />
+              ) : (
+                <>
+                  {forYou.length > 0 && (
+                    <MasonrySection
+                      title="Pour vous"
+                      items={forYou}
+                      getSellerRating={() => undefined}
+                      wishlistIds={wishlistIds}
+                      onToggleWishlist={toggleWishlist}
+                      onPressItem={openProduct}
+                    />
+                  )}
+                  {sections.map((sec) => (
+                    <MasonrySection
+                      key={sec.name}
+                      title={sec.name}
+                      items={sec.items.slice(0, 8)}
+                      onSeeAll={() => setBrowseCat(sec.name)}
+                      getSellerRating={() => undefined}
+                      wishlistIds={wishlistIds}
+                      onToggleWishlist={toggleWishlist}
+                      onPressItem={openProduct}
+                    />
+                  ))}
+                  {allListings.length === 0 && (
+                    <Text style={styles.emptyText}>Aucun article pour l'instant.</Text>
+                  )}
+                </>
+              )}
+            </ScrollView>
+          )
+        ) : loading ? (
           <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
         ) : (
           <FlatList
@@ -166,9 +263,9 @@ export default function SearchScreen({ navigation }) {
                 style={styles.card}
                 onPress={() => navigation.navigate('ProductDetail', { listing: item })}
               >
-                <View style={styles.thumb}>
+                <View style={[styles.thumb, { overflow: 'hidden' }]}>
                   {item.photo_url ? (
-                    <Ionicons name="image" size={22} color={colors.textMuted} />
+                    <Image source={{ uri: item.photo_url }} style={{ width: '100%', height: '100%' }} />
                   ) : (
                     <Ionicons name="image-outline" size={22} color={colors.textMuted} />
                   )}
@@ -190,13 +287,9 @@ export default function SearchScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    backgroundColor: colors.purple,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
+  header: { paddingTop: 50, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '600' },
+  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   searchRow: { flexDirection: 'row', gap: spacing.sm },
   searchInput: {

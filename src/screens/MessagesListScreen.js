@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator }
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
+import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 
@@ -51,9 +52,9 @@ export default function MessagesListScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <Text style={styles.headerTitle}>Messages</Text>
-      </View>
+      </GradientHeader>
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
@@ -103,6 +104,8 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '600' },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },

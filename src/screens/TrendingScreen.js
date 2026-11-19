@@ -3,19 +3,28 @@ import {
   View,
   Text,
   TouchableOpacity,
-  FlatList,
+  ScrollView,
   StyleSheet,
   Image,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
+import { getUserInterests, fetchRecommended, fetchTargetedAds } from '../lib/recommendations';
+import useWishlist from '../lib/useWishlist';
+import GradientHeader from '../components/GradientHeader';
+import MasonrySection from '../components/MasonrySection';
+import AdCarousel from '../components/AdCarousel';
 
 export default function TrendingScreen({ navigation }) {
   const [listings, setListings] = useState([]);
+  const [forYou, setForYou] = useState([]);
+  const [ads, setAds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { wishlistIds, loadWishlist, toggleWishlist } = useWishlist(navigation);
 
   const loadTrending = useCallback(async () => {
     setLoading(true);
@@ -43,58 +52,89 @@ export default function TrendingScreen({ navigation }) {
       setListings(sorted);
     }
     setLoading(false);
+
+    // Pubs ciblées et « Pour vous », selon les centres d'intérêt.
+    const interests = await getUserInterests();
+    const [adsList, rec] = await Promise.all([
+      fetchTargetedAds('tendances', interests),
+      fetchRecommended({ interests, limit: 8 }),
+    ]);
+    setAds(adsList);
+    setForYou(rec);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadTrending();
-    }, [loadTrending])
+      loadWishlist();
+    }, [loadTrending, loadWishlist])
   );
+
+  const onPressAd = (ad) => {
+    if (ad.link_url) Linking.openURL(ad.link_url).catch(() => {});
+    else if (ad.target_category) navigation.navigate('CategoryListing', { category: ad.target_category });
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <Text style={styles.headerTitle}>Tendances</Text>
-      </View>
+        <Text style={styles.headerSub}>Ce qui plaît en ce moment</Text>
+      </GradientHeader>
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
       ) : (
-        <FlatList
-          data={listings}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={{ gap: spacing.sm }}
-          contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>Aucun article pour l'instant.</Text>
-          }
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('ProductDetail', { listing: item })}
-            >
-              <View style={styles.thumb}>
-                {item.photo_url ? (
-                  <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
-                ) : (
-                  <Ionicons name="image-outline" size={26} color={colors.textMuted} />
-                )}
-                {item.boost_until && new Date(item.boost_until) > new Date() && (
-                  <View style={styles.boostBadge}>
-                    <Ionicons name="flash" size={10} color={colors.white} />
-                    <Text style={styles.boostBadgeText}>En vedette</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-              <Text style={styles.cardPrice}>
-                {Number(item.price).toLocaleString('fr-FR')} FCFA
-              </Text>
-              <Text style={styles.cardCity} numberOfLines={1}>{item.city}</Text>
-            </TouchableOpacity>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xl }} showsVerticalScrollIndicator={false}>
+          {ads.length > 0 && (
+            <View style={{ marginBottom: spacing.lg }}>
+              <AdCarousel ads={ads} onPressAd={onPressAd} />
+            </View>
           )}
-        />
+
+          {forYou.length > 0 && (
+            <MasonrySection
+              title="Pour vous"
+              items={forYou}
+              getSellerRating={() => undefined}
+              wishlistIds={wishlistIds}
+              onToggleWishlist={toggleWishlist}
+              onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
+            />
+          )}
+
+          <Text style={styles.sectionTitle}>Tendances du moment</Text>
+          {listings.length === 0 ? (
+            <Text style={styles.emptyText}>Aucun article pour l'instant.</Text>
+          ) : (
+            <View style={styles.grid}>
+              {listings.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.card}
+                  onPress={() => navigation.navigate('ProductDetail', { listing: item })}
+                >
+                  <View style={styles.thumb}>
+                    {item.photo_url ? (
+                      <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
+                    ) : (
+                      <Ionicons name="image-outline" size={26} color={colors.textMuted} />
+                    )}
+                    {item.boost_until && new Date(item.boost_until) > new Date() && (
+                      <View style={styles.boostBadge}>
+                        <Ionicons name="flash" size={10} color={colors.white} />
+                        <Text style={styles.boostBadgeText}>En vedette</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.cardPrice}>{Number(item.price).toLocaleString('fr-FR')} FCFA</Text>
+                  <Text style={styles.cardCity} numberOfLines={1}>{item.city}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       )}
     </View>
   );
@@ -102,16 +142,14 @@ export default function TrendingScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    backgroundColor: colors.purple,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
-  },
+  header: { paddingTop: 50, paddingBottom: spacing.lg, paddingHorizontal: spacing.lg },
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '600' },
+  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.lg, marginBottom: spacing.sm },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
   card: {
-    flex: 1,
+    width: '48.5%',
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
