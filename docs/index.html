@@ -34,7 +34,7 @@
   button { font-family: inherit; }
 
   /* ---------- Connexion ---------- */
-  #login-screen {
+  #login-screen, #pwd-screen {
     max-width: 400px; margin: 80px auto; background: var(--surface);
     border: 1px solid var(--border); border-radius: 16px; padding: 32px;
   }
@@ -43,8 +43,8 @@
     font-family: var(--font-head); font-weight: 700; font-size: 24px;
     display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
   }
-  #login-screen h1 { font-family: var(--font-head); font-size: 22px; margin: 0 0 4px; }
-  #login-screen p { color: var(--text-secondary); font-size: 14px; margin: 0 0 20px; }
+  #login-screen h1, #pwd-screen h1 { font-family: var(--font-head); font-size: 22px; margin: 0 0 4px; }
+  #login-screen p, #pwd-screen p { color: var(--text-secondary); font-size: 14px; margin: 0 0 20px; }
   input, select, textarea {
     font-family: inherit; color: var(--text);
   }
@@ -273,6 +273,15 @@
     .kpi-value { font-size: 22px; }
     .todo-card, .kpi { padding: 14px; }
   }
+
+  #pwd-screen { margin-top: 80px; }
+  .pwd-error { color: var(--danger); font-size: 13px; margin: 0 0 10px; display: none; }
+  .pwd-banner { background: #FFF1DB; color: #9A5B00; border-radius: 12px; padding: 12px 16px; font-size: 14px; margin-bottom: 16px; }
+  .perm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 16px; margin: 10px 0 14px; }
+  .perm-grid label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  .perm-grid input { width: auto; margin: 0; }
+  .preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .team-form label.lbl { display: block; font-size: 13px; color: var(--text-secondary); margin: 8px 0 6px; }
 </style>
 </head>
 <body>
@@ -281,7 +290,7 @@
   <div class="login-logo">Z</div>
   <h1>Zuno — Espace admin</h1>
   <p>Connexion réservée aux comptes administrateurs.</p>
-  <input type="email" id="login-email" placeholder="Adresse email">
+  <input type="text" id="login-email" placeholder="Nom d’utilisateur ou email" autocomplete="username" autocapitalize="off">
   <input type="password" id="login-password" placeholder="Mot de passe">
   <button class="primary" id="login-btn">Se connecter</button>
   <div id="login-error"></div>
@@ -319,6 +328,8 @@
             <button type="button" class="tab-btn" data-tab="demandes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><path d="M19 8v6M16 11h6"/></svg>Comptes marchands<span class="badge" id="badge-demandes"></span></button>
       <button type="button" class="tab-btn" data-tab="comptes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Comptes</button>
       <button type="button" class="tab-btn" data-tab="identites"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Vérification d'identité<span class="badge" id="badge-identites"></span></button>
+      <div class="nav-label" id="nav-admin-label" style="display:none">Administration</div>
+      <button type="button" class="tab-btn" data-tab="equipe" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Équipe</button>
       <div class="sidebar-foot">
         <div class="admin-mail" id="admin-mail"></div>
         <button type="button" class="logout-btn" id="logout-btn">Se déconnecter</button>
@@ -333,6 +344,7 @@
     <div class="panel active" id="panel-overview"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-paiements"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-demandes"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-equipe"><div class="loading">Chargement…</div></div>
 
     <div class="panel" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
@@ -525,7 +537,7 @@ const DISPUTE_LABELS = {
 };
 
 document.getElementById('login-btn').addEventListener('click', async () => {
-  const email = document.getElementById('login-email').value.trim();
+  const email = usernameToEmail(document.getElementById('login-email').value);
   const password = document.getElementById('login-password').value;
   const errorEl = document.getElementById('login-error');
   errorEl.style.display = 'none';
@@ -550,7 +562,7 @@ async function checkAdminAndInit() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
 
-  const { data: adminRow } = await sb.from('admins').select('id').eq('id', user.id).maybeSingle();
+  const adminRow = await loadMyAdminRow(user.id);
   document.getElementById('login-screen').style.display = 'none';
 
   if (!adminRow) {
@@ -558,22 +570,23 @@ async function checkAdminAndInit() {
     return;
   }
 
+  if (!(await teamGate(adminRow, user))) return;
   document.getElementById('app').style.display = 'block';
-  document.getElementById('admin-mail').textContent = user.email || '';
-  showTab('overview');
-  loadLitiges();
-  loadModeration();
-  loadIdentites();
-  loadAds();
-  loadBoosts();
-  loadUsers();
-  loadArticles();
-  loadMerchants();
-  loadComptes();
-  loadCommandes();
-  loadPaniers();
-  loadPromos();
-  loadReversements();
+  document.getElementById('admin-mail').textContent = user.email && !user.email.endsWith('@' + TEAM_DOMAIN) ? user.email : (adminRow.display_name || adminRow.username || '');
+  showTab(firstAllowedTab());
+  if (can('litiges')) loadLitiges();
+  if (can('moderation')) loadModeration();
+  if (can('identites')) loadIdentites();
+  if (can('publicites')) loadAds();
+  if (can('boosts')) loadBoosts();
+  if (can('utilisateurs')) loadUsers();
+  if (can('articles')) loadArticles();
+  if (can('marchands')) loadMerchants();
+  if (can('comptes')) loadComptes();
+  if (can('commandes')) loadCommandes();
+  if (can('paniers')) loadPaniers();
+  if (can('promos')) loadPromos();
+  if (can('reversements')) loadReversements();
 }
 
 async function loadLitiges() {
@@ -2316,6 +2329,7 @@ const PAGE_INFO = {
   commandes: ['Commandes', 'Suis chaque commande du paiement à la livraison.'],
   litiges: ['Litiges', 'Signalements ouverts par les acheteurs.'],
   demandes: ['Comptes marchands', "Demandes d'ouverture, et création d'un compte à la demande d'un utilisateur."],
+  equipe: ['Équipe', "Les profils du back-office et ce que chacun peut gérer."],
   paiements: ['Paiements', "Tout l'argent qui entre et qui sort, réseau par réseau."],
   reversements: ['Versements marchands', 'Demandes de reversement à traiter.'],
   paniers: ['Paniers', 'Paniers en cours des acheteurs.'],
@@ -2346,6 +2360,7 @@ function closeSidebar() {
 }
 
 function showTab(name) {
+  if (!can(name)) name = firstAllowedTab();
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + name));
   const info = PAGE_INFO[name] || [name, ''];
@@ -2356,6 +2371,7 @@ function showTab(name) {
   if (name === 'overview') loadOverview();
   if (name === 'paiements') loadPaiements();
   if (name === 'demandes') loadDemandes();
+  if (name === 'equipe') loadEquipe();
 }
 
 document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -2953,6 +2969,255 @@ async function revokeMerchant(id) {
   const { error } = await sb.from('users').update({ merchant_status: 'aucun' }).eq('id', id);
   if (error) { alert('Erreur : ' + error.message); return; }
   loadDemandes();
+}
+
+
+/* ---------- Équipe : profils du back-office, droits, mot de passe tous les 60 jours ---------- */
+const TEAM_DOMAIN = 'team.zuno.invalid';
+const PASSWORD_MAX_DAYS = 60;
+const PASSWORD_WARN_DAYS = 10;
+const TEAM_SECTIONS = [
+  ['overview', "Vue d'ensemble"], ['commandes', 'Commandes'], ['litiges', 'Litiges'], ['paiements', 'Paiements'],
+  ['reversements', 'Versements marchands'], ['paniers', 'Paniers'], ['moderation', 'Modération'], ['articles', 'Articles'],
+  ['publicites', 'Publicités'], ['boosts', 'Mises en avant'], ['promos', 'Promos'], ['campagnes', 'Campagnes'],
+  ['utilisateurs', 'Utilisateurs'], ['marchands', 'Marchands'], ['demandes', 'Comptes marchands'],
+  ['comptes', 'Comptes'], ['identites', "Vérification d'identité"],
+];
+const TEAM_PRESETS = {
+  support: ['Support client', ['overview', 'commandes', 'litiges', 'paniers', 'utilisateurs']],
+  moderation: ['Modération', ['overview', 'moderation', 'articles', 'identites', 'utilisateurs']],
+  finance: ['Finance', ['overview', 'commandes', 'paiements', 'reversements']],
+  marketing: ['Marketing', ['overview', 'publicites', 'boosts', 'promos', 'campagnes']],
+};
+let ME = { is_super: true, perms: new Set(), legacy: true };
+let teamRows = [];
+
+function can(tab) {
+  if (tab === 'equipe') return !!ME.is_super;
+  return !!ME.is_super || ME.perms.has(tab);
+}
+function firstAllowedTab() {
+  const t = TEAM_SECTIONS.find(([k]) => can(k));
+  return t ? t[0] : (can('equipe') ? 'equipe' : 'overview');
+}
+function daysSince(iso) { return iso ? Math.floor((Date.now() - new Date(iso).getTime()) / 86400000) : 9999; }
+
+async function loadMyAdminRow(uid) {
+  const full = await sb.from('admins')
+    .select('id, username, display_name, is_super, permissions, active, password_changed_at, must_change_password')
+    .eq('id', uid).maybeSingle();
+  if (!full.error) return full.data;
+  // Le fichier SQL n'a pas encore été lancé : on garde l'accès complet de l'admin actuel.
+  const old = await sb.from('admins').select('id').eq('id', uid).maybeSingle();
+  return old.data ? { id: uid, is_super: true, permissions: [], active: true, legacy: true } : null;
+}
+
+function applyMenuAccess() {
+  document.querySelectorAll('.tab-btn').forEach((b) => { b.style.display = can(b.dataset.tab) ? '' : 'none'; });
+  document.querySelectorAll('.nav-label').forEach((lab) => {
+    let el = lab.nextElementSibling, any = false;
+    while (el && !el.classList.contains('nav-label') && !el.classList.contains('sidebar-foot')) {
+      if (el.classList.contains('tab-btn') && el.style.display !== 'none') any = true;
+      el = el.nextElementSibling;
+    }
+    lab.style.display = any ? '' : 'none';
+  });
+}
+
+async function teamGate(row, user) {
+  ME = { id: row.id, is_super: !!row.is_super, perms: new Set(row.permissions || []), legacy: !!row.legacy };
+  if (row.active === false) {
+    await sb.auth.signOut();
+    const na = document.getElementById('not-admin');
+    na.querySelector('p').textContent = "Ce profil a été désactivé. Contacte un super-administrateur.";
+    na.style.display = 'block';
+    return false;
+  }
+  applyMenuAccess();
+  if (row.legacy) return true;
+  const days = daysSince(row.password_changed_at);
+  if (row.must_change_password || days >= PASSWORD_MAX_DAYS) {
+    document.getElementById('app').style.display = 'none';
+    await forcePasswordChange(row.must_change_password ? 'first' : 'expired');
+  } else if (PASSWORD_MAX_DAYS - days <= PASSWORD_WARN_DAYS) {
+    const left = PASSWORD_MAX_DAYS - days;
+    const b = document.createElement('div');
+    b.className = 'pwd-banner';
+    b.innerHTML = 'Ton mot de passe expire dans ' + left + ' jour' + (left > 1 ? 's' : '') +
+      '. <button type="button" class="link-btn" id="pwd-change-now">Le changer maintenant</button>';
+    const host = document.querySelector('.panels') || document.getElementById('app');
+    host.parentNode.insertBefore(b, host);
+    document.getElementById('pwd-change-now').onclick = async () => { await forcePasswordChange('voluntary'); b.remove(); };
+  }
+  return true;
+}
+
+function forcePasswordChange(reason) {
+  return new Promise((resolve) => {
+    const box = document.createElement('div');
+    box.id = 'pwd-screen';
+    const msg = reason === 'first' ? 'Bienvenue ! Remplace le mot de passe temporaire par le tien.'
+      : reason === 'expired' ? 'Ton mot de passe a plus de 60 jours : il doit être changé pour continuer.'
+      : 'Choisis un nouveau mot de passe.';
+    box.innerHTML = '<div class="login-logo">Z</div><h1>Nouveau mot de passe</h1><p>' + esc(msg) + '</p>' +
+      '<input type="password" id="pwd-new" placeholder="Nouveau mot de passe (10 caractères minimum)" autocomplete="new-password">' +
+      '<input type="password" id="pwd-new2" placeholder="Répète le mot de passe" autocomplete="new-password">' +
+      '<div class="pwd-error" id="pwd-error"></div><button class="primary" id="pwd-save">Enregistrer</button>';
+    document.body.appendChild(box);
+    const err = (t) => { const e = document.getElementById('pwd-error'); e.textContent = t; e.style.display = 'block'; };
+    document.getElementById('pwd-save').onclick = async () => {
+      const a = document.getElementById('pwd-new').value, b = document.getElementById('pwd-new2').value;
+      if (a.length < 10) return err('10 caractères minimum.');
+      if (!/[A-Za-z]/.test(a) || !/[0-9]/.test(a)) return err('Mélange des lettres et des chiffres.');
+      if (a !== b) return err('Les deux mots de passe sont différents.');
+      const btn = document.getElementById('pwd-save'); btn.disabled = true;
+      const { error } = await sb.auth.updateUser({ password: a });
+      if (error) { btn.disabled = false; return err(/different/i.test(error.message) ? 'Choisis un mot de passe différent du précédent.' : error.message); }
+      const { error: e2 } = await sb.rpc('admin_password_changed');
+      if (e2) { btn.disabled = false; return err(e2.message); }
+      box.remove();
+      document.getElementById('app').style.display = 'block';
+      resolve();
+    };
+  });
+}
+
+function usernameToEmail(v) {
+  v = (v || '').trim();
+  return v.includes('@') ? v : v.toLowerCase() + '@' + TEAM_DOMAIN;
+}
+
+async function teamCall(body) {
+  const { data, error } = await sb.functions.invoke('admin-team', { body });
+  if (error) {
+    let m = error.message;
+    try { const j = await error.context.json(); if (j && j.error) m = j.error; } catch (e) {}
+    throw new Error(m);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+function permBoxes(selected) {
+  return '<div class="perm-grid">' + TEAM_SECTIONS.map(([k, l]) =>
+    '<label><input type="checkbox" class="perm-cb" value="' + k + '"' + (selected.includes(k) ? ' checked' : '') + '>' + esc(l) + '</label>').join('') + '</div>';
+}
+function presetButtons() {
+  return '<div class="preset-row"><span class="card-meta" style="align-self:center">Profils types :</span>' +
+    Object.entries(TEAM_PRESETS).map(([k, v]) => '<button type="button" class="outline-btn" style="height:34px;padding:0 12px" onclick="applyPreset(\'' + k + '\')">' + esc(v[0]) + '</button>').join('') +
+    '<button type="button" class="link-btn" onclick="setAllPerms(true)">Tout cocher</button><button type="button" class="link-btn" onclick="setAllPerms(false)">Tout décocher</button></div>';
+}
+function setAllPerms(v) { document.querySelectorAll('.perm-cb').forEach((c) => { c.checked = v; }); }
+function applyPreset(k) { const p = TEAM_PRESETS[k][1]; document.querySelectorAll('.perm-cb').forEach((c) => { c.checked = p.includes(c.value); }); }
+function chosenPerms() { return [...document.querySelectorAll('.perm-cb:checked')].map((c) => c.value); }
+function randomPassword() {
+  const a = 'abcdefghjkmnpqrstuvwxyz', A = 'ABCDEFGHJKMNPQRSTUVWXYZ', n = '23456789';
+  const pick = (s) => s[crypto.getRandomValues(new Uint32Array(1))[0] % s.length];
+  let out = pick(A) + pick(n);
+  for (let i = 0; i < 8; i++) out += pick(a);
+  return out + pick(n) + pick(A);
+}
+
+async function loadEquipe() {
+  const panel = document.getElementById('panel-equipe');
+  if (!can('equipe')) { panel.innerHTML = ''; return; }
+  const { data, error } = await sb.from('admins')
+    .select('id, username, display_name, is_super, permissions, active, password_changed_at, must_change_password')
+    .order('display_name', { ascending: true });
+  if (error) {
+    panel.innerHTML = '<div class="error-box">' + esc(error.message) + '<br>Lance d\'abord le fichier add_team_admins.sql dans le SQL Editor de Supabase.</div>';
+    return;
+  }
+  teamRows = data || [];
+  const rows = teamRows.map((m) => {
+    const days = daysSince(m.password_changed_at);
+    const left = PASSWORD_MAX_DAYS - days;
+    const pw = m.must_change_password ? '<span class="st st-warn">À changer à la 1re connexion</span>'
+      : left <= 0 ? '<span class="st st-bad">Expiré</span>'
+      : left <= PASSWORD_WARN_DAYS ? '<span class="st st-warn">Expire dans ' + left + ' j</span>'
+      : '<span class="st st-ok">Valide ' + left + ' j</span>';
+    const rights = m.is_super ? 'Super-admin (tout)' : ((m.permissions || []).length + ' page(s)');
+    const me = m.id === ME.id;
+    return '<tr><td><b>' + esc(m.display_name || m.username || '—') + '</b>' + (me ? ' <span class="st st-info">Toi</span>' : '') +
+      '<div class="muted">' + esc(m.username || 'compte historique') + '</div></td>' +
+      '<td>' + esc(rights) + '</td><td>' + pw + '</td>' +
+      '<td>' + (m.active === false ? '<span class="st st-bad">Désactivé</span>' : '<span class="st st-ok">Actif</span>') + '</td>' +
+      '<td style="white-space:nowrap">' +
+        '<button type="button" class="link-btn" onclick="editMember(\'' + esc(m.id) + '\')">Droits</button> · ' +
+        (m.username ? '<button type="button" class="link-btn" onclick="resetMemberPassword(\'' + esc(m.id) + '\')">Mot de passe</button> · ' : '') +
+        (me ? '' : '<button type="button" class="link-btn" onclick="toggleMember(\'' + esc(m.id) + '\',' + (m.active === false) + ')">' + (m.active === false ? 'Réactiver' : 'Désactiver') + '</button> · ' +
+          '<button type="button" class="link-btn" style="color:#B3261E" onclick="deleteMember(\'' + esc(m.id) + '\')">Supprimer</button>') +
+      '</td></tr>';
+  }).join('');
+  panel.innerHTML =
+    '<section class="section"><div class="table-box"><div class="table-head"><h2>Membres du back-office (' + teamRows.length + ')</h2>' +
+    '<button type="button" class="btn btn-approve" onclick="showMemberForm()">Ajouter un membre</button></div><div class="scroll-x">' +
+    '<table class="t"><thead><tr><th>Membre</th><th>Droits</th><th>Mot de passe</th><th>Statut</th><th></th></tr></thead><tbody>' +
+    (rows || '<tr><td colspan="5" class="muted">Aucun membre.</td></tr>') + '</tbody></table></div></div></section>' +
+    '<section class="section"><div class="box team-form" id="member-form" style="display:none"></div></section>' +
+    '<p class="card-meta">Chaque membre doit changer son mot de passe tous les ' + PASSWORD_MAX_DAYS + ' jours. Il est prévenu ' + PASSWORD_WARN_DAYS + ' jours avant.</p>';
+}
+
+function showMemberForm(id) {
+  const m = id ? teamRows.find((x) => x.id === id) : null;
+  const box = document.getElementById('member-form');
+  box.style.display = 'block';
+  box.dataset.editing = id || '';
+  box.innerHTML = '<h2>' + (m ? 'Droits de ' + esc(m.display_name || m.username) : 'Nouveau membre') + '</h2>' +
+    (m ? '' :
+      '<label class="lbl">Nom affiché</label><input type="text" id="tm-name" placeholder="Ex. Aïcha, support">' +
+      '<label class="lbl">Nom d\'utilisateur (lettres minuscules, chiffres, point, tiret)</label><input type="text" id="tm-user" placeholder="aicha.support" autocomplete="off">' +
+      '<label class="lbl">Mot de passe temporaire (à transmettre au membre)</label>' +
+      '<div style="display:flex;gap:8px"><input type="text" id="tm-pass" autocomplete="off"><button type="button" class="outline-btn" onclick="document.getElementById(\'tm-pass\').value=randomPassword()">Générer</button></div>') +
+    '<label class="perm-grid" style="display:flex;margin:10px 0"><input type="checkbox" id="tm-super"' + (m && m.is_super ? ' checked' : '') + ' onchange="document.getElementById(\'tm-perms\').style.display=this.checked?\'none\':\'block\'"> <b>Super-administrateur</b> (accès à tout, peut gérer l\'équipe)</label>' +
+    '<div id="tm-perms" style="display:' + (m && m.is_super ? 'none' : 'block') + '"><label class="lbl">Pages que ce membre peut gérer</label>' + presetButtons() + permBoxes(m ? (m.permissions || []) : []) + '</div>' +
+    '<div id="tm-error" class="error-box" style="display:none;margin-bottom:10px"></div>' +
+    '<div class="actions"><button type="button" class="btn btn-approve" onclick="saveMember()">' + (m ? 'Enregistrer' : 'Créer le profil') + '</button>' +
+    '<button type="button" class="btn" onclick="document.getElementById(\'member-form\').style.display=\'none\'">Annuler</button></div>';
+  box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!m) document.getElementById('tm-pass').value = randomPassword();
+}
+function editMember(id) { showMemberForm(id); }
+
+async function saveMember() {
+  const box = document.getElementById('member-form');
+  const id = box.dataset.editing;
+  const err = document.getElementById('tm-error');
+  err.style.display = 'none';
+  const is_super = document.getElementById('tm-super').checked;
+  const permissions = is_super ? [] : chosenPerms();
+  if (!is_super && !permissions.length) { err.textContent = 'Coche au moins une page, ou choisis super-administrateur.'; err.style.display = 'block'; return; }
+  try {
+    if (id) {
+      await teamCall({ action: 'update', id, is_super, permissions });
+    } else {
+      const username = document.getElementById('tm-user').value.trim().toLowerCase();
+      const display_name = document.getElementById('tm-name').value.trim();
+      const password = document.getElementById('tm-pass').value;
+      const r = await teamCall({ action: 'create', username, display_name, password, is_super, permissions });
+      alert('Profil créé.\n\nNom d\'utilisateur : ' + r.username + '\nMot de passe temporaire : ' + password + '\n\nTransmets-les au membre. Il devra choisir son propre mot de passe à la première connexion.');
+    }
+    loadEquipe();
+  } catch (e) { err.textContent = e.message; err.style.display = 'block'; }
+}
+
+async function resetMemberPassword(id) {
+  const m = teamRows.find((x) => x.id === id);
+  const pw = randomPassword();
+  if (!confirm('Réinitialiser le mot de passe de ' + (m.display_name || m.username) + ' ?\nNouveau mot de passe temporaire : ' + pw)) return;
+  try {
+    await teamCall({ action: 'reset_password', id, password: pw });
+    alert('Mot de passe temporaire : ' + pw + '\n\nTransmets-le au membre : il devra le changer à sa prochaine connexion.');
+    loadEquipe();
+  } catch (e) { alert('Erreur : ' + e.message); }
+}
+async function toggleMember(id, active) {
+  try { await teamCall({ action: 'set_active', id, active }); loadEquipe(); } catch (e) { alert('Erreur : ' + e.message); }
+}
+async function deleteMember(id) {
+  const m = teamRows.find((x) => x.id === id);
+  if (!confirm('Supprimer définitivement le profil de ' + (m.display_name || m.username) + ' ?')) return;
+  try { await teamCall({ action: 'delete', id }); loadEquipe(); } catch (e) { alert('Erreur : ' + e.message); }
 }
 </script>
 </body>
