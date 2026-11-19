@@ -1,95 +1,111 @@
-// Edge Function : create-payment
-// Appelée par l'appli au moment du paiement. Crée une facture PayDunya
-// pour la commande, et renvoie l'adresse où rediriger l'acheteur pour
-// finaliser son paiement (Wave, Orange Money, etc.)
+// Crée (ou retrouve) l'achat NITA d'une commande et renvoie le lien de paiement.
+// Remplace l'ancienne version PayDunya.
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { checkAchatStatus, createAchat, nitaConfig, toNitaPhone } from '../_shared/nita.ts';
 
-const PAYDUNYA_MASTER_KEY = Deno.env.get('PAYDUNYA_MASTER_KEY')!;
-const PAYDUNYA_PRIVATE_KEY = Deno.env.get('PAYDUNYA_PRIVATE_KEY')!;
-const PAYDUNYA_PUBLIC_KEY = Deno.env.get('PAYDUNYA_PUBLIC_KEY')!;
-const PAYDUNYA_TOKEN = Deno.env.get('PAYDUNYA_TOKEN')!;
-// 'test' tant qu'on utilise les clés de bac à sable, 'live' le jour où
-// PayDunya valide le compte pour de vrais paiements.
-const PAYDUNYA_MODE = Deno.env.get('PAYDUNYA_MODE') || 'test';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Page affichée à l'acheteur après son paiement (à publier dans docs/retour.html).
+const RETURN_URL = 'https://dondakrim.github.io/zuno-app/retour.html';
 
-const PAYDUNYA_BASE_URL =
-  PAYDUNYA_MODE === 'live'
-    ? 'https://app.paydunya.com/api/v1'
-    : 'https://app.paydunya.com/sandbox-api/v1';
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
   try {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) return json({ error: 'Non connecté.' }, 401);
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const userClient = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) return json({ error: 'Session invalide.' }, 401);
+
     const { orderId } = await req.json();
-    if (!orderId) {
-      return new Response(JSON.stringify({ error: 'orderId manquant' }), { status: 400 });
-    }
+    if (!orderId) return json({ error: 'orderId manquant.' }, 400);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-    const { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await admin
       .from('orders')
-      .select('*, listings(title)')
+      .select('id, acheteur_id, montant, reference_number, payment_provider, payment_reference, payment_url, listings(title), deliveries(telephone_contact)')
       .eq('id', orderId)
       .single();
+    if (orderError || !order) return json({ error: 'Commande introuvable.' }, 404);
 
-    if (orderError || !order) {
-      return new Response(JSON.stringify({ error: 'Commande introuvable' }), { status: 404 });
+    // Seul l'acheteur de la commande peut lancer son paiement.
+    if (order.acheteur_id !== user.id) return json({ error: 'Cette commande ne t\'appartient pas.' }, 403);
+
+    const montant = Math.round(Number(order.montant));
+    if (!(montant > 0)) return json({ error: 'Montant de commande invalide.' }, 400);
+
+    const cfg = nitaConfig();
+    const requestId = `ZN-${order.id}`; // 1 à 100 caractères, unique parmi les achats non annulés
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
+
+    // Paiement déjà lancé pour cette commande : on regarde où il en est avant d'en créer un autre.
+    if (order.payment_provider === 'nita' && order.payment_reference) {
+      const status = await checkAchatStatus(cfg, requestId, clientIp);
+      const code = String(status.data?.code ?? '');
+      if (status.ok && code === '1') return json({ alreadyPaid: true, codeAchat: order.payment_reference });
+      if (status.ok && code === '0' && order.payment_url) {
+        return json({ url: order.payment_url, codeAchat: order.payment_reference });
+      }
+      if (status.ok && code === '3') return json({ error: 'Cet achat est bloqué. Contacte le support Zuno.' }, 409);
+      // '2' (annulé) ou inconnu : on crée un nouvel achat ci-dessous (le requestId peut resservir après annulation).
     }
 
-    const invoicePayload = {
-      invoice: {
-        total_amount: Math.round(order.montant),
-        description: `Zuno — ${order.listings?.title || 'Article'}`,
-      },
-      store: {
-        name: 'Zuno',
-        tagline: "Marketplace d'occasion",
-        website_url: 'https://zunomarket.store',
-      },
-      actions: {
-        callback_url: `${SUPABASE_URL}/functions/v1/payment-ipn`,
-        return_url: 'https://zunomarket.store/paiement-reussi',
-        cancel_url: 'https://zunomarket.store/paiement-annule',
-      },
-      custom_data: {
-        order_id: orderId,
-      },
-    };
+    // Numéro du client : contact de livraison, sinon numéro de son profil.
+    let phone = toNitaPhone(order.deliveries?.[0]?.telephone_contact);
+    if (!phone) {
+      const { data: profile } = await admin.from('users').select('telephone').eq('id', user.id).maybeSingle();
+      phone = toNitaPhone(profile?.telephone);
+    }
+    if (!phone) return json({ error: 'Numéro de téléphone du client introuvable ou invalide.' }, 400);
 
-    const paydunyaResponse = await fetch(`${PAYDUNYA_BASE_URL}/checkout-invoice/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'PAYDUNYA-MASTER-KEY': PAYDUNYA_MASTER_KEY,
-        'PAYDUNYA-PRIVATE-KEY': PAYDUNYA_PRIVATE_KEY,
-        'PAYDUNYA-PUBLIC-KEY': PAYDUNYA_PUBLIC_KEY,
-        'PAYDUNYA-TOKEN': PAYDUNYA_TOKEN,
-      },
-      body: JSON.stringify(invoicePayload),
+    const reference = 'ZN-CMD-' + String(order.reference_number).padStart(6, '0');
+    const title = order.listings?.title || 'Article Zuno';
+
+    const result = await createAchat(cfg, {
+      descriptionAchat: [title],
+      montantTransaction: montant,
+      motifTransaction: `Commande ${reference}`,
+      requestId,
+      phoneClient: phone,
+      adresseIp: clientIp,
+      urlRetour: RETURN_URL,
     });
 
-    const result = await paydunyaResponse.json();
-
-    if (result.response_code !== '00') {
-      return new Response(JSON.stringify({ error: result.response_text || 'Erreur PayDunya' }), {
-        status: 400,
-      });
+    if (!result.ok || !result.data?.codeAchat || !result.data?.urlPaiement) {
+      console.error('NITA saveAchatEnLigne refusé :', result.httpStatus, result.raw.slice(0, 500));
+      return json({ error: 'Le paiement n\'a pas pu être créé. Réessaie dans un instant.' }, 502);
     }
 
-    // response_text contient directement l'adresse de paiement à ouvrir.
-    await supabase
+    const { error: updateError } = await admin
       .from('orders')
-      .update({ payment_reference: result.token, payment_provider: 'paydunya' })
-      .eq('id', orderId);
+      .update({
+        payment_provider: 'nita',
+        payment_reference: result.data.codeAchat,
+        payment_url: result.data.urlPaiement,
+      })
+      .eq('id', order.id);
+    if (updateError) console.error('Mise à jour commande :', updateError.message);
 
-    return new Response(
-      JSON.stringify({ redirectUrl: result.response_text, token: result.token }),
-      { headers: { 'Content-Type': 'application/json' } }
-    );
+    return json({ url: result.data.urlPaiement, codeAchat: result.data.codeAchat });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+    console.error('create-payment :', err);
+    return json({ error: 'Erreur serveur.' }, 500);
   }
 });

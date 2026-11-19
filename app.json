@@ -25,6 +25,7 @@
       },
       "package": "com.zuno.app",
       "permissions": [
+        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -51,6 +52,12 @@
       "eas": {
         "projectId": "71cb5d9a-ad9e-4345-89ed-6de0c94fb53c"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/71cb5d9a-ad9e-4345-89ed-6de0c94fb53c"
     }
   }
 }

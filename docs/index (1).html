@@ -5,118 +5,164 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zuno — Admin</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --purple: #2E0B8C;
+    --purple-dark: #1E0763;
     --orange: #FF6A00;
-    --bg: #F7F7F5;
+    --bg: #F6F5F9;
     --surface: #FFFFFF;
-    --border: #E5E3DC;
-    --text: #1A1A1A;
-    --text-secondary: #6B6A63;
-    --text-muted: #9B998F;
-    --danger: #E24B4A;
-    --success: #1D9E75;
+    --border: #E8E6F0;
+    --text: #1B1530;
+    --text-secondary: #4A4560;
+    --text-muted: #6A6580;
+    --danger: #B3261E;
+    --success: #0E7A4B;
+    --font-head: 'Space Grotesk', 'Inter', system-ui, sans-serif;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--bg);
     color: var(--text);
+    -webkit-font-smoothing: antialiased;
   }
-  .topbar {
-    background: var(--purple);
-    color: #fff;
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .topbar-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
-  .logo-icon {
-    width: 26px; height: 26px; border-radius: 7px; background: var(--orange);
-    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px;
-  }
-  .logout-btn { background: none; border: 1px solid rgba(255,255,255,0.4); color: #fff; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-size: 13px; }
+  button { font-family: inherit; }
 
+  /* ---------- Connexion ---------- */
   #login-screen {
-    max-width: 380px; margin: 80px auto; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 12px; padding: 32px;
+    max-width: 400px; margin: 80px auto; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 16px; padding: 32px;
   }
-  #login-screen h1 { font-size: 18px; margin: 0 0 4px; }
-  #login-screen p { color: var(--text-secondary); font-size: 13px; margin: 0 0 20px; }
+  .login-logo {
+    width: 44px; height: 44px; border-radius: 12px; background: var(--orange); color: #1B0A4D;
+    font-family: var(--font-head); font-weight: 700; font-size: 24px;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+  #login-screen h1 { font-family: var(--font-head); font-size: 22px; margin: 0 0 4px; }
+  #login-screen p { color: var(--text-secondary); font-size: 14px; margin: 0 0 20px; }
+  input, select, textarea {
+    font-family: inherit; color: var(--text);
+  }
   input {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px;
-    font-size: 14px; margin-bottom: 10px;
+    width: 100%; padding: 11px 12px; border: 1px solid #D9D6E6; border-radius: 10px;
+    font-size: 14px; margin-bottom: 10px; background: #fff;
   }
+  input:focus, select:focus, textarea:focus { outline: 2px solid #8F7BE6; outline-offset: 1px; }
   button.primary {
-    width: 100%; padding: 11px; border: none; border-radius: 8px; background: var(--orange);
-    color: #fff; font-weight: 600; font-size: 14px; cursor: pointer;
+    width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--orange);
+    color: #1B0A4D; font-weight: 700; font-size: 14px; cursor: pointer;
   }
   button.primary:disabled { opacity: 0.5; cursor: default; }
   #login-error { color: var(--danger); font-size: 13px; margin-top: 8px; display: none; }
+  #not-admin { max-width: 420px; margin: 80px auto; text-align: center; color: var(--text-secondary); }
 
-  #app { display: none; max-width: 1100px; margin: 0 auto; }
-  .app-body { display: flex; gap: 24px; align-items: flex-start; padding: 20px; }
-  .tabs {
-    display: flex; flex-direction: column; gap: 4px; width: 190px; flex-shrink: 0;
-    position: sticky; top: 20px;
+  /* ---------- Structure ---------- */
+  #app { display: none; }
+  .shell { display: flex; min-height: 100vh; }
+  .sidebar {
+    flex: 0 0 264px; width: 264px; background: var(--purple-dark); color: #fff;
+    padding: 24px 16px; display: flex; flex-direction: column; gap: 4px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; z-index: 60;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; padding: 0 12px 18px; }
+  .logo-icon {
+    width: 40px; height: 40px; border-radius: 12px; background: var(--orange); color: #1B0A4D;
+    font-family: var(--font-head); font-weight: 700; font-size: 22px;
+    display: flex; align-items: center; justify-content: center; flex: none;
+  }
+  .brand-name { font-family: var(--font-head); font-weight: 700; font-size: 20px; line-height: 1; }
+  .brand-sub { font-size: 12px; color: #B9AFE3; margin-top: 4px; }
+  .nav-label {
+    font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+    color: #B9AFE3; padding: 16px 12px 6px;
   }
   .tab-btn {
-    padding: 10px 14px; border-radius: 8px; border: 1px solid transparent;
-    background: transparent; cursor: pointer; font-size: 13px; font-weight: 600;
-    color: var(--text-secondary); text-align: left; width: 100%;
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px;
+    border-radius: 10px; border: 0; background: transparent; cursor: pointer;
+    font-size: 14px; color: #DAD4F3; text-align: left; min-height: 40px;
   }
-  .tab-btn:hover { background: var(--bg); }
-  .tab-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
-  .panels { flex: 1; min-width: 0; }
+  .tab-btn svg { flex: none; }
+  .tab-btn:hover { background: rgba(255,255,255,.08); }
+  .tab-btn.active { background: rgba(255,255,255,.14); color: #fff; font-weight: 600; }
+  .tab-btn.active svg { stroke: #FF8A3D; }
+  .tab-btn:focus-visible { outline: 2px solid #FF8A3D; outline-offset: 1px; }
+  .badge {
+    margin-left: auto; min-width: 22px; text-align: center; padding: 2px 7px; border-radius: 999px;
+    background: var(--orange); color: #1B0A4D; font-size: 12px; font-weight: 700; display: none;
+  }
+  .sidebar-foot { margin-top: auto; padding-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+  .admin-mail { font-size: 12px; color: #C9C0EC; padding: 0 12px; word-break: break-all; }
+  .logout-btn {
+    background: rgba(255,255,255,.1); border: 0; color: #fff; padding: 10px 14px; border-radius: 10px;
+    cursor: pointer; font-size: 14px; text-align: left;
+  }
+  .logout-btn:hover { background: rgba(255,255,255,.18); }
+
+  .main { flex: 1; min-width: 0; padding: 28px 32px 48px; }
+  .page-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+  .page-header h1 { margin: 0; font-family: var(--font-head); font-size: 28px; line-height: 1.15; }
+  .page-header p { margin: 6px 0 0; font-size: 14px; color: var(--text-muted); }
+  .menu-btn {
+    display: none; width: 44px; height: 44px; flex: none; border-radius: 10px; border: 1px solid var(--border);
+    background: #fff; cursor: pointer; align-items: center; justify-content: center; color: var(--text);
+  }
+  .sidebar-overlay { display: none; }
+  .panels { max-width: 1240px; }
   .panel { display: none; }
   .panel.active { display: block; }
 
-  /* Sur petit écran, le menu repasse en haut, à plat, plutôt qu'en colonne. */
-  @media (max-width: 720px) {
-    .app-body { flex-direction: column; }
-    .tabs {
-      flex-direction: row; flex-wrap: wrap; width: 100%; position: static;
+  @media (max-width: 900px) {
+    .sidebar {
+      position: fixed; left: 0; top: 0; bottom: 0; transform: translateX(-100%);
+      transition: transform .2s ease; box-shadow: none;
     }
-    .tab-btn { width: auto; border-radius: 999px; }
+    .sidebar.open { transform: none; box-shadow: 0 0 40px rgba(0,0,0,.35); }
+    .sidebar-overlay.open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; }
+    .menu-btn { display: flex; }
+    .main { padding: 16px 16px 40px; }
+    .page-header h1 { font-size: 24px; }
   }
-  .card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    padding: 16px; margin-bottom: 12px;
-  }
-  .card-title { font-weight: 700; font-size: 14px; margin: 0 0 4px; }
-  .card-sub { color: var(--text-secondary); font-size: 12px; margin: 0 0 8px; }
-  .card-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
-  .pill {
-    display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px;
-    border-radius: 999px; background: var(--bg); color: var(--text-secondary); margin-right: 6px;
-  }
-  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .btn {
-    padding: 7px 14px; border-radius: 8px; border: none; font-size: 12px; font-weight: 700; cursor: pointer;
-  }
-  .btn-approve { background: var(--success); color: #fff; }
 
-  /* Grille alignée pour les listes de comptes/marchands, plutôt qu'une
-     colonne unique de cartes empilées. */
-  .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  /* ---------- Cartes et boutons (utilisés par toutes les pages) ---------- */
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; margin-bottom: 12px;
+  }
+  .card-title { font-weight: 700; font-size: 15px; margin: 0 0 4px; }
+  .card-sub { color: var(--text-secondary); font-size: 13px; margin: 0 0 8px; }
+  .card-meta { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+  .pill {
+    display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px;
+    border-radius: 999px; background: #ECE8FB; color: var(--purple); margin-right: 6px;
+  }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .btn {
+    padding: 9px 16px; border-radius: 10px; border: none; font-size: 13px; font-weight: 700;
+    cursor: pointer; min-height: 38px;
+  }
+  .btn:hover { filter: brightness(1.08); }
+  .btn-approve { background: var(--success); color: #fff; }
+  .btn-reject { background: var(--danger); color: #fff; }
+
+  .grid-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
   .grid-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
-    padding: 16px; display: flex; flex-direction: column; min-height: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; display: flex; flex-direction: column; min-height: 0;
   }
   .grid-card .card-title { margin-bottom: 2px; }
   .grid-card .card-sub { margin-bottom: 6px; }
-  .grid-card .voir-plus-btn { margin-top: auto; padding-top: 10px; }
+  .grid-card .voir-plus-btn { margin-top: auto; }
 
-  /* Page de détail plein écran, affichée par-dessus la grille au clic
-     sur "Voir plus". */
   .detail-page { display: none; }
   .detail-page.active { display: block; }
   .detail-back {
     display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
-    color: var(--purple); font-weight: 700; font-size: 13px; cursor: pointer; margin-bottom: 16px; padding: 0;
+    color: var(--purple); font-weight: 700; font-size: 14px; cursor: pointer; margin-bottom: 16px; padding: 0;
   }
   .detail-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
   .detail-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
@@ -125,42 +171,114 @@
     display: flex; align-items: center; justify-content: center;
     color: #fff; font-size: 26px; font-weight: 800;
   }
-  .detail-title { font-size: 20px; font-weight: 800; color: var(--text); margin: 0; }
-  .detail-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 14px; }
-  .detail-section h4 { margin: 0 0 10px; font-size: 13px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-  .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--bg); font-size: 13px; }
+  .detail-title { font-family: var(--font-head); font-size: 22px; font-weight: 700; color: var(--text); margin: 0; }
+  .detail-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .detail-section h4 { margin: 0 0 10px; font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid #F0EEF6; font-size: 14px; }
   .detail-row:last-child { border-bottom: none; }
   .detail-row span:first-child { color: var(--text-secondary); }
   .detail-row span:last-child { font-weight: 600; text-align: right; }
-  .btn-reject { background: var(--danger); color: #fff; }
-  .empty { color: var(--text-muted); font-size: 13px; text-align: center; padding: 30px; }
-  .id-photo { max-width: 220px; border-radius: 8px; border: 1px solid var(--border); display: block; margin-bottom: 10px; }
-  .loading { text-align: center; padding: 30px; color: var(--text-muted); }
-  #not-admin { max-width: 420px; margin: 80px auto; text-align: center; color: var(--text-secondary); }
+  .empty { color: var(--text-muted); font-size: 14px; text-align: center; padding: 36px; }
+  .id-photo { max-width: 220px; border-radius: 10px; border: 1px solid var(--border); display: block; margin-bottom: 10px; }
+  .loading { text-align: center; padding: 36px; color: var(--text-muted); }
 
-  /* Cases à cocher de la section Campagnes */
+  /* Cases à cocher (Campagnes) */
   input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    padding: 0;
-    flex: none;
-    accent-color: #2E0B8C;
+    width: 18px; height: 18px; margin: 0; padding: 0; flex: none; accent-color: #2E0B8C;
+  }
+  label:has(> input[type="checkbox"]) {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; text-align: left;
   }
 
-  label:has(> input[type="checkbox"]) {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    cursor: pointer;
-    text-align: left;
+  /* ---------- Vue d'ensemble et Paiements ---------- */
+  .section { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .section-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+  .todo-card {
+    text-align: left; font: inherit; color: inherit; cursor: pointer; background: #fff;
+    border: 1px solid var(--border); border-radius: 16px; padding: 18px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .todo-card:hover { border-color: #B9AFE3; }
+  .todo-card:focus-visible { outline: 2px solid #8F7BE6; outline-offset: 2px; }
+  .todo-tag { align-self: flex-start; font-size: 13px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
+  .tag-danger { color: #B3261E; background: #FDE7E5; }
+  .tag-warn { color: #9A5B00; background: #FFF1DB; }
+  .tag-info { color: #2E0B8C; background: #ECE8FB; }
+  .tag-ok { color: #0E7A4B; background: #E3F5EC; }
+  .todo-n { font-family: var(--font-head); font-size: 36px; font-weight: 700; line-height: 1; }
+  .todo-label { font-size: 14px; font-weight: 500; }
+  .todo-sub { font-size: 12px; color: var(--text-muted); }
+  .kpi { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 8px; }
+  .kpi-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+  .kpi-value { font-family: var(--font-head); font-size: 27px; font-weight: 700; line-height: 1.1; }
+  .kpi-value small { font-size: 14px; font-weight: 500; color: var(--text-muted); }
+  .delta { font-size: 13px; font-weight: 600; }
+  .delta.up { color: #0E7A4B; }
+  .delta.down { color: #B3261E; }
+  .delta-sub { font-size: 13px; color: var(--text-muted); font-weight: 400; }
+  .row-flex { display: flex; flex-direction: row; flex-wrap: wrap; gap: 16px; align-items: stretch; }
+  .box { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px; min-width: 0; }
+  .box h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; }
+  .box-note { margin: -6px 0 12px; font-size: 13px; color: var(--text-muted); }
+  .table-box { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 20px 8px 8px; min-width: 0; }
+  .table-box .table-head { padding: 0 12px 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .table-box h2 { margin: 0; font-size: 16px; font-weight: 700; }
+  .scroll-x { overflow-x: auto; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.t th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted); padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.t td { padding: 12px; border-bottom: 1px solid #F0EEF6; white-space: nowrap; }
+  table.t tr:last-child td { border-bottom: 0; }
+  table.t tr.clickable { cursor: pointer; }
+  table.t tr.clickable:hover td { background: #F6F4FD; }
+  table.t td.muted { color: var(--text-muted); }
+  .st { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 10px; }
+  .st-ok { background: #E3F5EC; color: #0E7A4B; }
+  .st-warn { background: #FFF1DB; color: #9A5B00; }
+  .st-bad { background: #FDE7E5; color: #B3261E; }
+  .st-info { background: #ECE8FB; color: #2E0B8C; }
+  .st-none { background: #F0EEF6; color: #4A4560; }
+  .bar-row { margin-bottom: 12px; }
+  .bar-row:last-child { margin-bottom: 0; }
+  .bar-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; gap: 8px; }
+  .bar-track { height: 8px; border-radius: 4px; background: #ECEAF3; }
+  .bar-fill { height: 8px; border-radius: 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .chip {
+    height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid #D9D6E6; background: #fff;
+    color: var(--text); font-size: 14px; cursor: pointer;
+  }
+  .chip.active { background: var(--purple); border-color: var(--purple); color: #fff; font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; }
+  .alert-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #F0EEF6; font-size: 13px; line-height: 1.45; }
+  .alert-item:last-child { border-bottom: 0; padding-bottom: 0; }
+  .alert-ico { flex: 0 0 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+  .alert-sub { color: var(--text-muted); }
+  .link-btn { background: none; border: 0; padding: 0; color: var(--purple); font-weight: 600; font-size: 13px; cursor: pointer; }
+  .outline-btn {
+    height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #D9D6E6; background: #fff;
+    color: var(--text); font-size: 14px; font-weight: 500; cursor: pointer;
+  }
+  .primary-btn {
+    height: 44px; padding: 0 18px; border-radius: 10px; border: 0; background: var(--orange);
+    color: #1B0A4D; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .error-box { background: #FDE7E5; color: #B3261E; border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+  @media (max-width: 600px) {
+    .grid-auto { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .todo-n { font-size: 30px; }
+    .kpi-value { font-size: 22px; }
+    .todo-card, .kpi { padding: 14px; }
   }
 </style>
 </head>
 <body>
 
 <div id="login-screen">
+  <div class="login-logo">Z</div>
   <h1>Zuno — Espace admin</h1>
   <p>Connexion réservée aux comptes administrateurs.</p>
   <input type="email" id="login-email" placeholder="Adresse email">
@@ -174,30 +292,47 @@
 </div>
 
 <div id="app">
-  <div class="topbar">
-    <div class="topbar-brand"><div class="logo-icon">Z</div> Zuno — Admin</div>
-    <button class="logout-btn" id="logout-btn">Se déconnecter</button>
-  </div>
-  <div class="app-body">
-    <div class="tabs">
-      <button class="tab-btn active" data-tab="litiges">Litiges</button>
-      <button class="tab-btn" data-tab="moderation">Modération</button>
-      <button class="tab-btn" data-tab="identites">Identités</button>
-      <button class="tab-btn" data-tab="publicites">Publicités</button>
-      <button class="tab-btn" data-tab="boosts">Mises en avant</button>
-      <button class="tab-btn" data-tab="utilisateurs">Utilisateurs</button>
-      <button class="tab-btn" data-tab="articles">Articles</button>
-      <button class="tab-btn" data-tab="marchands">Marchands</button>
-      <button class="tab-btn" data-tab="comptes">Comptes</button>
-      <button class="tab-btn" data-tab="commandes">Commandes</button>
-      <button class="tab-btn" data-tab="paniers">Paniers</button>
-      <button class="tab-btn" data-tab="campagnes">Campagnes</button>
-      <button class="tab-btn" data-tab="promos">Promos</button>
-      <button class="tab-btn" data-tab="reversements">Reversements</button>
-    </div>
+  <div class="shell">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <nav class="sidebar" id="sidebar" aria-label="Navigation principale">
+      <div class="brand">
+        <div class="logo-icon">Z</div>
+        <div><div class="brand-name">Zuno</div><div class="brand-sub">Espace admin</div></div>
+      </div>
+      <button type="button" class="tab-btn active" data-tab="overview"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Vue d'ensemble</button>
+      <div class="nav-label">Opérations</div>
+      <button type="button" class="tab-btn" data-tab="commandes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.5 12h11L21 7H6"/></svg>Commandes</button>
+      <button type="button" class="tab-btn" data-tab="litiges"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>Litiges<span class="badge" id="badge-litiges"></span></button>
+      <button type="button" class="tab-btn" data-tab="paiements"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Paiements</button>
+      <button type="button" class="tab-btn" data-tab="reversements"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h14v4"/><path d="M3 7v11a2 2 0 0 0 2 2h16V9H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/></svg>Versements marchands<span class="badge" id="badge-reversements"></span></button>
+      <button type="button" class="tab-btn" data-tab="paniers"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9l2 11h10l2-11"/><path d="M3 9h18M9 9l3-5 3 5"/></svg>Paniers</button>
+      <div class="nav-label">Contenu</div>
+      <button type="button" class="tab-btn" data-tab="moderation"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>Modération<span class="badge" id="badge-moderation"></span></button>
+      <button type="button" class="tab-btn" data-tab="articles"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>Articles</button>
+      <button type="button" class="tab-btn" data-tab="publicites"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v3h4l8 4V7L7 11z"/><path d="M19 9a4 4 0 0 1 0 6"/></svg>Publicités</button>
+      <button type="button" class="tab-btn" data-tab="boosts"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Mises en avant<span class="badge" id="badge-boosts"></span></button>
+      <button type="button" class="tab-btn" data-tab="promos"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></svg>Promos</button>
+      <button type="button" class="tab-btn" data-tab="campagnes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3L11 14"/><path d="M22 3l-7 18-4-7-7-4z"/></svg>Campagnes</button>
+      <div class="nav-label">Communauté</div>
+      <button type="button" class="tab-btn" data-tab="utilisateurs"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><path d="M17 5a3 3 0 0 1 0 6M22 20c0-3-2-5-4-5.5"/></svg>Utilisateurs</button>
+      <button type="button" class="tab-btn" data-tab="marchands"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>Marchands</button>
+      <button type="button" class="tab-btn" data-tab="comptes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Comptes</button>
+      <button type="button" class="tab-btn" data-tab="identites"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Vérification d'identité<span class="badge" id="badge-identites"></span></button>
+      <div class="sidebar-foot">
+        <div class="admin-mail" id="admin-mail"></div>
+        <button type="button" class="logout-btn" id="logout-btn">Se déconnecter</button>
+      </div>
+    </nav>
+    <div class="main">
+      <header class="page-header">
+        <button type="button" class="menu-btn" id="menu-btn" aria-label="Ouvrir le menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div><h1 id="page-title">Vue d'ensemble</h1><p id="page-sub"></p></div>
+      </header>
+      <div class="panels">
+    <div class="panel active" id="panel-overview"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-paiements"><div class="loading">Chargement…</div></div>
 
-    <div class="panels">
-    <div class="panel active" id="panel-litiges"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-boosts"><div class="loading">Chargement…</div></div>
@@ -337,6 +472,7 @@
     </div>
   </div>
 </div>
+</div>
 
 <div id="email-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; z-index:100; padding:20px;">
   <div class="card" style="max-width:480px; width:100%; max-height:85vh; overflow-y:auto;">
@@ -406,14 +542,6 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   location.reload();
 });
 
-document.querySelectorAll('.tab-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-  });
-});
 
 async function checkAdminAndInit() {
   document.getElementById('not-admin').style.display = 'none';
@@ -429,6 +557,8 @@ async function checkAdminAndInit() {
   }
 
   document.getElementById('app').style.display = 'block';
+  document.getElementById('admin-mail').textContent = user.email || '';
+  showTab('overview');
   loadLitiges();
   loadModeration();
   loadIdentites();
@@ -2173,6 +2303,494 @@ async function processReversement(id, status) {
 
   closeReversementDetail();
   loadReversements();
+}
+
+/* =====================================================================
+   Nouveau tableau de bord : navigation, Vue d'ensemble, Paiements
+   ===================================================================== */
+
+const PAGE_INFO = {
+  overview: ["Vue d'ensemble", ''],
+  commandes: ['Commandes', 'Suis chaque commande du paiement à la livraison.'],
+  litiges: ['Litiges', 'Signalements ouverts par les acheteurs.'],
+  paiements: ['Paiements', "Tout l'argent qui entre et qui sort, réseau par réseau."],
+  reversements: ['Versements marchands', 'Demandes de reversement à traiter.'],
+  paniers: ['Paniers', 'Paniers en cours des acheteurs.'],
+  moderation: ['Modération', 'Annonces signalées ou à vérifier.'],
+  articles: ['Articles', 'Toutes les annonces de la plateforme.'],
+  publicites: ['Publicités', "Bannières affichées dans l'application."],
+  boosts: ['Mises en avant', 'Demandes de mise en avant en attente.'],
+  promos: ['Promos', 'Codes promo et leur utilisation.'],
+  campagnes: ['Campagnes', 'Notifications ciblées vers les utilisateurs.'],
+  utilisateurs: ['Utilisateurs', 'Utilisateurs et signalements.'],
+  marchands: ['Marchands', 'Boutiques, ventes et statut.'],
+  comptes: ['Comptes', 'Recherche et détails de chaque compte.'],
+  identites: ["Vérification d'identité", "Pièces d'identité en attente de validation."],
+};
+
+function overviewSubtitle() {
+  const d = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  return "Voici ce qui demande ton attention aujourd'hui, " + d + '.';
+}
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + name));
+  const info = PAGE_INFO[name] || [name, ''];
+  document.getElementById('page-title').textContent = info[0];
+  document.getElementById('page-sub').textContent = name === 'overview' ? overviewSubtitle() : info[1];
+  closeSidebar();
+  window.scrollTo(0, 0);
+  if (name === 'overview') loadOverview();
+  if (name === 'paiements') loadPaiements();
+}
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => showTab(btn.dataset.tab));
+});
+document.getElementById('menu-btn').addEventListener('click', openSidebar);
+document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
+
+/* ---------- Petits outils ---------- */
+const fmt = (n) => Number(n || 0).toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, '\u00a0');
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
+const DAY = 86400000;
+
+function setBadge(tab, n) {
+  const el = document.getElementById('badge-' + tab);
+  if (!el) return;
+  el.textContent = n;
+  el.style.display = n > 0 ? 'inline-block' : 'none';
+}
+
+function orderRef(o) {
+  return 'ZN-CMD-' + String(o.reference_number == null ? '' : o.reference_number).padStart(6, '0');
+}
+
+// Un achat est « en attente » tant que le paiement n'est pas confirmé ;
+// il est « annulé » si la commande l'est ; sinon il est « payé ».
+const CANCELLED_STATUSES = ['annulee', 'annulée', 'annule', 'annulé', 'cancelled', 'canceled'];
+const isPending = (o) => o.statut === 'en_attente_paiement';
+const isCancelled = (o) => CANCELLED_STATUSES.includes(o.statut);
+const isPaid = (o) => !isPending(o) && !isCancelled(o);
+
+function statsOf(list) {
+  const paid = list.filter(isPaid);
+  const volume = paid.reduce((s, o) => s + Number(o.montant || 0), 0);
+  return {
+    created: list.length,
+    paid: paid.length,
+    pending: list.filter(isPending).length,
+    pendingAmount: list.filter(isPending).reduce((s, o) => s + Number(o.montant || 0), 0),
+    cancelled: list.filter(isCancelled).length,
+    volume,
+    avg: paid.length ? Math.round(volume / paid.length) : 0,
+    rate: list.length ? Math.round((paid.length / list.length) * 100) : 0,
+  };
+}
+
+function inWindow(o, from, to) {
+  const t = new Date(o.created_at).getTime();
+  return t >= from && t < to;
+}
+
+function deltaHtml(cur, prev, unit) {
+  if (!prev) return '<span class="delta-sub">Pas de comparaison disponible</span>';
+  const diff = cur - prev;
+  const up = diff >= 0;
+  const text = unit === 'pt'
+    ? (up ? '▲ ' : '▼ ') + Math.abs(diff) + ' pt'
+    : (up ? '▲ ' : '▼ ') + Math.abs(Math.round((diff / prev) * 100)) + ' %';
+  return '<span class="delta ' + (up ? 'up' : 'down') + '">' + text + '</span> <span class="delta-sub">vs 30 jours précédents</span>';
+}
+
+function kpiCard(label, valueHtml, bottomHtml) {
+  return '<div class="kpi"><div class="kpi-label">' + label + '</div><div class="kpi-value">' + valueHtml + '</div><div>' + bottomHtml + '</div></div>';
+}
+
+function barRow(label, valueText, pct, color) {
+  return '<div class="bar-row"><div class="bar-top"><span>' + label + '</span><b>' + valueText + '</b></div>'
+    + '<div class="bar-track"><div class="bar-fill" style="width:' + Math.max(0, Math.min(100, pct)) + '%;background:' + color + '"></div></div></div>';
+}
+
+function shortDate(ts) {
+  return new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+function dateTime(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' ' +
+    d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+function openOrder(id) {
+  showTab('commandes');
+  if (typeof commandesData !== 'undefined' && commandesData[id]) showCommandeDetail(id);
+}
+
+/* ---------- Graphique : ventes sur 30 jours ---------- */
+function salesChartSvg(days) {
+  const W = window.innerWidth < 700 ? 400 : 640;
+  const L = 20, R = W - 18, T = 30, B = 190;
+  const maxV = Math.max(1, ...days.map((d) => d.value));
+  const maxC = Math.max(1, ...days.map((d) => d.count));
+  const x = (i) => L + (R - L) * (i / Math.max(1, days.length - 1));
+  const yv = (v) => B - (B - T) * (v / maxV);
+  const yc = (c) => B - (B - T) * (c / maxC);
+  const pts = (fn, key) => days.map((d, i) => x(i).toFixed(1) + ',' + fn(d[key]).toFixed(1)).join(' ');
+  const area = 'M' + x(0).toFixed(1) + ',' + B + ' L' + pts(yv, 'value').split(' ').join(' L') + ' L' + x(days.length - 1).toFixed(1) + ',' + B + ' Z';
+  const total = days.reduce((s, d) => s + d.value, 0);
+  const totalCount = days.reduce((s, d) => s + d.count, 0);
+  const idx = [0, 7, 14, 21, days.length - 1];
+  const labels = idx.map((i, k) => {
+    const anchor = k === 0 ? 'start' : (k === idx.length - 1 ? 'end' : 'middle');
+    return '<text x="' + x(i).toFixed(1) + '" y="214" text-anchor="' + anchor + '">' + esc(days[i].label) + '</text>';
+  }).join('');
+  const hits = days.map((d, i) =>
+    '<circle cx="' + x(i).toFixed(1) + '" cy="' + yv(d.value).toFixed(1) + '" r="7" fill="transparent"><title>' +
+    esc(d.label) + ' : ' + fmt(d.value) + ' FCFA, ' + d.count + ' commande(s) payée(s)</title></circle>').join('');
+  return '<svg viewBox="0 0 ' + W + ' 230" style="width:100%;height:auto;display:block" role="img" aria-label="Ventes des 30 derniers jours : ' +
+    fmt(total) + ' FCFA, ' + totalCount + ' commande(s) payée(s)">' +
+    '<g stroke="#ECEAF3" stroke-width="1"><line x1="10" y1="30" x2="' + W + '" y2="30"/><line x1="10" y1="80" x2="' + W + '" y2="80"/><line x1="10" y1="130" x2="' + W + '" y2="130"/><line x1="10" y1="190" x2="' + W + '" y2="190"/></g>' +
+    '<path d="' + area + '" fill="#4B2BC4" fill-opacity=".10"/>' +
+    '<polyline points="' + pts(yv, 'value') + '" fill="none" stroke="#4B2BC4" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<polyline points="' + pts(yc, 'count') + '" fill="none" stroke="#FF6A00" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+    hits +
+    '<g font-family="Inter,sans-serif" font-size="13" fill="#6A6580">' + labels + '</g></svg>';
+}
+
+/* ---------- Vue d'ensemble ---------- */
+let overviewLoading = false;
+
+async function loadOverview() {
+  const panel = document.getElementById('panel-overview');
+  if (overviewLoading) return;
+  overviewLoading = true;
+  try {
+    const now = Date.now();
+    const d30 = new Date(now - 30 * DAY).toISOString();
+    const d60 = new Date(now - 60 * DAY).toISOString();
+
+    const [ordersRes, usersCur, usersPrev, disputes, moderation, identities, payouts, boosts] = await Promise.all([
+      sb.from('orders')
+        .select('id, created_at, montant, statut, reference_number, acheteur_id, payment_provider, listings(title), deliveries(statut_livraison)')
+        .gte('created_at', d60).order('created_at', { ascending: false }).limit(1000),
+      sb.from('users').select('id', { count: 'exact', head: true }).gte('created_at', d30),
+      sb.from('users').select('id', { count: 'exact', head: true }).gte('created_at', d60).lt('created_at', d30),
+      sb.from('order_disputes').select('id', { count: 'exact', head: true }).eq('status', 'ouvert'),
+      sb.from('moderation_queue').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      sb.from('users').select('id', { count: 'exact', head: true }).eq('identity_status', 'en_attente'),
+      sb.from('payout_requests').select('amount_to_pay').eq('status', 'en_attente'),
+      sb.from('boost_requests').select('id', { count: 'exact', head: true }).eq('status', 'en_attente'),
+    ]);
+
+    if (ordersRes.error) {
+      panel.innerHTML = '<div class="error-box">Impossible de charger les commandes : ' + esc(ordersRes.error.message) + '</div>';
+      return;
+    }
+
+    const orders = ordersRes.data || [];
+    const cur = orders.filter((o) => inWindow(o, now - 30 * DAY, now + DAY));
+    const prev = orders.filter((o) => inWindow(o, now - 60 * DAY, now - 30 * DAY));
+    const sCur = statsOf(cur);
+    const sPrev = statsOf(prev);
+
+    // Noms des acheteurs pour les 8 dernières commandes
+    const recent = orders.slice(0, 8);
+    const buyerIds = [...new Set(recent.map((o) => o.acheteur_id).filter(Boolean))];
+    const names = {};
+    if (buyerIds.length) {
+      const { data: profiles } = await sb.from('users').select('id, nom').in('id', buyerIds);
+      (profiles || []).forEach((p) => { names[p.id] = p.nom; });
+    }
+
+    // Série journalière (30 jours) pour le graphique
+    const days = [];
+    for (let i = 29; i >= 0; i--) {
+      const start = new Date(now - i * DAY); start.setHours(0, 0, 0, 0);
+      days.push({ key: start.toDateString(), label: shortDate(start), value: 0, count: 0 });
+    }
+    const byKey = {};
+    days.forEach((d) => { byKey[d.key] = d; });
+    cur.filter(isPaid).forEach((o) => {
+      const k = new Date(o.created_at); k.setHours(0, 0, 0, 0);
+      const bucket = byKey[k.toDateString()];
+      if (bucket) { bucket.value += Number(o.montant || 0); bucket.count += 1; }
+    });
+
+    const nDisputes = disputes.count || 0;
+    const nIdentities = identities.count || 0;
+    const nModeration = moderation.count || 0;
+    const nBoosts = boosts.count || 0;
+    const payoutList = payouts.data || [];
+    const nPayouts = payoutList.length;
+    const payoutTotal = payoutList.reduce((s, p) => s + Number(p.amount_to_pay || 0), 0);
+    setBadge('litiges', nDisputes);
+    setBadge('identites', nIdentities);
+    setBadge('moderation', nModeration);
+    setBadge('reversements', nPayouts);
+    setBadge('boosts', nBoosts);
+
+    const todo = [
+      { tab: 'litiges', n: nDisputes, label: 'Litiges ouverts', tag: 'Urgent', tone: 'danger', sub: 'À traiter en priorité' },
+      { tab: 'identites', n: nIdentities, label: 'Identités à vérifier', tag: 'À valider', tone: 'warn', sub: 'Marchands en attente de validation' },
+      { tab: 'moderation', n: nModeration, label: 'Annonces à modérer', tag: 'À modérer', tone: 'warn', sub: 'Signalées ou à vérifier' },
+      { tab: 'reversements', n: nPayouts, label: 'Demandes de versement', tag: 'Versements', tone: 'info', sub: nPayouts ? 'Total à payer : ' + fmt(payoutTotal) + ' FCFA' : 'Aucune demande' },
+      { tab: 'boosts', n: nBoosts, label: 'Mises en avant', tag: 'À confirmer', tone: 'info', sub: 'Paiements à confirmer' },
+    ].map((t) => {
+      const zero = t.n === 0;
+      return '<button type="button" class="todo-card" onclick="showTab(\'' + t.tab + '\')">' +
+        '<span class="todo-tag ' + (zero ? 'tag-ok' : 'tag-' + t.tone) + '">' + (zero ? 'À jour' : t.tag) + '</span>' +
+        '<span class="todo-n">' + t.n + '</span>' +
+        '<span class="todo-label">' + t.label + '</span>' +
+        '<span class="todo-sub">' + esc(t.sub) + '</span></button>';
+    }).join('');
+
+    const kpis =
+      kpiCard('Volume de ventes', fmt(sCur.volume) + ' <small>FCFA</small>', deltaHtml(sCur.volume, sPrev.volume)) +
+      kpiCard('Commandes', fmt(sCur.created), deltaHtml(sCur.created, sPrev.created)) +
+      kpiCard('Nouveaux inscrits', fmt(usersCur.count || 0), deltaHtml(usersCur.count || 0, usersPrev.count || 0)) +
+      kpiCard('Panier moyen', fmt(sCur.avg) + ' <small>FCFA</small>', deltaHtml(sCur.avg, sPrev.avg));
+
+    const rows = recent.map((o) => {
+      const ds = o.deliveries && o.deliveries[0] ? o.deliveries[0].statut_livraison : null;
+      const pay = isPaid(o) ? '<span class="st st-ok">Payée</span>'
+        : isPending(o) ? '<span class="st st-warn">En attente</span>'
+        : '<span class="st st-bad">Annulée</span>';
+      const liv = ds ? '<span class="st st-info">' + esc(COMMANDE_LABELS[ds] || ds) + '</span>' : '<span class="muted">—</span>';
+      return '<tr class="clickable" onclick="openOrder(\'' + esc(o.id) + '\')"><td><b>' + esc(orderRef(o)) + '</b></td>' +
+        '<td>' + esc(o.listings && o.listings.title ? o.listings.title : 'Annonce supprimée') + '</td>' +
+        '<td>' + esc(names[o.acheteur_id] || '—') + '</td>' +
+        '<td>' + fmt(o.montant) + '</td><td>' + pay + '</td><td>' + liv + '</td>' +
+        '<td class="muted">' + esc(dateTime(o.created_at)) + '</td></tr>';
+    }).join('');
+
+    // Répartition des paiements et des livraisons (30 derniers jours)
+    const total = Math.max(1, sCur.created);
+    const payBars =
+      barRow('Payées', sCur.paid, (sCur.paid / total) * 100, '#1FB36B') +
+      barRow('En attente', sCur.pending, (sCur.pending / total) * 100, '#F2A63B') +
+      barRow('Annulées', sCur.cancelled, (sCur.cancelled / total) * 100, '#D9473F');
+    const delivCount = {};
+    cur.forEach((o) => {
+      const ds = o.deliveries && o.deliveries[0] ? o.deliveries[0].statut_livraison : null;
+      if (ds) delivCount[ds] = (delivCount[ds] || 0) + 1;
+    });
+    const delivBars = Object.keys(COMMANDE_LABELS).map((k) =>
+      barRow(esc(COMMANDE_LABELS[k]), delivCount[k] || 0, ((delivCount[k] || 0) / total) * 100, '#4B2BC4')).join('');
+
+    panel.innerHTML =
+      '<section class="section"><div class="section-head"><h2>À traiter maintenant</h2></div><div class="grid-auto">' + todo + '</div></section>' +
+      '<section class="section grid-auto" aria-label="Indicateurs clés">' + kpis + '</section>' +
+      '<section class="section row-flex">' +
+        '<div class="box" style="flex:2 1 520px"><div class="section-head" style="margin-bottom:8px"><h2 style="margin:0">Ventes sur 30 jours</h2>' +
+          '<div class="legend" style="margin:0"><span><i style="background:#4B2BC4"></i>Volume (FCFA)</span><span><i style="background:#FF6A00"></i>Commandes payées</span></div></div>' +
+          salesChartSvg(days) + '</div>' +
+        '<div class="box" style="flex:1 1 300px"><h2>Santé des paiements</h2>' + payBars +
+          '<h2 style="margin-top:22px">Livraisons</h2>' + delivBars + '</div>' +
+      '</section>' +
+      '<section class="section"><div class="table-box"><div class="table-head"><h2>Dernières commandes</h2>' +
+        '<button type="button" class="link-btn" onclick="showTab(\'commandes\')">Tout voir</button></div>' +
+        '<div class="scroll-x"><table class="t"><thead><tr><th>Référence</th><th>Article</th><th>Acheteur</th><th>Montant (FCFA)</th><th>Paiement</th><th>Livraison</th><th>Date</th></tr></thead><tbody>' +
+        (rows || '<tr><td colspan="7" class="muted">Aucune commande pour le moment.</td></tr>') +
+        '</tbody></table></div></div></section>';
+  } catch (e) {
+    panel.innerHTML = '<div class="error-box">Erreur : ' + esc(e && e.message ? e.message : e) + '</div>';
+  } finally {
+    overviewLoading = false;
+  }
+}
+
+/* ---------- Paiements ---------- */
+const PROVIDER_LABELS = { nita: 'MyNITA', kkiapay: 'KKiaPay', orange_money: 'Orange Money', moov_money: 'Moov Money', wave: 'Wave', paydunya: 'PayDunya' };
+const PROVIDER_COLORS = ['#2E0B8C', '#FF6A00', '#9B8AE8', '#C9C3DD', '#0E8C8C', '#B3261E'];
+const providerKey = (o) => o.payment_provider || '__none';
+const providerLabel = (k) => (k === '__none' ? 'Non renseigné' : (PROVIDER_LABELS[k] || k));
+
+let paiementsData = null;
+let paiementsFilter = 'all';
+let paiementsLoading = false;
+
+async function loadPaiements() {
+  const panel = document.getElementById('panel-paiements');
+  if (paiementsLoading) return;
+  paiementsLoading = true;
+  try {
+    if (!paiementsData) panel.innerHTML = '<div class="loading">Chargement…</div>';
+    const since = new Date(Date.now() - 90 * DAY).toISOString();
+    const [o, p] = await Promise.all([
+      sb.from('orders')
+        .select('id, created_at, montant, statut, payment_provider, payment_reference, reference_number, listings(title)')
+        .gte('created_at', since).order('created_at', { ascending: false }).limit(2000),
+      sb.from('payout_requests').select('*').order('created_at', { ascending: false }).limit(200),
+    ]);
+    if (o.error) {
+      panel.innerHTML = '<div class="error-box">Impossible de charger les paiements : ' + esc(o.error.message) + '</div>';
+      return;
+    }
+    paiementsData = { orders: o.data || [], payouts: p.data || [] };
+    renderPaiements();
+  } catch (e) {
+    panel.innerHTML = '<div class="error-box">Erreur : ' + esc(e && e.message ? e.message : e) + '</div>';
+  } finally {
+    paiementsLoading = false;
+  }
+}
+
+function setPaiementsFilter(f) {
+  paiementsFilter = f;
+  renderPaiements();
+}
+
+function renderPaiements() {
+  const panel = document.getElementById('panel-paiements');
+  const { orders, payouts } = paiementsData;
+  const now = Date.now();
+
+  // Réseaux présents, du plus utilisé au moins utilisé
+  const volumeByProvider = {};
+  orders.filter(isPaid).forEach((o) => {
+    const k = providerKey(o);
+    volumeByProvider[k] = (volumeByProvider[k] || 0) + Number(o.montant || 0);
+  });
+  const providers = [...new Set(orders.map(providerKey))].sort((a, b) => (volumeByProvider[b] || 0) - (volumeByProvider[a] || 0));
+  if (paiementsFilter !== 'all' && !providers.includes(paiementsFilter)) paiementsFilter = 'all';
+  const colorOf = (k) => PROVIDER_COLORS[providers.indexOf(k) % PROVIDER_COLORS.length];
+
+  const selected = paiementsFilter === 'all' ? orders : orders.filter((o) => providerKey(o) === paiementsFilter);
+  const sCur = statsOf(selected.filter((o) => inWindow(o, now - 30 * DAY, now + DAY)));
+  const sPrev = statsOf(selected.filter((o) => inWindow(o, now - 60 * DAY, now - 30 * DAY)));
+
+  const chips = '<div class="chips" role="group" aria-label="Filtrer par réseau de paiement">' +
+    '<button type="button" class="chip' + (paiementsFilter === 'all' ? ' active' : '') + '" onclick="setPaiementsFilter(\'all\')">Tous les réseaux</button>' +
+    providers.map((k) => '<button type="button" class="chip' + (paiementsFilter === k ? ' active' : '') + '" onclick="setPaiementsFilter(\'' + esc(k) + '\')">' + esc(providerLabel(k)) + '</button>').join('') +
+    '</div>';
+
+  const kpis =
+    kpiCard('Total encaissé', fmt(sCur.volume) + ' <small>FCFA</small>', deltaHtml(sCur.volume, sPrev.volume)) +
+    kpiCard('Transactions payées', fmt(sCur.paid), deltaHtml(sCur.paid, sPrev.paid)) +
+    kpiCard('Taux de réussite', sCur.rate + ' %', sPrev.created ? deltaHtml(sCur.rate, sPrev.rate, 'pt') : '<span class="delta-sub">Pas de comparaison disponible</span>') +
+    kpiCard('Panier moyen', fmt(sCur.avg) + ' <small>FCFA</small>', deltaHtml(sCur.avg, sPrev.avg)) +
+    kpiCard('En attente de paiement', fmt(sCur.pending), '<span class="delta-sub">' + fmt(sCur.pendingAmount) + ' FCFA en jeu</span>');
+
+  // Détail par réseau (30 derniers jours, tous réseaux)
+  const cur30 = orders.filter((o) => inWindow(o, now - 30 * DAY, now + DAY));
+  const totalPaidVolume = Math.max(1, statsOf(cur30).volume);
+  const networkRows = providers.map((k) => {
+    const s = statsOf(cur30.filter((o) => providerKey(o) === k));
+    const part = Math.round((s.volume / totalPaidVolume) * 100);
+    return '<tr><td><span style="display:inline-flex;align-items:center;gap:10px"><span style="width:12px;height:12px;border-radius:4px;background:' + colorOf(k) + '"></span><b>' + esc(providerLabel(k)) + '</b></span></td>' +
+      '<td>' + s.paid + '</td><td>' + fmt(s.volume) + '</td><td>' + (s.created ? s.rate + ' %' : '—') + '</td><td>' + s.pending + '</td><td>' + part + ' %</td></tr>';
+  }).join('');
+
+  // Encaissements par semaine, 5 dernières semaines
+  const weeks = [];
+  for (let i = 4; i >= 0; i--) {
+    const from = now - (i + 1) * 7 * DAY, to = now - i * 7 * DAY;
+    const by = {};
+    orders.filter((o) => isPaid(o) && inWindow(o, from, to)).forEach((o) => {
+      const k = providerKey(o);
+      by[k] = (by[k] || 0) + Number(o.montant || 0);
+    });
+    weeks.push({ label: shortDate(from), by, total: Object.values(by).reduce((s, v) => s + v, 0) });
+  }
+  const maxWeek = Math.max(1, ...weeks.map((w) => w.total));
+  const bars = weeks.map((w, i) => {
+    const x = 20 + i * 78;
+    let y = 190;
+    const segs = providers.map((k) => {
+      const h = ((w.by[k] || 0) / maxWeek) * 160;
+      if (h <= 0) return '';
+      y -= h;
+      return '<rect x="' + x + '" y="' + y.toFixed(1) + '" width="54" height="' + h.toFixed(1) + '" fill="' + colorOf(k) + '"><title>' +
+        esc(providerLabel(k)) + ' : ' + fmt(w.by[k]) + ' FCFA</title></rect>';
+    }).join('');
+    return segs + '<text x="' + (x + 27) + '" y="212" text-anchor="middle" font-family="Inter,sans-serif" font-size="12" fill="#6A6580">' + esc(w.label) + '</text>';
+  }).join('');
+  const legend = '<div class="legend">' + providers.map((k) => '<span><i style="background:' + colorOf(k) + '"></i>' + esc(providerLabel(k)) + '</span>').join('') + '</div>';
+  const weekly = '<svg viewBox="0 0 400 230" style="width:100%;height:auto;display:block" role="img" aria-label="Encaissements des 5 dernières semaines, par réseau">' +
+    '<g stroke="#ECEAF3" stroke-width="1"><line x1="10" y1="30" x2="400" y2="30"/><line x1="10" y1="80" x2="400" y2="80"/><line x1="10" y1="130" x2="400" y2="130"/><line x1="10" y1="190" x2="400" y2="190"/></g>' +
+    bars + '</svg>';
+
+  // Opérations : encaissements + versements aux marchands
+  const ops = selected.slice(0, 60).map((o) => ({
+    ts: new Date(o.created_at).getTime(),
+    type: isPaid(o) ? 'Encaissement' : (isPending(o) ? 'Paiement initié' : 'Paiement annulé'),
+    ref: orderRef(o),
+    net: providerLabel(providerKey(o)),
+    amount: Number(o.montant || 0),
+    st: isPaid(o) ? '<span class="st st-ok">Réussie</span>' : (isPending(o) ? '<span class="st st-warn">En attente</span>' : '<span class="st st-bad">Annulée</span>'),
+    orderId: o.id,
+  }));
+  if (paiementsFilter === 'all') {
+    payouts.forEach((p) => {
+      const stMap = { en_attente: '<span class="st st-warn">En attente</span>', traite: '<span class="st st-ok">Versé</span>', refuse: '<span class="st st-bad">Refusé</span>' };
+      ops.push({
+        ts: new Date(p.created_at).getTime(),
+        type: 'Versement marchand',
+        ref: 'ZN-REV-' + String(p.reference_number == null ? '' : p.reference_number).padStart(6, '0'),
+        net: p.payout_channel_label || '—',
+        amount: Number(p.amount_to_pay || 0),
+        st: stMap[p.status] || '<span class="st st-none">' + esc(p.status) + '</span>',
+        orderId: null,
+      });
+    });
+  }
+  ops.sort((a, b) => b.ts - a.ts);
+  const opRows = ops.slice(0, 15).map((op) =>
+    '<tr' + (op.orderId ? ' class="clickable" onclick="openOrder(\'' + esc(op.orderId) + '\')"' : '') + '>' +
+    '<td class="muted">' + esc(dateTime(op.ts)) + '</td><td>' + esc(op.type) + '</td><td><b>' + esc(op.ref) + '</b></td>' +
+    '<td>' + esc(op.net) + '</td><td>' + fmt(op.amount) + '</td><td>' + op.st + '</td></tr>').join('');
+
+  // Alertes
+  const stale = orders.filter((o) => isPending(o) && inWindow(o, now - 7 * DAY, now - 30 * 60000)).length;
+  const pendingPayouts = payouts.filter((p) => p.status === 'en_attente');
+  const payoutSum = pendingPayouts.reduce((s, p) => s + Number(p.amount_to_pay || 0), 0);
+  const cancelled30 = cur30.filter(isCancelled).length;
+  const alertItem = (bg, fg, icon, title, sub) =>
+    '<div class="alert-item"><span class="alert-ico" style="background:' + bg + ';color:' + fg + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg></span><div><b>' + title + '</b><div class="alert-sub">' + sub + '</div></div></div>';
+  const alerts =
+    alertItem('#FFF1DB', '#9A5B00', '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+      stale + ' paiement(s) en attente depuis plus de 30 min', stale ? 'À vérifier ou à laisser expirer' : 'Rien de bloqué') +
+    alertItem('#FDE7E5', '#B3261E', '<path d="M12 3l10 18H2z"/><path d="M12 10v5"/>',
+      cancelled30 + ' paiement(s) annulé(s) sur 30 jours', 'Tous réseaux confondus') +
+    alertItem('#ECE8FB', '#2E0B8C', '<path d="M3 12h18M13 6l6 6-6 6"/>',
+      pendingPayouts.length + ' versement(s) à traiter', fmt(payoutSum) + ' FCFA à reverser');
+
+  panel.innerHTML =
+    '<div class="section-head" style="margin-bottom:16px"><span class="muted" style="font-size:13px;color:var(--text-muted)">Chaque nouveau moyen de paiement apparaît ici automatiquement dès qu\'il est utilisé.</span>' +
+      '<button type="button" class="outline-btn" onclick="exportTransactionsCSV()">Exporter en CSV</button></div>' +
+    chips +
+    '<section class="section grid-auto" aria-label="Indicateurs de paiement">' + kpis + '</section>' +
+    '<section class="section row-flex">' +
+      '<div class="table-box" style="flex:3 1 520px"><div class="table-head"><h2>Détail par réseau</h2><span class="card-meta" style="margin:0">30 derniers jours</span></div>' +
+        '<div class="scroll-x"><table class="t"><thead><tr><th>Réseau</th><th>Payées</th><th>Montant (FCFA)</th><th>Réussite</th><th>En attente</th><th>Part</th></tr></thead><tbody>' +
+        (networkRows || '<tr><td colspan="6" class="muted">Aucune transaction.</td></tr>') + '</tbody></table></div></div>' +
+      '<div class="box" style="flex:2 1 360px"><h2>Encaissements par semaine</h2>' + legend + weekly + '</div>' +
+    '</section>' +
+    '<section class="section row-flex" style="align-items:flex-start">' +
+      '<div class="table-box" style="flex:3 1 520px"><div class="table-head"><h2>Dernières opérations</h2></div>' +
+        '<div class="scroll-x"><table class="t"><thead><tr><th>Date</th><th>Opération</th><th>Référence</th><th>Réseau</th><th>Montant (FCFA)</th><th>Statut</th></tr></thead><tbody>' +
+        (opRows || '<tr><td colspan="6" class="muted">Aucune opération.</td></tr>') + '</tbody></table></div></div>' +
+      '<div style="flex:2 1 360px;display:flex;flex-direction:column;gap:16px;min-width:0">' +
+        '<div class="box"><h2>Versements aux marchands</h2>' +
+          '<div style="display:flex;align-items:baseline;gap:8px"><span class="todo-n">' + pendingPayouts.length + '</span><span style="font-size:14px;color:var(--text-muted)">demande(s) en attente</span></div>' +
+          '<p class="box-note" style="margin:8px 0 14px">Total à reverser : <b>' + fmt(payoutSum) + ' FCFA</b></p>' +
+          '<button type="button" class="primary-btn" style="width:100%" onclick="showTab(\'reversements\')">Traiter les versements</button></div>' +
+        '<div class="box"><h2>Alertes</h2>' + alerts + '</div>' +
+      '</div>' +
+    '</section>';
 }
 </script>
 </body>

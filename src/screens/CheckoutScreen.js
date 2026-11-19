@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Modal,
   Linking,
+  AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
@@ -40,6 +41,9 @@ export default function CheckoutScreen({ route, navigation }) {
   const [accepted, setAccepted] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Commande dont le paiement NITA est en cours (page de paiement ouverte).
+  const [pendingOrderId, setPendingOrderId] = useState(null);
+  const [verifying, setVerifying] = useState(false);
 
   const sousTotal = listing.price * quantity;
   const fraisLivraison = deliveryMethod?.price || 0;
@@ -48,6 +52,60 @@ export default function CheckoutScreen({ route, navigation }) {
   const isPickup = deliveryMethod?.id === 'pickup';
   const isNegotiated = deliveryMethod?.id === 'a_negocier';
   const skipAddress = isPickup || isNegotiated;
+
+  const goToChat = () =>
+    listing.vendeur_id
+      ? navigation.replace('Chat', {
+          listingId: listing.id,
+          listingTitle: listing.title,
+          otherUserId: listing.vendeur_id,
+        })
+      : navigation.popToTop();
+
+  const showSavedAlert = () =>
+    Alert.alert(
+      'Commande enregistrée',
+      isPickup
+        ? "Direction la messagerie pour te mettre d'accord avec le vendeur sur le lieu et l'heure."
+        : 'Direction la messagerie pour suivre la suite avec le vendeur.',
+      [{ text: 'OK', onPress: goToChat }]
+    );
+
+  // Demande au serveur si NITA a bien reçu le paiement.
+  const verifyPayment = async (manual = false) => {
+    if (!pendingOrderId || verifying) return;
+    setVerifying(true);
+    const { data, error } = await supabase.functions.invoke('check-payment', {
+      body: { orderId: pendingOrderId },
+    });
+    setVerifying(false);
+    if (!error && data?.paid) {
+      setPendingOrderId(null);
+      Alert.alert('Paiement confirmé ✅', 'Ton paiement a bien été reçu. Direction la messagerie avec le vendeur.', [
+        { text: 'OK', onPress: goToChat },
+      ]);
+    } else if (manual) {
+      Alert.alert(
+        'Paiement non confirmé',
+        "Nous n'avons pas encore reçu ton paiement. Si tu viens de payer, patiente quelques secondes puis réessaie."
+      );
+    }
+  };
+
+  // Quand l'acheteur revient dans l'app après la page de paiement, on vérifie tout seul.
+  const verifyRef = useRef(verifyPayment);
+  verifyRef.current = verifyPayment;
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') verifyRef.current(false);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const payLater = () => {
+    setPendingOrderId(null);
+    showSavedAlert();
+  };
 
   const handleConfirm = async () => {
     if (!nom.trim() || telephone.replace(/\D/g, '').length < 7 || (!skipAddress && !quartier.trim())) {
@@ -151,44 +209,24 @@ export default function CheckoutScreen({ route, navigation }) {
       });
     }
 
-    // Ouvre la page de paiement PayDunya (Wave, Orange Money, etc. selon
-    // ce que la personne choisit sur cette page). Actuellement branché en
-    // mode test : aucun vrai argent ne bouge tant que les clés de
-    // production ne sont pas activées.
+    // Ouvre la page de paiement MyNITA. En mode test, aucun vrai argent ne bouge.
     const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
       'create-payment',
       { body: { orderId: order.id } }
     );
 
-    if (paymentError || !paymentData?.redirectUrl) {
+    if (paymentError || (!paymentData?.url && !paymentData?.alreadyPaid)) {
       console.error('Erreur création paiement:', paymentError, paymentData);
       Alert.alert(
         'Paiement indisponible',
         "Impossible d'ouvrir la page de paiement pour l'instant. La commande est bien enregistrée, réessaie le paiement depuis Mes commandes."
       );
-    } else {
-      Linking.openURL(paymentData.redirectUrl);
+      showSavedAlert();
+      return;
     }
 
-    Alert.alert(
-      'Commande enregistrée',
-      isPickup
-        ? "Direction la messagerie pour te mettre d'accord avec le vendeur sur le lieu et l'heure."
-        : 'Direction la messagerie pour suivre la suite avec le vendeur.',
-      [
-        {
-          text: 'OK',
-          onPress: () =>
-            listing.vendeur_id
-              ? navigation.replace('Chat', {
-                  listingId: listing.id,
-                  listingTitle: listing.title,
-                  otherUserId: listing.vendeur_id,
-                })
-              : navigation.popToTop(),
-        },
-      ]
-    );
+    setPendingOrderId(order.id);
+    if (paymentData.url) Linking.openURL(paymentData.url);
   };
 
   return (
@@ -314,6 +352,31 @@ export default function CheckoutScreen({ route, navigation }) {
         </View>
       </Modal>
 
+      <Modal visible={!!pendingOrderId} transparent animationType="fade" onRequestClose={payLater}>
+        <View style={styles.payOverlay}>
+          <View style={styles.payCard}>
+            <Text style={styles.payTitle}>Paiement en cours</Text>
+            <Text style={styles.payText}>
+              Termine ton paiement sur la page NITA qui vient de s'ouvrir, puis reviens ici. Nous vérifions automatiquement.
+            </Text>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => verifyPayment(true)}
+              disabled={verifying}
+            >
+              {verifying ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.confirmButtonText}>J'ai payé, vérifier</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={payLater} style={{ marginTop: spacing.md, alignItems: 'center' }}>
+              <Text style={styles.linkText}>Payer plus tard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <TouchableOpacity
         style={[styles.confirmButton, !accepted && styles.confirmButtonDisabled]}
         onPress={handleConfirm}
@@ -424,5 +487,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmButtonDisabled: { opacity: 0.5 },
+  payOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  payCard: { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg },
+  payTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
+  payText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.lg },
   confirmButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
 });
