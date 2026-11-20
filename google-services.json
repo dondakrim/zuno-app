@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "981574477273",
+    "project_id": "zuno-5da2a",
+    "storage_bucket": "zuno-5da2a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:981574477273:android:17c822f9495de7714f25c8",
+        "android_client_info": {
+          "package_name": "com.zuno.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbzgoQks3RnpDiCPKHBevQEKiRgZ5n8-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
