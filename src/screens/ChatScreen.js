@@ -8,13 +8,33 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
-import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import { checkMessage, BLOCK_MESSAGE } from '../lib/chatGuard';
+
+// Phrases toutes prêtes pour accélérer la discussion jusqu'à la commande
+const BUYER_QUICK = [
+  'Bonjour, cet article est-il toujours disponible ?',
+  'Quel est ton meilleur prix ?',
+  'Peux-tu envoyer plus de photos ?',
+  'Quel est son état exactement ?',
+  'Comment se passe la livraison ?',
+  'Je suis intéressé(e), je passe commande sur Zuno.',
+];
+const SELLER_QUICK = [
+  'Bonjour, oui il est toujours disponible.',
+  'Tu peux passer commande directement sur Zuno, le paiement est sécurisé.',
+  'Je peux faire un petit geste sur le prix.',
+  'Il est en très bon état, comme sur les photos.',
+  'La livraison se fait via Zuno, tu seras suivi(e) à chaque étape.',
+  'Merci pour ta commande, je prépare ça !',
+];
 
 export default function ChatScreen({ route, navigation }) {
   const { listingId, listingTitle, otherUserId } = route.params;
@@ -23,11 +43,19 @@ export default function ChatScreen({ route, navigation }) {
   const [myId, setMyId] = useState(null);
   const [sending, setSending] = useState(false);
   const [activeOffer, setActiveOffer] = useState(null);
+  const [sellerId, setSellerId] = useState(null);
   const listRef = useRef(null);
 
   const loadThread = useCallback(async () => {
     const id = await getDeviceUserId();
     setMyId(id);
+
+    const { data: listingRow } = await supabase
+      .from('listings')
+      .select('vendeur_id')
+      .eq('id', listingId)
+      .maybeSingle();
+    setSellerId(listingRow?.vendeur_id || null);
 
     const { data, error } = await supabase
       .from('messages')
@@ -80,9 +108,14 @@ export default function ChatScreen({ route, navigation }) {
     }, [loadThread])
   );
 
-  const handleSend = async () => {
-    if (!input.trim() || !myId) return;
-    const content = input.trim();
+  const sendText = async (raw) => {
+    const content = String(raw || '').trim();
+    if (!content || !myId) return;
+
+    if (checkMessage(content)) {
+      Alert.alert('Message non envoyé', BLOCK_MESSAGE);
+      return;
+    }
     setInput('');
     setSending(true);
 
@@ -94,10 +127,22 @@ export default function ChatScreen({ route, navigation }) {
     });
 
     setSending(false);
-    if (!error) {
-      loadThread();
+    if (error) {
+      setInput(content);
+      if (String(error.message || '').includes('CONTACT_INTERDIT')) {
+        Alert.alert('Message non envoyé', BLOCK_MESSAGE);
+      } else {
+        Alert.alert('Erreur', "Le message n'a pas pu être envoyé. Réessaie.");
+      }
+      return;
     }
+    loadThread();
   };
+
+  const handleSend = () => sendText(input);
+
+  const iAmSeller = sellerId && myId === sellerId;
+  const quick = iAmSeller ? SELLER_QUICK : BUYER_QUICK;
 
   return (
     <KeyboardAvoidingView
@@ -105,7 +150,7 @@ export default function ChatScreen({ route, navigation }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={80}
     >
-      <GradientHeader style={styles.header}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
@@ -113,7 +158,14 @@ export default function ChatScreen({ route, navigation }) {
           {listingTitle}
         </Text>
         <View style={{ width: 22 }} />
-      </GradientHeader>
+      </View>
+
+      <View style={styles.safeBanner}>
+        <Ionicons name="shield-checkmark" size={15} color={colors.success} />
+        <Text style={styles.safeBannerText}>
+          Reste sur Zuno : paiement protégé et suivi de livraison. Les numéros ne s'échangent pas ici.
+        </Text>
+      </View>
 
       {activeOffer && activeOffer.status === 'en_attente' && (
         <View style={styles.offerBanner}>
@@ -169,6 +221,18 @@ export default function ChatScreen({ route, navigation }) {
           );
         }}
       />
+
+      {!input.trim() ? (
+        <View style={styles.quickWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickRow} keyboardShouldPersistTaps="handled">
+            {quick.map((q) => (
+              <TouchableOpacity key={q} style={styles.quickChip} onPress={() => sendText(q)} disabled={sending} activeOpacity={0.8}>
+                <Text style={styles.quickChipText} numberOfLines={2}>{q}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       <View style={styles.inputRow}>
         <TextInput
@@ -226,6 +290,27 @@ const styles = StyleSheet.create({
   },
   offerRejectButtonText: { color: colors.white, fontSize: 11, fontWeight: '700' },
   offerWaitingText: { color: 'rgba(255,255,255,0.7)', fontSize: 11 },
+  safeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 8,
+    backgroundColor: colors.successBg,
+  },
+  safeBannerText: { flex: 1, fontSize: 11, color: colors.textPrimary },
+  quickWrap: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.sm },
+  quickRow: { paddingHorizontal: spacing.md, gap: spacing.sm },
+  quickChip: {
+    maxWidth: 230,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.purple,
+    backgroundColor: colors.tintPurple,
+  },
+  quickChipText: { fontSize: 12, fontWeight: '600', color: colors.purple },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },
   bubble: {
     maxWidth: '78%',
@@ -253,7 +338,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: spacing.sm,
     padding: spacing.md,
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
@@ -266,6 +351,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     maxHeight: 100,
     fontSize: 14,
+    color: colors.textPrimary,
   },
   sendButton: {
     backgroundColor: colors.orange,

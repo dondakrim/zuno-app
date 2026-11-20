@@ -20,6 +20,7 @@ import { getDeviceUserId } from '../../lib/deviceUser';
 import { useMode } from '../../context/ModeContext';
 import { getSellerRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../../lib/reputation';
 import { COUNTRIES } from '../../data/countries';
+import GradientHeader from '../../components/GradientHeader';
 
 const PAYOUT_FEE_RATE = 0.02; // 2% prélevés par Zuno sur chaque reversement
 
@@ -285,44 +286,69 @@ export default function MerchantDashboardScreen({ navigation }) {
 
   const isTrusted = completedSales >= TRUST_BADGE_THRESHOLD;
 
+  const STATUS_PILL = {
+    a_traiter: { label: 'À traiter', fg: colors.orange, bg: colors.tintOrange },
+    pris_en_charge: { label: 'Préparation', fg: colors.blue, bg: colors.tintBlue },
+    en_cours: { label: 'En livraison', fg: colors.blue, bg: colors.tintBlue },
+    livre: { label: 'Livré', fg: colors.success, bg: colors.successBg },
+    annulee: { label: 'Annulée', fg: colors.danger, bg: colors.tintRed },
+  };
+
+  const statCards = [
+    { icon: 'pricetags', tint: colors.tintPurple, fg: colors.purple, value: stats.actives, label: 'Annonces actives' },
+    { icon: 'time', tint: colors.tintOrange, fg: colors.orange, value: stats.enAttente, label: 'Commandes en attente', onPress: () => navigation.navigate('Commandes') },
+    { icon: 'trending-up', tint: colors.successBg, fg: colors.success, value: stats.chiffreAffaires.toLocaleString('fr-FR'), label: 'FCFA de ventes' },
+    { icon: 'heart', tint: colors.tintRed, fg: colors.danger, value: stats.favoris, label: 'Fois en favori' },
+  ];
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <GradientHeader style={styles.header}>
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>{boutiqueNom || 'Ma boutique'}</Text>
-          <TouchableOpacity onPress={() => switchMode('visiteur')} style={styles.switchButton}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerHello}>Mon espace marchand</Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>{boutiqueNom || 'Ma boutique'}</Text>
+          </View>
+          <TouchableOpacity onPress={() => switchMode('visiteur')} style={styles.switchButton} activeOpacity={0.8}>
             <Ionicons name="swap-horizontal" size={14} color={colors.white} />
             <Text style={styles.switchButtonText}>Mode visiteur</Text>
           </TouchableOpacity>
         </View>
+
         <View style={styles.reputationRow}>
           <StarRating average={rating.average} count={rating.count} />
-          <View style={{ flexDirection: 'row', gap: spacing.xs }}>
-            {identityStatus === 'verifiee' && (
-              <View style={styles.identityBadge}>
-                <Ionicons name="shield-checkmark-outline" size={13} color={colors.white} />
-                <Text style={styles.identityBadgeText}>Identité vérifiée</Text>
-              </View>
-            )}
-            {isTrusted && (
-              <View style={styles.trustBadge}>
-                <Ionicons name="shield-checkmark" size={13} color={colors.white} />
-                <Text style={styles.trustBadgeText}>Vendeur de confiance</Text>
-              </View>
-            )}
-          </View>
         </View>
+        <View style={styles.badgesRow}>
+          {identityStatus === 'verifiee' && (
+            <View style={styles.identityBadge}>
+              <Ionicons name="shield-checkmark-outline" size={13} color={colors.white} />
+              <Text style={styles.identityBadgeText}>Identité vérifiée</Text>
+            </View>
+          )}
+          {isTrusted && (
+            <View style={styles.trustBadge}>
+              <Ionicons name="shield-checkmark" size={13} color={colors.white} />
+              <Text style={styles.trustBadgeText}>Vendeur de confiance</Text>
+            </View>
+          )}
+        </View>
+
         <TouchableOpacity
           style={styles.identityLink}
           onPress={() => navigation.navigate('IdentityVerification')}
+          activeOpacity={0.8}
         >
-          <Ionicons name="id-card-outline" size={13} color="rgba(255,255,255,0.85)" />
+          <Ionicons
+            name={identityStatus === 'verifiee' ? 'checkmark-circle' : 'id-card-outline'}
+            size={15}
+            color={colors.white}
+          />
           <Text style={styles.identityLinkText}>
-            {identityStatus === 'verifiee' ? "Voir ma vérification d'identité" : "Vérifier mon identité"}
+            {identityStatus === 'verifiee' ? "Voir ma vérification d'identité" : 'Vérifier mon identité'}
           </Text>
-          <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.85)" />
+          <Ionicons name="chevron-forward" size={14} color={colors.white} />
         </TouchableOpacity>
-      </View>
+      </GradientHeader>
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
@@ -330,47 +356,46 @@ export default function MerchantDashboardScreen({ navigation }) {
         <FlatList
           data={listings}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: spacing.lg }}
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}
           ListHeaderComponent={
             <View>
-              <View style={styles.soldeCard}>
+              <GradientHeader style={styles.soldeCard}>
                 <Text style={styles.soldeLabel}>Solde disponible</Text>
-                <Text style={styles.soldeValue}>{netSolde.toLocaleString('fr-FR')} FCFA</Text>
+                <Text style={styles.soldeValue}>{netSolde.toLocaleString('fr-FR')} <Text style={styles.soldeUnit}>FCFA</Text></Text>
                 <Text style={styles.soldeHint}>
                   {dejaDemande > 0
                     ? `${dejaDemande.toLocaleString('fr-FR')} FCFA déjà en cours de reversement`
                     : 'Basé sur les ventes déjà livrées ou récupérées'}
                 </Text>
-                <TouchableOpacity style={styles.payoutButton} onPress={openPayoutModal}>
-                  <Ionicons name="cash-outline" size={16} color={colors.purple} />
+                <TouchableOpacity style={styles.payoutButton} onPress={openPayoutModal} activeOpacity={0.85}>
+                  <Ionicons name="cash-outline" size={17} color={colors.purple} />
                   <Text style={styles.payoutButtonText}>Demander un reversement</Text>
                 </TouchableOpacity>
-              </View>
+              </GradientHeader>
 
               <View style={styles.statsGrid}>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.actives}</Text>
-                  <Text style={styles.statLabel}>Annonces actives</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.enAttente}</Text>
-                  <Text style={styles.statLabel}>Commandes en attente</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.chiffreAffaires.toLocaleString('fr-FR')}</Text>
-                  <Text style={styles.statLabel}>FCFA de ventes</Text>
-                </View>
-                <View style={styles.statCard}>
-                  <Text style={styles.statValue}>{stats.favoris}</Text>
-                  <Text style={styles.statLabel}>Fois en favori</Text>
-                </View>
+                {statCards.map((s) => (
+                  <TouchableOpacity
+                    key={s.label}
+                    style={styles.statCard}
+                    activeOpacity={s.onPress ? 0.8 : 1}
+                    onPress={s.onPress}
+                  >
+                    <View style={[styles.statIcon, { backgroundColor: s.tint }]}>
+                      <Ionicons name={s.icon} size={17} color={s.fg} />
+                    </View>
+                    <Text style={styles.statValue}>{s.value}</Text>
+                    <Text style={styles.statLabel}>{s.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
 
               <TouchableOpacity
                 style={styles.newListingButton}
                 onPress={() => navigation.navigate('PostListing')}
+                activeOpacity={0.85}
               >
-                <Ionicons name="add-circle-outline" size={20} color={colors.white} />
+                <Ionicons name="add-circle" size={22} color={colors.white} />
                 <Text style={styles.newListingButtonText}>Déposer une nouvelle annonce</Text>
               </TouchableOpacity>
 
@@ -382,92 +407,110 @@ export default function MerchantDashboardScreen({ navigation }) {
               </View>
 
               {recentOrders.length === 0 ? (
-                <Text style={styles.emptyText}>Aucune commande pour l'instant.</Text>
+                <View style={styles.emptyBox}>
+                  <Ionicons name="receipt-outline" size={22} color={colors.textMuted} />
+                  <Text style={styles.emptyText}>Aucune commande pour l'instant.</Text>
+                </View>
               ) : (
-                recentOrders.map((order) => (
-                  <View key={order.id} style={styles.orderCard}>
-                    <View style={styles.thumb}>
-                      {order.listings?.photo_url ? (
-                        <Image source={{ uri: order.listings.photo_url }} style={styles.thumbImage} />
-                      ) : (
-                        <Ionicons name="cube-outline" size={18} color={colors.textMuted} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.orderTitle} numberOfLines={1}>{order.listings?.title}</Text>
-                      <Text style={styles.orderSubtitle}>
-                        {Number(order.montant).toLocaleString('fr-FR')} FCFA
-                      </Text>
-                    </View>
-                  </View>
-                ))
+                recentOrders.map((order) => {
+                  const st = STATUS_PILL[order.deliveries?.[0]?.statut_livraison] || STATUS_PILL.a_traiter;
+                  return (
+                    <TouchableOpacity
+                      key={order.id}
+                      style={styles.orderCard}
+                      onPress={() => navigation.navigate('Commandes')}
+                      activeOpacity={0.85}
+                    >
+                      <View style={styles.thumb}>
+                        {order.listings?.photo_url ? (
+                          <Image source={{ uri: order.listings.photo_url }} style={styles.thumbImage} />
+                        ) : (
+                          <Ionicons name="cube-outline" size={18} color={colors.textMuted} />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.orderTitle} numberOfLines={1}>{order.listings?.title}</Text>
+                        <Text style={styles.orderSubtitle}>
+                          {Number(order.montant).toLocaleString('fr-FR')} FCFA
+                        </Text>
+                      </View>
+                      <View style={[styles.pill, { backgroundColor: st.bg }]}>
+                        <Text style={[styles.pillText, { color: st.fg }]}>{st.label}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
 
-              <Text style={styles.sectionTitle}>Mes annonces</Text>
+              <Text style={[styles.sectionTitle, { marginTop: spacing.lg }]}>Mes annonces ({listings.length})</Text>
             </View>
           }
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              Tu n'as pas encore d'annonce. Utilise le bouton ci-dessus pour publier la première.
-            </Text>
+            <View style={styles.emptyBox}>
+              <Ionicons name="images-outline" size={22} color={colors.textMuted} />
+              <Text style={styles.emptyText}>
+                Tu n'as pas encore d'annonce. Utilise le bouton ci-dessus pour publier la première.
+              </Text>
+            </View>
           }
-          renderItem={({ item }) => (
-            <View style={styles.listingCard}>
-              <TouchableOpacity
-                style={styles.listingCardRow}
-                onPress={() => navigation.navigate('ProductDetail', { listing: item })}
-              >
-                <View style={styles.thumb}>
-                  {item.photo_url ? (
-                    <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
-                  ) : (
-                    <Ionicons name="image-outline" size={18} color={colors.textMuted} />
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.orderTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.orderSubtitle}>
-                    {Number(item.price).toLocaleString('fr-FR')} FCFA
-                  </Text>
-                </View>
-                <View style={[styles.soldBadge, item.status === 'vendu' && styles.soldBadgeSold]}>
-                  <Text style={[styles.soldBadgeText, item.status === 'vendu' && styles.soldBadgeTextSold]}>
-                    {item.status === 'vendu' ? 'Vendu' : 'En vente'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => handleDeleteListing(item)}
-              >
-                <Ionicons name="trash-outline" size={14} color={colors.danger} />
-                <Text style={styles.removeButtonText}>Retirer l'annonce</Text>
-              </TouchableOpacity>
-
-              {item.status !== 'vendu' && (
-                <>
-                  {item.boost_until && new Date(item.boost_until) > new Date() ? (
-                    <View style={styles.boostActiveBadge}>
-                      <Ionicons name="flash" size={12} color={colors.orange} />
-                      <Text style={styles.boostActiveBadgeText}>
-                        En vedette jusqu'au {new Date(item.boost_until).toLocaleDateString('fr-FR')}
+          renderItem={({ item }) => {
+            const sold = item.status === 'vendu';
+            const boosted = item.boost_until && new Date(item.boost_until) > new Date();
+            return (
+              <View style={styles.listingCard}>
+                <TouchableOpacity
+                  style={styles.listingCardRow}
+                  onPress={() => navigation.navigate('ProductDetail', { listing: item })}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.thumbLarge}>
+                    {item.photo_url ? (
+                      <Image source={{ uri: item.photo_url }} style={styles.thumbImage} />
+                    ) : (
+                      <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.orderTitle} numberOfLines={2}>{item.title}</Text>
+                    <Text style={styles.listingPrice}>{Number(item.price).toLocaleString('fr-FR')} FCFA</Text>
+                    <View style={[styles.pill, sold ? styles.pillSold : styles.pillSale, { alignSelf: 'flex-start', marginTop: 6 }]}>
+                      <Text style={[styles.pillText, { color: sold ? colors.textMuted : colors.success }]}>
+                        {sold ? 'Vendu' : 'En vente'}
                       </Text>
                     </View>
-                  ) : boostByListing[item.id] ? (
-                    <View style={styles.boostActiveBadge}>
-                      <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
-                      <Text style={styles.boostPendingText}>En attente de paiement (500 FCFA)</Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity style={styles.boostButton} onPress={() => handleBoostListing(item)}>
-                      <Ionicons name="flash-outline" size={14} color={colors.purple} />
-                      <Text style={styles.boostButtonText}>Mettre en avant (500 FCFA / 3j)</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              )}
-            </View>
-          )}
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+
+                <View style={styles.listingActions}>
+                  {!sold ? (
+                    boosted ? (
+                      <View style={styles.boostInfo}>
+                        <Ionicons name="flash" size={13} color={colors.orange} />
+                        <Text style={styles.boostActiveBadgeText}>
+                          En vedette jusqu'au {new Date(item.boost_until).toLocaleDateString('fr-FR')}
+                        </Text>
+                      </View>
+                    ) : boostByListing[item.id] ? (
+                      <View style={styles.boostInfo}>
+                        <Ionicons name="time-outline" size={13} color={colors.textSecondary} />
+                        <Text style={styles.boostPendingText}>En attente de paiement (500 FCFA)</Text>
+                      </View>
+                    ) : (
+                      <TouchableOpacity style={styles.boostButton} onPress={() => handleBoostListing(item)} activeOpacity={0.8}>
+                        <Ionicons name="flash-outline" size={14} color={colors.purple} />
+                        <Text style={styles.boostButtonText}>Mettre en avant</Text>
+                      </TouchableOpacity>
+                    )
+                  ) : <View style={{ flex: 1 }} />}
+                  <TouchableOpacity style={styles.removeButton} onPress={() => handleDeleteListing(item)} activeOpacity={0.8}>
+                    <Ionicons name="trash-outline" size={14} color={colors.danger} />
+                    <Text style={styles.removeButtonText}>Retirer</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          }}
         />
       )}
 
@@ -555,33 +598,31 @@ export default function MerchantDashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
-    backgroundColor: colors.purple,
     paddingTop: 50,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { color: colors.white, fontSize: 18, fontWeight: '700' },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  headerHello: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontWeight: '600' },
+  headerTitle: { color: colors.white, fontSize: 21, fontWeight: '800' },
   switchButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: 'rgba(255,255,255,0.5)',
     borderRadius: radius.pill,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
-  switchButtonText: { color: colors.white, fontSize: 11, fontWeight: '600' },
-  reputationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: spacing.sm,
-  },
+  switchButtonText: { color: colors.white, fontSize: 11, fontWeight: '700' },
+  reputationRow: { marginTop: spacing.sm },
+  badgesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
   starsRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  ratingText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, marginLeft: 4 },
-  noRatingText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  ratingText: { color: 'rgba(255,255,255,0.9)', fontSize: 12, marginLeft: 4 },
+  noRatingText: { color: 'rgba(255,255,255,0.75)', fontSize: 12 },
   trustBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -605,25 +646,145 @@ const styles = StyleSheet.create({
   identityLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: spacing.sm,
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
   },
-  identityLinkText: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  identityLinkText: { color: colors.white, fontSize: 12, fontWeight: '700' },
+
   soldeCard: {
-    backgroundColor: colors.purple,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.lg,
     marginBottom: spacing.md,
     alignItems: 'center',
+    overflow: 'hidden',
   },
-  soldeLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600' },
-  soldeValue: { color: colors.white, fontSize: 26, fontWeight: '700', marginTop: 4 },
-  soldeHint: { color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 4, textAlign: 'center' },
+  soldeLabel: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+  soldeValue: { color: colors.white, fontSize: 32, fontWeight: '800', marginTop: 4 },
+  soldeUnit: { fontSize: 15, fontWeight: '700' },
+  soldeHint: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 4, textAlign: 'center' },
   payoutButton: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white,
-    borderRadius: radius.md, paddingVertical: 8, paddingHorizontal: 16, marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+    marginTop: 14,
   },
-  payoutButtonText: { color: colors.purple, fontWeight: '700', fontSize: 13 },
+  payoutButtonText: { color: colors.purple, fontWeight: '800', fontSize: 13 },
+
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
+  statCard: {
+    width: '48.5%',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
+  statIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  statValue: { fontSize: 20, fontWeight: '800', color: colors.textPrimary },
+  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+
+  newListingButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.orange,
+    borderRadius: radius.lg,
+    paddingVertical: 15,
+    marginBottom: spacing.lg,
+  },
+  newListingButtonText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.sm },
+  seeAllText: { fontSize: 12, color: colors.orange, fontWeight: '700' },
+  emptyBox: {
+    alignItems: 'center',
+    gap: 6,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13 },
+
+  orderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  thumb: { width: 46, height: 46, borderRadius: radius.md, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  thumbLarge: { width: 68, height: 68, borderRadius: radius.md, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  thumbImage: { width: '100%', height: '100%' },
+  orderTitle: { fontSize: 13.5, fontWeight: '700', color: colors.textPrimary },
+  orderSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  pillText: { fontSize: 10.5, fontWeight: '800' },
+  pillSale: { backgroundColor: colors.successBg },
+  pillSold: { backgroundColor: colors.background },
+
+  listingCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  listingCardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  listingPrice: { fontSize: 14, fontWeight: '800', color: colors.orange, marginTop: 3 },
+  listingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  boostButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: radius.md,
+    backgroundColor: colors.tintPurple,
+  },
+  boostButtonText: { fontSize: 12, color: colors.purple, fontWeight: '800' },
+  boostInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  boostActiveBadgeText: { fontSize: 11, color: colors.orange, fontWeight: '700', flex: 1 },
+  boostPendingText: { fontSize: 11, color: colors.textSecondary, fontWeight: '600', flex: 1 },
+  removeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.tintRed,
+  },
+  removeButtonText: { fontSize: 12, color: colors.danger, fontWeight: '700' },
+
   payoutOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   payoutCard: {
     backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20,
@@ -658,109 +819,4 @@ const styles = StyleSheet.create({
     flex: 2, paddingVertical: 13, borderRadius: radius.md, backgroundColor: colors.purple, alignItems: 'center',
   },
   payoutSubmitText: { color: colors.white, fontWeight: '700' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  statCard: {
-    width: '48%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  statValue: { fontSize: 20, fontWeight: '700', color: colors.purple },
-  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  newListingButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.orange,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  newListingButtonText: { color: colors.white, fontWeight: '700', fontSize: 14 },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
-  seeAllText: { fontSize: 12, color: colors.orange, fontWeight: '600' },
-  emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.md, marginBottom: spacing.md },
-  orderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  thumb: {
-    width: 44,
-    height: 44,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  thumbImage: { width: '100%', height: '100%' },
-  orderTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
-  orderSubtitle: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  listingCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  listingCardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  soldBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    backgroundColor: colors.successBg,
-  },
-  soldBadgeSold: { backgroundColor: colors.background },
-  soldBadgeText: { fontSize: 10, fontWeight: '700', color: colors.success },
-  soldBadgeTextSold: { color: colors.textMuted },
-  removeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    alignSelf: 'flex-start',
-  },
-  removeButtonText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
-  boostButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  boostButtonText: { fontSize: 12, color: colors.purple, fontWeight: '700' },
-  boostActiveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  boostActiveBadgeText: { fontSize: 11, color: colors.orange, fontWeight: '700' },
-  boostPendingText: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
 });

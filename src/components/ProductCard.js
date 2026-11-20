@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
+import { usePrefs } from '../lib/prefs';
 
 const CONDITION_INFO = {
   Neuf: { icon: 'sparkles', color: colors.success },
@@ -15,6 +16,7 @@ const CONDITION_INFO = {
 // Zuno) — c'est la meilleure approximation disponible d'une note par
 // article.
 export default function ProductCard({ listing, sellerRating, isWishlisted, onToggleWishlist, onPress }) {
+  const { formatPrice } = usePrefs();
   const hasPromo = listing.promo_price && Number(listing.promo_price) < Number(listing.price);
   const conditionInfo = CONDITION_INFO[listing.condition];
 
@@ -71,11 +73,11 @@ export default function ProductCard({ listing, sellerRating, isWishlisted, onTog
       <View style={styles.priceRow}>
         {hasPromo && (
           <Text style={styles.oldPrice}>
-            {Number(listing.price).toLocaleString('fr-FR')} FCFA
+            {formatPrice(listing.price)}
           </Text>
         )}
         <Text style={styles.price}>
-          {Number(hasPromo ? listing.promo_price : listing.price).toLocaleString('fr-FR')} FCFA
+          {formatPrice(hasPromo ? listing.promo_price : listing.price)}
         </Text>
       </View>
     </TouchableOpacity>

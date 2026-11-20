@@ -1,0 +1,638 @@
+-${finalDiscount.toLocaleString('fr-FR')} FCFA sur ton achat.
+. Si tu penses qu'il s'agit d'une erreur, contacte le support.
+// ...contenu... //
+1. Qui veux-tu signaler ?
+2. Pourquoi ?
+3. Explique (facultatif)
+Achète et vends d\'occasion partout au Niger
+Adresse email (facultatif)
+Affiché à la place de "Ma boutique" dans ton tableau de bord marchand, si tu es en mode marchand.
+Aide et communauté
+Ajoute au moins ${MIN_PHOTOS} photos pour bien présenter ton article (${photos.length}/${MIN_PHOTOS} pour l'instant).
+Ajouter au panier
+Ajouter un prix promo (facultatif)
+Ajouté
+Alertes et avertissements de Zuno
+Annonce bloquée
+Annonce en cours de vérification
+Annonces actives
+Annulation par le vendeur
+Annulations répétées
+Annuler cette commande ?
+Annuler en tant qu’acheteur
+Annuler la commande
+Annulée
+Approuver cette annonce ?
+Appuie longtemps sur un code pour le copier, puis colle-le au moment du paiement.
+Appuie pour modifier tes informations
+Appuie sur « Vendre » (bouton central), ajoute des photos, un titre, un prix et ta ville. Ton annonce est vérifiée avant d'apparaître.
+Après la confirmation de livraison par l'acheteur.
+Après le début du traitement
+Après-midi (12h-16h)
+Arnaque ou fraude
+Article lourd ou encombrant (+50kg) — livraison à négocier avec l'acheteur
+Article non conforme
+Article non conforme à la description, article endommagé non signalé dans l'annonce, article manquant ou différent.
+Article non livré
+Article non reçu
+Articles en vedette
+Articles et boutiques enregistrés
+Articles similaires
+Aucun achat pour le moment
+Aucun article dans cette catégorie pour l'instant.
+Aucun article enregistré. Appuie sur le cœur d'une annonce pour la retrouver ici.
+Aucun article mis de côté. Appuie sur l'icône marque-page sur une fiche produit pour l'ajouter ici.
+Aucun article ne correspond à ta recherche.
+Aucun article pour l'instant.
+Aucun article pour le moment. Les conseils et actualités de Zuno arrivent bientôt.
+Aucun canal disponible pour l'instant.
+Aucun coupon disponible pour le moment. Reviens bientôt !
+Aucun frais de livraison. Après validation de la commande, mets-toi d'accord avec le vendeur sur le lieu et l'heure via la messagerie.
+Aucun message pour l'instant. Lance la conversation !
+Aucun solde disponible
+Aucune annonce pour l'instant. Sois le premier à en publier une !
+Aucune boutique favorite. Appuie sur le cœur à côté d'un vendeur pour l'ajouter.
+Aucune commande dans cette catégorie.
+Aucune commande en cours de traitement.
+Aucune commande expédiée pour l'instant.
+Aucune commande pour l'instant.
+Aucune conversation pour l'instant. Contacte un vendeur depuis une annonce pour commencer.
+Aucune info pour le moment. Les alertes et nouveautés de Zuno apparaîtront ici.
+Autorisation nécessaire
+Autre problème
+Avis envoyé, merci !
+Aïcha Idé
+Basé sur les ventes déjà livrées ou récupérées
+Bientôt
+Bienvenue sur Zuno
+Bon état
+Boutique non identifiée
+Bravo, déjà
+Burkina Faso
+Bénin
+Canal de reversement
+Cancellation policy
+Cas acceptés
+Cas non acceptés
+Catégorie
+Catégorie manquante
+Ce code n'est plus disponible (peut-être déjà utilisé son maximum de fois). La commande sera passée sans réduction.
+Ce code promo a atteint sa limite d'utilisation.
+Ce code promo n'est plus valable.
+Ce code promo n'existe pas ou n'est plus actif.
+Ce code s'applique à partir de ${Number(data.min_amount).toLocaleString('fr-FR')} FCFA d'achat.
+Ce qui plaît en ce moment
+Certification requise
+Cet article a été ajouté à ton panier.
+Cet article est volumineux ou lourd (véhicule, gros électroménager...). La livraison n'est pas incluse dans le prix affiché — tu en discuteras directement avec le vendeur dans la messagerie, une fois la commande passée.
+Cette annonce a été créée avant l'activation de la messagerie, impossible de contacter son auteur.
+Cette annonce a été créée avant l'activation des favoris.
+Cette annonce n'a pas pu être publiée car son contenu semble enfreindre les règles de Zuno
+Cette section arrive bientôt.
+Champs manquants
+Changer d'identité
+Changer d'identité (test)
+Changer d'identité de test
+Changer de numéro
+Choisir un pays
+Choisir une icône
+Choisir une photo
+Choisis au moins ${MIN_INTERESTS} centres d'intérêt pour continuer (${selected.length}/${MIN_INTERESTS} pour l'instant).
+Choisis d'abord une photo de ta pièce d'identité.
+Choisis d’abord la personne.
+Choisis la raison qui correspond le mieux — le vendeur et notre équipe seront prévenus.
+Choisis le motif du signalement.
+Choisis ta devise
+Choisis ta langue
+Choisis un avatar
+Choisis un canal
+Choisis un pays
+Choose your currency
+Choose your language
+Coche la case en bas confirmant que tu es responsable de l'état et de la provenance de cet article avant de publier.
+Code appliqué
+Code expiré
+Code incorrect
+Code invalide
+Code promo
+Code promo invalide
+Code épuisé
+Commande enregistrée
+Commandes en attente
+Commandes reçues
+Comment acheter un article ?
+Comment contacter le support ?
+Comment publier une annonce ?
+Complete your profile
+Complète ton compte
+Complète ton profil
+Comportement abusif
+Compte marchand
+Compte particulier
+Compte supprimé
+Compte suspendu
+Compte, aide et informations
+Compte, aide et infos
+Conditions de vente
+Conditions générales
+Connecte-toi pour profiter de toutes les fonctions.
+Conseils et actualités
+Consulter les questions fréquentes
+Contacte les vendeurs sans quitter l\'appli
+Contacter l'acheteur
+Contacter le vendeur
+Continuez de scroller pour en trouver.
+Crée ton compte
+Créer mon compte
+Customer service
+Côte d'Ivoire
+Danger zone
+Dans Moi, appuie sur « Devenir marchand » et remplis la demande. Notre équipe l'examine puis te répond.
+Dark theme
+Delete my account
+Demande en cours d’examen
+Demande envoyée
+Demande marchand en cours
+Demander la mise en avant
+Demander un compte marchand
+Demander un reversement
+Dernière mise à jour : novembre 2026
+Dernières commandes
+Des annulations abusives peuvent entraîner une restriction du compte.
+Devenir marchand
+Direction la messagerie pour suivre la suite avec le vendeur.
+Direction la messagerie pour te mettre d'accord avec le vendeur sur le lieu et l'heure.
+Dis-nous comment améliorer Zuno
+Dis-nous comment améliorer Zuno. Chaque message est lu par l’équipe.
+Discute en direct
+Déconnexion
+Déconnexion indisponible
+Découvre les articles près de chez toi.
+Décris ce qui te semble poser problème…
+Décris l'article : état détaillé, raison de la vente, ce qui est inclus…
+Délai
+Délai de livraison estimé
+Déposer une annonce
+Déposer une nouvelle annonce
+Déroulement
+Détail technique : ${deliveryError.message}
+Détail technique : ${e.message}
+Détail technique : ${error.message}
+Détail technique : ${orderError.message}
+Détection automatique
+Elle est peut-être en cours de vérification. Si elle est refusée, tu reçois une notification avec la raison.
+Email invalide
+En attente de paiement (500 FCFA)
+En attente de réponse
+En attente de traitement
+En attente de vérification
+En cours
+En cours de livraison
+En vedette
+En vente
+Encore un peu
+Entre le code reçu par SMS.
+Entre ton numéro de téléphone, on t'envoie un code par SMS.
+Envoi impossible
+Envoyer la demande
+Envoyer le signalement
+Envoyer pour vérification
+Envoyée
+Erreur création commande:
+Erreur création identité:
+Erreur création livraison:
+Erreur création paiement:
+Erreur lecture du mode, on continue avec la valeur par défaut :
+Erreur lecture onboarding, on continue quand même :
+Erreur vérification bannissement, on continue quand même :
+Euro (€)
+Ex: Niamey
+Ex: Plateau, Niamey
+Explique (facultatif)
+Expédition en région
+Expédiés
+FCFA de ventes
+Faire une offre
+Faire une offre à ce prix
+Faux profil
+Ferme complètement l'appli et rouvre-la pour refaire ce choix.
+Ferme complètement l'application et rouvre-la pour appliquer le nouveau thème.
+Find your promo codes
+Fois en favori
+Franc CFA (FCFA)
+Français
+Frequently asked questions
+Guinée-Bissau
+Gère ton compte, tes préférences et ton aide.
+Help and community
+Heure de livraison souhaitée
+Identité vérifiée
+Impossible d'envoyer la demande :
+Impossible d'ouvrir la page de paiement pour l'instant. La commande est bien enregistrée, réessaie le paiement depuis Mes commandes.
+Impossible de faire une offre sur cette annonce.
+Impossible d’ouvrir
+Indique au moins ton nom complet.
+Indique le nom de ta boutique.
+Indique le numéro sur lequel recevoir le reversement.
+Indique un montant valide pour ton offre.
+Indique un montant valide.
+Indique un numéro WhatsApp valide.
+Indique un numéro de téléphone valide.
+Informations de livraison
+Informations légales
+Informations manquantes
+Infos de Zuno
+J'ai lu et j'accepte les conditions
+J'ai lu, j'accepte
+J'ai payé, vérifier
+J'ai reçu un article différent
+Je certifie être seul responsable de l'état et de la provenance de cet article, et confirme qu'il ne s'agit pas d'un article interdit sur Zuno.
+Je n'ai pas reçu l'article
+Je n'ai pas trouvé ma réponse
+L'adresse email ne semble pas valide.
+L'article ne correspond pas à l'annonce
+La connexion avec compte arrive bientôt.
+La connexion par téléphone est actuellement désactivée pour les tests, il n'y a donc pas de session à quitter. Utilise \"Changer d'identité\" dans Paramètres si tu veux simuler un autre utilisateur.
+La livraison de cet article sera à négocier directement avec l'acheteur après l'achat (au lieu des options de livraison habituelles).
+Laisser un avis
+Lancer la commande
+Le prix promo doit être inférieur au prix normal.
+Le remboursement porte sur le prix de l'article. Les frais de livraison sont remboursés si la faute vient du vendeur ou de la livraison.
+Le vendeur n'a pas encore commencé à la traiter, tu peux encore l'annuler sans frais.
+Le vendeur ne répond plus
+Legal information
+Les frais de livraison peuvent changer selon la taille de l'article.
+Les moyens de contact seront bientôt disponibles.
+Les prix des annonces sont affichés à titre indicatif. Tu paies toujours en FCFA.
+Lien indisponible
+Lire l’article
+Liste des favoris
+Litige en cours
+Livraison dans la même ville
+Livraison suivie
+Livraison à négocier
+Livré
+Livrées
+Légal
+Ma boutique
+Maison et électroménager
+Maximum atteint
+Merci !
+Merci d'accepter les conditions avant de continuer.
+Merci, notre équipe va vérifier cette annonce.
+Merci. Notre équipe va examiner la situation.
+Mes achats
+Mes annonces
+Mes commandes
+Mes favoris
+Message trop court
+Mettre en avant (500 FCFA / 3j)
+Mettre en avant cette annonce
+Mises à jour de tes demandes
+Mode de livraison
+Mode et vêtements
+Mode visiteur
+Modifier mon profil
+Modération
+Moi → Paramètres → Supprimer mon compte. Cette action est définitive.
+Mon activité
+Mon argent est-il protégé ?
+Mon numéro WhatsApp est le même
+Mon panier
+Mon profil
+Montant en FCFA
+Montant invalide
+Montant minimum requis
+Montant trop élevé
+Montant à reverser
+Motif manquant
+Moussa Ibrahim
+My activity
+My profile
+Nom complet
+Nom de boutique
+Nom de l'article
+Nom de la boutique (facultatif)
+Nom de la personne ou de la boutique
+Nom de ta boutique
+Nom et numéro sont obligatoires.
+Nom manquant
+Nom, numéro et quartier sont obligatoires.
+Notifications push distantes indisponibles dans Expo Go sur Android (SDK 53+) — teste avec l'APK compilé pour cette fonctionnalité.
+Notifications push non activées :
+Notre équipe examine ta demande avec les photos que tu fournis, puis donne sa décision. En cas d'accord, l'article est renvoyé au vendeur.
+Nous n'avons pas encore reçu ton paiement. Si tu viens de payer, patiente quelques secondes puis réessaie.
+Nouveauté
+Nouveaux articles
+Nouveaux articles pour toi
+Nouvelle annonce
+Numéro WhatsApp
+Numéro WhatsApp invalide
+Numéro de téléphone
+Numéro invalide
+Numéro manquant
+Numéro pour recevoir l'argent
+Numéro à contacter
+On te contactera pour le règlement des 500 FCFA. L'annonce sera mise en avant dès la confirmation du paiement.
+On te prévient dès que c’est validé
+On te tiendra au courant une fois la vérification faite. Reviens sur cet écran pour voir l'avancement.
+Oui, tant que le vendeur n'a pas commencé à la traiter. Ouvre la commande et appuie sur « Annuler ».
+Oui. Ton paiement est gardé par Zuno. Le vendeur n'est payé qu'une fois la livraison confirmée.
+Outils de test
+Ouvre la commande et appuie sur « Signaler un problème ». Notre équipe examine ta demande.
+Ouvre une annonce, appuie sur « Acheter » ou ajoute-la au panier, choisis l'adresse de livraison puis paie avec Mobile Money ou carte.
+Paiement confirmé ✅
+Paiement en cours
+Paiement indisponible
+Paiement non confirmé
+Paiement protégé
+Par catégorie et selon tes centres d'intérêt
+Paramètres
+Paramètres, favoris, service client…
+Parcourir les articles
+Pas d'adresse à donner : une fois la commande validée, mets-toi d'accord avec le vendeur sur le lieu et l'heure du retrait via la messagerie.
+Pas d'adresse à donner ici : une fois la commande validée, discute avec le vendeur du mode et du prix de livraison via la messagerie.
+Pas encore d'avis
+Pas encore d’articles ?
+Pas encore soumise
+Passer en mode marchand
+Payer maintenant
+Payer plus tard
+Personne trouvée.
+Photo manquante
+Photos non envoyées
+Plus de photos nécessaires
+Plus disponible
+Plus tard
+Politique de confidentialité
+Politique de remboursement
+Politique de retour
+Politique d’annulation
+Pour vous
+Pourquoi ?
+Premier dépôt offert
+Pris en charge
+Privacy policy
+Prix (FCFA)
+Prix en FCFA
+Prix promo en FCFA (inférieur au prix normal)
+Prix promo invalide
+Problèmes
+Profil mis à jour
+Précision (facultatif)
+Préférences
+Présentation
+Présentation de l'article
+Préviens aussi directement le vendeur via la messagerie pour accélérer la résolution.
+Prêt pour le retrait
+Publie ton premier article en moins de deux minutes.
+Publie une annonce avec photos en quelques clics
+Publier l'annonce
+Publier une annonce
+Publiée
+Puis-je annuler une commande ?
+Qu'est-ce qui t'intéresse ?
+Quand es-tu remboursé ?
+Quand suis-je payé ?
+Quantité
+Que s’est-il passé ?
+Quel est le problème ?
+Questions fréquentes
+Qui signaler ?
+Recevoir le code
+Rechercher un article
+Refund policy
+Refusée — réessaie avec une autre photo
+Repasser en mode visiteur
+Report a user
+Report suspicious behavior
+Reporter un utilisateur
+Retirer cette annonce ?
+Retirer l'annonce
+Retrait en main propre
+Retrait en main propre (Pick up)
+Retrouve tes codes promo
+Return policy
+Review my interests
+Revoir mes centres d'intérêt
+Rien de nouveau ici pour l'instant.
+Rien à vérifier pour l'instant.
+Récupéré
+Réduction
+Réessaie dans un instant.
+Réinitialiser
+Réponse rapide
+Résultats
+Sans nom
+Saved items and shops
+Se connecter
+Se déconnecter
+Service clients
+Si ta commande est annulée avant traitement, si l'article n'est jamais livré, ou si un litige est tranché en ta faveur.
+Si tu penses qu'il s'agit d'une erreur, contacte-nous à contact@zunomarket.store.
+Si tu vends régulièrement sur Zuno
+Sign in
+Signale un comportement suspect
+Signalement envoyé
+Signaler ce vendeur
+Signaler cette annonce
+Signaler un problème
+Signalé par un utilisateur
+Simple changement d'avis, défaut déjà indiqué dans l'annonce, article utilisé ou abîmé après la livraison.
+Solde disponible
+Sponsorisé
+Statistiques, annonces et commandes
+Suis ta commande du dépôt à la livraison
+Suivi de tes achats et ventes
+Supprimer définitivement
+Supprimer mon compte
+Sécurité
+Sélectionne un moyen pour recevoir ton reversement.
+Sénégal
+Ta pièce a bien été transmise. La vérification est faite manuellement, ça peut prendre un peu de temps.
+Ta première annonce mise en avant gratuitement cette semaine.
+Table basse en bois
+Table basse solide, quelques marques d'usage sur le dessus.
+Tap to edit your information
+Tendances du moment
+Termine ton paiement sur la page NITA qui vient de s'ouvrir, puis reviens ici. Nous vérifions automatiquement.
+Terms and conditions
+Terms of use
+Tes informations personnelles ont été effacées. Ferme complètement l'application et rouvre-la pour repartir de zéro.
+Thème sombre
+Thème, langue, devise et plus
+Tips and news
+Titre de l'article
+Titre, prix et ville sont obligatoires.
+Ton accès à Zuno a été suspendu suite à une ou plusieurs violations des conditions d'utilisation.
+Ton annonce a bien été reçue. Certains éléments demandent une vérification manuelle avant qu'elle soit visible publiquement — ça ne prend généralement pas longtemps.
+Ton annonce est en ligne.
+Ton avis sur le vendeur
+Ton message a bien été envoyé à l’équipe Zuno.
+Ton nom
+Ton nom et prénom
+Ton numéro de téléphone et ton numéro WhatsApp sont nécessaires pour que les autres utilisateurs puissent te contacter facilement.
+Ton offre en FCFA
+Ton paiement a bien été reçu. Direction la messagerie avec le vendeur.
+Ton paiement est gardé par Zuno jusqu'à la confirmation de livraison. Le vendeur n'est pas payé avant.
+Ton panier est vide.
+Ton signalement reste confidentiel : la personne signalée ne saura pas que c’est toi.
+Ton signalement reste confidentiel.
+Ton solde disponible est de ${netSolde.toLocaleString('fr-FR')} FCFA.
+Tout voir
+Tu as 48 heures après la livraison pour signaler un problème depuis ta commande (« Signaler un problème »).
+Tu devras choisir à nouveau au moins 3 centres d'intérêt au prochain lancement de l'appli.
+Tu es en mode marchand
+Tu es maintenant un nouvel utilisateur de test.
+Tu n'as pas encore d'annonce. Utilise le bouton ci-dessus pour publier la première.
+Tu n'as pas encore de solde disponible pour un reversement.
+Tu n'as pas encore publié d'annonce. Appuie sur le + en haut pour commencer.
+Tu ne peux pas te signaler toi-même.
+Tu peux ajouter jusqu'à ${MAX_PHOTOS} photos.
+Tu peux annuler ta commande tant que le vendeur ne l'a pas commencée (statut « à traiter »). Appuie sur « Annuler » dans Mes commandes.
+Tu peux passer en mode marchand pour accéder à un tableau de bord dédié : statistiques, gestion des annonces et des commandes.
+Tu recevras ${amountToPay.toLocaleString('fr-FR')} FCFA via ${selectedChannel.provider_name} (2% de frais Zuno déduits). Traitement sous quelques jours.
+Téléphone Samsung A14
+Téléphone utilisé 8 mois, écran sans rayure, batterie à 90 %.
+Un badge "Identité vérifiée" s'affiche sur ton profil une fois ta pièce validée — ça rassure les acheteurs. Envoie une photo lisible d'une pièce officielle (carte d'identité, passeport ou permis de conduire).
+Un commentaire (facultatif)
+Un compte marchand te donne ta boutique, le suivi de tes ventes et tes versements.
+Un numéro de téléphone et un numéro WhatsApp sont nécessaires pour ${actionLabel}, afin que les autres utilisateurs puissent te contacter.
+Un problème
+Un tableau de bord pour vendre plus
+Un vendeur peut annuler s'il ne peut plus fournir l'article. Tu es alors remboursé.
+Une fois la commande en préparation ou en livraison, l'annulation n'est plus possible. Tu peux ouvrir un litige si besoin.
+Une fois la décision prise, le remboursement est envoyé sur le moyen de paiement utilisé. Le délai exact dépend de ton opérateur Mobile Money ou de ta banque.
+Une idée
+Une question, un problème ? Notre équipe est là pour t'aider.
+Usé
+Utile uniquement pour tester la messagerie et les commandes seul, sans deuxième téléphone : tu vas devenir un tout nouvel utilisateur de test sur cet appareil.
+Utile uniquement pour tester la messagerie et les commandes seul, sans deuxième téléphone.
+Va dans Moi → Mes commandes. Tu y vois chaque étape : à traiter, en cours, livrée.
+Vendeur : pas encore de ventes
+Vendeur Zuno
+Vendeur de confiance
+Vendeur injoignable
+Vendeur non identifié
+Vends en 5 minutes
+Version 1.0.0
+Veste en jean
+Veste en jean taille M, portée quelques fois, aucune tache.
+Veux-tu vraiment te déconnecter ?
+Ville, quartier
+Voir ma vérification d'identité
+Voir tout
+Vous aimerez aussi
+Véhicules et pièces
+Vérification
+Vérification d'identité
+Vérification…
+Vérifie que l’application est installée.
+Vérifie ta connexion et réessaie.
+Vérifie ton numéro de téléphone.
+Vérifier
+Vérifier mon identité
+Zone dangereuse
+Zuno a besoin d'accéder à tes photos.
+Zuno a besoin d'accéder à tes photos. Active l'autorisation dans les réglages de ton téléphone.
+Zuno alerts and notices
+Zuno est une place de marché d'articles d'occasion. Chaque article est décrit par son vendeur. Si l'article reçu ne correspond pas à l'annonce, tu peux demander un retour.
+a pas été acceptée{note ?
+a été que prévisualisé jusqu
+accord sur le lieu et l
+accroche pour une vraie analyse d
+accès à l
+acheter un article
+acheteur après l
+acheteur et le vendeur trouvent un accord commun (article non conforme, non reçu, etc.). Cette démarche se négocie directement entre les deux parties, par exemple via la messagerie intégrée à l
+adresse IP, modèle d
+ai lu et j
+ajout du carrousel n
+annonce, favori...) plutôt qu
+appelant doit alors arrêter l
+appli sans dépendre de Twilio pour l
+applique à partir de ${Number(data.min_amount).toLocaleString(
+arme de poing
+arme à feu
+as pas encore publié d
+aucune publicité n
+cocaïne
+contenu illégal
+contrefaçon
+corne de rhinocéros
+discrétion assurée
+disponible discrètement
+dm pour prix
+document administratif falsifié
+don d\'organe rémunéré
+détonateur
+entrée : on lit le thème choisi AVANT de charger le reste de l
+espèce protégée
+est la meilleure approximation disponible d
+fausse carte d\'identité
+faux acte de naissance
+faux avis achetés
+faux de marque
+faux diplôme
+faux permis de conduire
+habitudes du profil
+hacking à la demande
+héroïne
+id utilisé :
+identité falsifiée
+identité, centres d
+insérer l
+intérêt (quand aucune recherche n
+intérêt pour continuer (${selected.length}/${MIN_INTERESTS} pour l
+intérêt pour qu
+livraison partout sans vérification
+marchandise volée
+marché noir
+matière radioactive
+mercure à vendre
+mettre un article de côté
+morphine à vendre
+mp pour prix
+médicament contrefait
+médicament sans ordonnance
+non vérifié
+numéro de téléphone dans le texte
+o.deliveries?.[0]?.statut_livraison === filter); return (
+objet volé
+onglet Moi : le profil, puis Mes commandes et la vue d
+onglet Tendances : la grille d
+ouverture de l
+pas de questions
+peau de léopard
+piratage de compte
+produit interdit à la vente
+produit volé
+publier une annonce
+rein à vendre
+réplique de luxe
+sans poser de questions
+service de hacking
+stupéfiant
+stéroïde anabolisant
+sum + item.listings.price * item.quantity, 0); return (
+tramadol en vente
+transaction rapide et discrète
+un vendeur pour l
+une vérification a eu lieu si ce n
+usurpation d\'identité
+utilisateur identifié. Ne plante jamais l
+vente de rein
+« ${listing.title} » ne sera plus visible par les acheteurs. Cette action est définitive.
+À convenir avec le vendeur
+À négocier avec le vendeur
+À savoir
+À traiter
+Écris au moins quelques mots.
+Écris ton message ici…
+Écris ton message…
+Électronique et téléphones
+État
+écaille de tortue
+être supprimés d
+⏳ Ta demande est en cours de validation. Tu recevras une notification.
+✅ Ton compte marchand est actif.

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { usePrefs } from '../lib/prefs';
 import {
   View,
   Text,
@@ -21,6 +22,7 @@ import GradientHeader from '../components/GradientHeader';
 import MasonrySection from '../components/MasonrySection';
 
 export default function SearchScreen({ navigation }) {
+  const { formatPrice } = usePrefs();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState(null);
   const [city, setCity] = useState('');
@@ -273,7 +275,7 @@ export default function SearchScreen({ navigation }) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{item.title}</Text>
                   <Text style={styles.cardSubtitle}>
-                    {Number(item.price).toLocaleString('fr-FR')} FCFA · {item.city}
+                    {formatPrice(item.price)} · {item.city}
                   </Text>
                 </View>
               </TouchableOpacity>

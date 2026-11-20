@@ -5,6 +5,8 @@ import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { ILLEGAL_KEYWORDS } from '../lib/moderation';
+import { usePrefs } from '../lib/prefs';
+import ReportUserModal from '../components/ReportUserModal';
 import { getSellerRating, getListingRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../lib/reputation';
 
 const REPORT_CATEGORIES = [...Object.keys(ILLEGAL_KEYWORDS), 'AUTRE'];
@@ -14,6 +16,7 @@ const GALLERY_WIDTH = screenWidth - spacing.lg * 2;
 
 export default function ProductDetailScreen({ route, navigation }) {
   const { listing } = route.params;
+  const { formatPrice } = usePrefs();
   const [activeIndex, setActiveIndex] = useState(0);
   const [similar, setSimilar] = useState([]);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -24,6 +27,7 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [offerAmount, setOfferAmount] = useState('');
   const [sendingOffer, setSendingOffer] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showReportSeller, setShowReportSeller] = useState(false);
   const [reportCategory, setReportCategory] = useState(null);
   const [reportComment, setReportComment] = useState('');
   const [sendingReport, setSendingReport] = useState(false);
@@ -336,7 +340,7 @@ export default function ProductDetailScreen({ route, navigation }) {
           <Ionicons name="share-social-outline" size={20} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
-      <Text style={styles.price}>{Number(listing.price).toLocaleString('fr-FR')} FCFA</Text>
+      <Text style={styles.price}>{formatPrice(listing.price)}</Text>
 
       <View style={styles.badge}>
         <Text style={styles.badgeText}>{listing.condition}</Text>
@@ -434,6 +438,19 @@ export default function ProductDetailScreen({ route, navigation }) {
         <Text style={styles.offerLinkText}>Faire une offre à ce prix</Text>
       </TouchableOpacity>
 
+      {listing.vendeur_id ? (
+        <TouchableOpacity style={styles.offerLink} onPress={() => setShowReportSeller(true)}>
+          <Ionicons name="flag-outline" size={14} color={colors.textMuted} />
+          <Text style={[styles.offerLinkText, { color: colors.textMuted }]}>Signaler ce vendeur</Text>
+        </TouchableOpacity>
+      ) : null}
+
+      <ReportUserModal
+        visible={showReportSeller}
+        onClose={() => setShowReportSeller(false)}
+        target={{ id: listing.vendeur_id, name: seller.name }}
+      />
+
       <Modal visible={showOfferModal} transparent animationType="fade" onRequestClose={() => setShowOfferModal(false)}>
         <View style={styles.offerModalOverlay}>
           <View style={styles.offerModalCard}>
@@ -496,7 +513,7 @@ export default function ProductDetailScreen({ route, navigation }) {
                   {item.title}
                 </Text>
                 <Text style={styles.similarPrice}>
-                  {Number(item.price).toLocaleString('fr-FR')} FCFA
+                  {formatPrice(item.price)}
                 </Text>
               </TouchableOpacity>
             )}

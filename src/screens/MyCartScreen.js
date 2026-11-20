@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   headerTitle: { color: colors.white, fontSize: 18, fontWeight: '600' },
   headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 },
   empty: { alignItems: 'center', paddingVertical: spacing.xl },
-  emptyIcon: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#ECE8FB', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+  emptyIcon: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.tintPurple, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: colors.textPrimary },
   emptyText: { fontSize: 14, color: colors.textSecondary, marginTop: 4, textAlign: 'center' },
   browseButton: { marginTop: spacing.lg, backgroundColor: colors.orange, borderRadius: radius.md, paddingVertical: 12, paddingHorizontal: spacing.xl },

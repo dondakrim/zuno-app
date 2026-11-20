@@ -47,6 +47,118 @@ function getStatusLabel(status, modeLivraison) {
   return STATUS_LABELS[status] || status;
 }
 
+const STEP_INDEX = { a_traiter: 0, pris_en_charge: 1, en_cours: 2, livre: 3 };
+
+const NEXT_HINT = {
+  a_traiter: "Ta commande est enregistrée. Le vendeur va la confirmer très bientôt.",
+  pris_en_charge: "Le vendeur prépare ton article.",
+  en_cours: "Ton colis est en route. Tu seras prévenu(e) à l'arrivée.",
+  en_cours_pickup: 'Ton article est prêt : va le récupérer chez le vendeur.',
+  livre: 'Commande terminée. Pense à laisser un avis au vendeur.',
+  livre_pickup: 'Article récupéré. Pense à laisser un avis au vendeur.',
+  annulee: 'Cette commande a été annulée.',
+};
+
+function OrderTracker({ status, pickup }) {
+  if (status === 'annulee') {
+    return (
+      <View style={trackStyles.cancelled}>
+        <Ionicons name="close-circle" size={18} color={colors.danger} />
+        <Text style={trackStyles.cancelledText}>{NEXT_HINT.annulee}</Text>
+      </View>
+    );
+  }
+  const idx = STEP_INDEX[status] ?? 0;
+  const steps = [
+    { label: 'Commande\npassée', icon: 'receipt' },
+    { label: 'Préparation', icon: 'cube' },
+    { label: pickup ? 'Prêt au\nretrait' : 'En\nlivraison', icon: pickup ? 'storefront' : 'car' },
+    { label: pickup ? 'Récupéré' : 'Livré', icon: 'checkmark-done' },
+  ];
+  const hint = NEXT_HINT[(status === 'en_cours' || status === 'livre') && pickup ? status + '_pickup' : status] || '';
+  return (
+    <View style={trackStyles.wrap}>
+      <View style={trackStyles.row}>
+        {steps.map((st, i) => {
+          const done = i < idx || (idx === 3 && i === 3);
+          const current = i === idx && idx < 3;
+          return (
+            <View key={st.label} style={trackStyles.stepCol}>
+              {i > 0 ? <View style={[trackStyles.line, i <= idx && trackStyles.lineDone]} /> : null}
+              <View
+                style={[
+                  trackStyles.circle,
+                  done && trackStyles.circleDone,
+                  current && trackStyles.circleCurrent,
+                ]}
+              >
+                <Ionicons
+                  name={done ? 'checkmark' : st.icon}
+                  size={done ? 15 : 14}
+                  color={done || current ? colors.white : colors.textMuted}
+                />
+              </View>
+              <Text style={[trackStyles.label, i <= idx && trackStyles.labelActive]}>{st.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+      <View style={trackStyles.hintBox}>
+        <Ionicons name="information-circle-outline" size={15} color={colors.orange} />
+        <Text style={trackStyles.hintText}>{hint}</Text>
+      </View>
+    </View>
+  );
+}
+
+const trackStyles = StyleSheet.create({
+  wrap: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
+  row: { flexDirection: 'row' },
+  stepCol: { flex: 1, alignItems: 'center' },
+  circle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.background,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  circleDone: { backgroundColor: colors.success, borderColor: colors.success },
+  circleCurrent: { backgroundColor: colors.orange, borderColor: colors.orange },
+  line: { position: 'absolute', top: 13, left: '-50%', right: '50%', height: 3, backgroundColor: colors.border },
+  lineDone: { backgroundColor: colors.success },
+  label: { marginTop: 6, textAlign: 'center', fontSize: 10, color: colors.textMuted, fontWeight: '600' },
+  labelActive: { color: colors.textPrimary },
+  hintBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.tintOrange,
+  },
+  hintText: { flex: 1, fontSize: 12, color: colors.textPrimary, lineHeight: 17 },
+  cancelled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.md,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.tintRed,
+  },
+  cancelledText: { flex: 1, fontSize: 12, color: colors.danger, fontWeight: '600' },
+});
+
+function formatDate(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 export default function MyOrdersScreen({ navigation }) {
   const [tab, setTab] = useState('panier');
   const [loading, setLoading] = useState(true);
@@ -226,6 +338,7 @@ export default function MyOrdersScreen({ navigation }) {
     const canCancel = delivery?.statut_livraison === 'a_traiter';
     const canReport =
       !canCancel && delivery?.statut_livraison !== 'annulee' && !isDisputed;
+    const showActions = canCancel || canReport || (order.listings?.vendeur_id && delivery?.statut_livraison !== 'annulee');
 
     return (
       <View key={order.id} style={styles.card}>
@@ -246,38 +359,40 @@ export default function MyOrdersScreen({ navigation }) {
           </View>
         </View>
 
-        <View style={styles.badgeRow}>
-          {delivery && (
-            <View
-              style={[
-                styles.statusBadge,
-                delivery.statut_livraison === 'annulee' && styles.statusBadgeCancelled,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  delivery.statut_livraison === 'annulee' && styles.statusBadgeTextCancelled,
-                ]}
-              >
-                {getStatusLabel(delivery.statut_livraison, order.mode_livraison)}
-              </Text>
-            </View>
-          )}
-          {isDisputed && (
+        <Text style={styles.dateText}>Commandé le {formatDate(order.created_at)}</Text>
+
+        <OrderTracker status={delivery?.statut_livraison || 'a_traiter'} pickup={order.mode_livraison === 'pickup'} />
+
+        {isDisputed && (
+          <View style={[styles.badgeRow, { marginTop: spacing.md }]}>
             <View style={styles.disputeBadge}>
               <Ionicons name="alert-circle" size={12} color={colors.white} />
               <Text style={styles.disputeBadgeText}>Litige en cours</Text>
             </View>
-          )}
-        </View>
+          </View>
+        )}
 
-        {(canCancel || canReport) && (
+        {showActions && (
           <View style={styles.actionRow}>
             {canCancel && (
               <TouchableOpacity onPress={() => handleCancelOrder(order)} style={styles.actionButton}>
                 <Ionicons name="close-circle-outline" size={14} color={colors.danger} />
                 <Text style={styles.actionButtonText}>Annuler la commande</Text>
+              </TouchableOpacity>
+            )}
+            {order.listings?.vendeur_id && delivery?.statut_livraison !== 'annulee' && (
+              <TouchableOpacity
+                onPress={() =>
+                  navigation.navigate('Chat', {
+                    listingId: order.listing_id,
+                    listingTitle: order.listings?.title,
+                    otherUserId: order.listings.vendeur_id,
+                  })
+                }
+                style={styles.actionButton}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={14} color={colors.purple} />
+                <Text style={styles.actionButtonTextPurple}>Contacter le vendeur</Text>
               </TouchableOpacity>
             )}
             {canReport && (
@@ -290,6 +405,14 @@ export default function MyOrdersScreen({ navigation }) {
         )}
       </View>
     );
+  };
+
+  const counts = {
+    panier: cartItems.length,
+    envies: wishlist.length,
+    en_cours: processingOrders.length,
+    expedies: shippedOrders.length,
+    favoris: favorites.length,
   };
 
   return (
@@ -315,6 +438,11 @@ export default function MyOrdersScreen({ navigation }) {
               <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
                 {t.label}
               </Text>
+              {counts[t.key] > 0 ? (
+                <View style={[styles.countBadge, active && styles.countBadgeActive]}>
+                  <Text style={[styles.countText, active && styles.countTextActive]}>{counts[t.key]}</Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           );
         })}
@@ -494,14 +622,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   thumb: {
-    width: 48,
-    height: 48,
+    width: 56,
+    height: 56,
     borderRadius: radius.sm,
     backgroundColor: colors.background,
     alignItems: 'center',
@@ -530,7 +658,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm },
-  statusBadgeCancelled: { backgroundColor: '#F5E6E6' },
+  statusBadgeCancelled: { backgroundColor: colors.tintRed },
   statusBadgeTextCancelled: { color: colors.danger },
   disputeBadge: {
     flexDirection: 'row',
@@ -553,5 +681,19 @@ const styles = StyleSheet.create({
   },
   actionButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButtonText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
+  dateText: { fontSize: 11, color: colors.textMuted, marginTop: spacing.sm },
+  actionButtonTextPurple: { fontSize: 12, color: colors.purple, fontWeight: '600' },
+  countBadge: {
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    backgroundColor: colors.orange,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeActive: { backgroundColor: colors.white },
+  countText: { fontSize: 9, fontWeight: '800', color: colors.white },
+  countTextActive: { color: colors.orange },
   actionButtonTextMuted: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
 });

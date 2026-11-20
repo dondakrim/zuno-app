@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { usePrefs } from '../lib/prefs';
 import {
   View,
   Text,
@@ -79,10 +80,11 @@ function MenuRow({ icon, label, hint, onPress, last }) {
 }
 
 export default function ProfileScreen({ navigation }) {
+  const { formatPrice } = usePrefs();
   const { mode, switchMode } = useMode();
   const [tab, setTab] = useState('annonces');
   const [deviceId, setDeviceId] = useState('');
-  const [profile, setProfile] = useState({ nom: '', ville: '', photo_url: null });
+  const [profile, setProfile] = useState({ nom: '', ville: '', photo_url: null, telephone: '' });
   const [myListings, setMyListings] = useState([]);
   const [myOrders, setMyOrders] = useState([]);
   const [reviewedOrderIds, setReviewedOrderIds] = useState([]);
@@ -98,7 +100,7 @@ export default function ProfileScreen({ navigation }) {
 
     const { data: profileData } = await supabase
       .from('users')
-      .select('nom, ville, photo_url, avatar_icon, avatar_color, merchant_status')
+      .select('nom, ville, telephone, photo_url, avatar_icon, avatar_color, merchant_status')
       .eq('id', myId)
       .maybeSingle();
     if (profileData) setProfile(profileData);
@@ -224,6 +226,12 @@ export default function ProfileScreen({ navigation }) {
   );
 
   const hasName = profile.nom && profile.nom !== 'Toi (test)';
+  const hasFullName = hasName && profile.nom.trim().split(/\s+/).length >= 2;
+  const hasPhone = !!profile.telephone && !String(profile.telephone).startsWith('local-');
+  const missing = [];
+  if (!hasFullName) missing.push('ton prénom et ton nom');
+  if (!hasPhone) missing.push('ton numéro de téléphone');
+  const profileIncomplete = missing.length > 0;
   const listingsData = tab === 'annonces' ? myListings : myOrders;
 
   // Carte « marchand » : le texte dépend de l'état du compte.
@@ -268,7 +276,7 @@ export default function ProfileScreen({ navigation }) {
             )}
           </View>
         </View>
-        <Text style={styles.name}>{hasName ? profile.nom : 'Complète ton profil'}</Text>
+        <Text style={styles.name}>{hasName ? profile.nom : 'Bienvenue sur Zuno'}</Text>
         {profile.ville ? (
           <View style={styles.villeRow}>
             <Ionicons name="location-outline" size={13} color="rgba(255,255,255,0.8)" />
@@ -307,6 +315,23 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.statLabel}>Achats</Text>
         </View>
       </View>
+
+      {profileIncomplete ? (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={styles.completeCard}
+          onPress={() => navigation.navigate('EditProfile')}
+        >
+          <View style={styles.completeIcon}>
+            <Ionicons name="person-circle-outline" size={26} color={colors.orange} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.completeTitle}>Complète ton profil</Text>
+            <Text style={styles.completeSub}>Il manque {missing.join(' et ')}. Cela prend 1 minute.</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.orange} />
+        </TouchableOpacity>
+      ) : null}
 
       <TouchableOpacity activeOpacity={0.85} onPress={onMerchantPress}>
         <GradientHeader style={styles.merchantCard}>
@@ -427,7 +452,7 @@ export default function ProfileScreen({ navigation }) {
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {item.title}
               </Text>
-              <Text style={styles.cardPrice}>{Number(item.price).toLocaleString('fr-FR')} FCFA</Text>
+              <Text style={styles.cardPrice}>{formatPrice(item.price)}</Text>
             </View>
             <View style={[styles.saleChip, onSale ? styles.saleChipOn : styles.saleChipSold]}>
               <Text style={[styles.saleChipText, onSale ? styles.saleChipTextOn : styles.saleChipTextSold]}>
@@ -562,6 +587,28 @@ const shadow = {
 };
 
 const styles = StyleSheet.create({
+  completeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: colors.tintOrange,
+    borderWidth: 1,
+    borderColor: colors.orange,
+  },
+  completeIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  completeTitle: { fontSize: 14, fontWeight: '800', color: colors.textPrimary },
+  completeSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   container: { flex: 1, backgroundColor: colors.background },
 
   // ----- En-tête
@@ -675,7 +722,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#FFF1E6',
+    backgroundColor: colors.tintOrange,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -685,7 +732,7 @@ const styles = StyleSheet.create({
   // ----- Onglets
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#ECEAF3',
+    backgroundColor: colors.border,
     borderRadius: radius.pill,
     padding: 4,
     marginHorizontal: spacing.lg,
@@ -726,7 +773,7 @@ const styles = StyleSheet.create({
   cardPrice: { fontSize: 13, fontWeight: '700', color: colors.orange, marginTop: 3 },
   saleChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   saleChipOn: { backgroundColor: colors.successBg },
-  saleChipSold: { backgroundColor: '#ECEAF3' },
+  saleChipSold: { backgroundColor: colors.border },
   saleChipText: { fontSize: 11, fontWeight: '700' },
   saleChipTextOn: { color: colors.success },
   saleChipTextSold: { color: colors.textSecondary },
@@ -737,7 +784,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FFF1E6',
+    backgroundColor: colors.tintOrange,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,

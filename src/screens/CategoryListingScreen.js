@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { usePrefs } from '../lib/prefs';
 import {
   View,
   Text,
@@ -13,11 +14,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
+import ReportUserModal from '../components/ReportUserModal';
 
 export default function CategoryListingScreen({ route, navigation }) {
+  const { formatPrice } = usePrefs();
   const { category, vendeurId, title } = route.params;
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const loadListings = useCallback(async () => {
     setLoading(true);
@@ -41,8 +45,17 @@ export default function CategoryListingScreen({ route, navigation }) {
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{title || category}</Text>
-        <View style={{ width: 22 }} />
+        {vendeurId ? (
+          <TouchableOpacity onPress={() => setReportOpen(true)} hitSlop={10}>
+            <Ionicons name="flag-outline" size={20} color={colors.white} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
+        )}
       </GradientHeader>
+      {vendeurId ? (
+        <ReportUserModal visible={reportOpen} onClose={() => setReportOpen(false)} target={{ id: vendeurId, name: title }} />
+      ) : null}
 
       {loading ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
@@ -72,7 +85,7 @@ export default function CategoryListingScreen({ route, navigation }) {
               </View>
               <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
               <Text style={styles.cardPrice}>
-                {Number(item.price).toLocaleString('fr-FR')} FCFA
+                {formatPrice(item.price)}
               </Text>
               <Text style={styles.cardCity} numberOfLines={1}>{item.city}</Text>
             </TouchableOpacity>

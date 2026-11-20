@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { usePrefs } from '../lib/prefs';
 import {
   View,
   Text,
@@ -20,6 +21,7 @@ import MasonrySection from '../components/MasonrySection';
 import AdCarousel from '../components/AdCarousel';
 
 export default function TrendingScreen({ navigation }) {
+  const { formatPrice } = usePrefs();
   const [listings, setListings] = useState([]);
   const [forYou, setForYou] = useState([]);
   const [ads, setAds] = useState([]);
@@ -128,7 +130,7 @@ export default function TrendingScreen({ navigation }) {
                     )}
                   </View>
                   <Text style={styles.cardTitle} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.cardPrice}>{Number(item.price).toLocaleString('fr-FR')} FCFA</Text>
+                  <Text style={styles.cardPrice}>{formatPrice(item.price)}</Text>
                   <Text style={styles.cardCity} numberOfLines={1}>{item.city}</Text>
                 </TouchableOpacity>
               ))}

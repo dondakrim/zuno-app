@@ -23,7 +23,8 @@ export type NitaResult = {
 
 export function nitaConfig(): NitaConfig {
   const get = (name: string) => {
-    const value = Deno.env.get(name);
+    // trim() retire les espaces / retours à la ligne cachés laissés par un copier-coller.
+    const value = Deno.env.get(name)?.trim();
     if (!value) throw new Error(`Secret manquant : ${name}`);
     return value;
   };
@@ -106,7 +107,11 @@ async function getToken(cfg: NitaConfig, forceRefresh = false): Promise<string> 
   });
   const token = result.data?.token;
   if (!token) {
-    throw new Error(`Authentification NITA refusée (HTTP ${result.httpStatus}) : ${result.raw.slice(0, 300)}`);
+    // On indique seulement les longueurs (jamais les valeurs) pour repérer une saisie tronquée.
+    throw new Error(
+      `Authentification NITA refusée (HTTP ${result.httpStatus}) : ${result.raw.slice(0, 300)}` +
+        ` [login : ${cfg.login.length} car., mot de passe : ${cfg.password.length} car.]`,
+    );
   }
   cachedToken = { value: token, expiresAt: Date.now() + 10 * 60 * 1000 };
   return token;

@@ -1,3 +1,13 @@
+import CouponsScreen from '../screens/CouponsScreen';
+import BlogScreen from '../screens/BlogScreen';
+import BlogPostScreen from '../screens/BlogPostScreen';
+import SuggestionsScreen from '../screens/SuggestionsScreen';
+import ReportUserScreen from '../screens/ReportUserScreen';
+import InfosScreen from '../screens/InfosScreen';
+import FaqScreen from '../screens/FaqScreen';
+import LegalScreen from '../screens/LegalScreen';
+import SupportScreen from '../screens/SupportScreen';
+import FavoritesScreen from '../screens/FavoritesScreen';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -145,6 +155,16 @@ function MoiStackNavigator() {
       <MoiStack.Screen name="BecomeMerchant" component={BecomeMerchantScreen} />
             <MoiStack.Screen name="Account" component={AccountScreen} />
       <MoiStack.Screen name="Settings" component={SettingsScreen} />
+      <MoiStack.Screen name="Faq" component={FaqScreen} />
+<MoiStack.Screen name="Legal" component={LegalScreen} />
+<MoiStack.Screen name="Support" component={SupportScreen} />
+<MoiStack.Screen name="Favorites" component={FavoritesScreen} />
+<MoiStack.Screen name="Suggestions" component={SuggestionsScreen} />
+<MoiStack.Screen name="ReportUser" component={ReportUserScreen} />
+<MoiStack.Screen name="Infos" component={InfosScreen} />
+<MoiStack.Screen name="Coupons" component={CouponsScreen} />
+<MoiStack.Screen name="Blog" component={BlogScreen} />
+<MoiStack.Screen name="BlogPost" component={BlogPostScreen} />
       <MoiStack.Screen name="Notifications" component={NotificationsScreen} />
       <MoiStack.Screen name="Chat" component={ChatScreen} />
     </MoiStack.Navigator>
@@ -205,13 +225,12 @@ function MerchantOrdersStackNavigator() {
       <MerchantOrdersStack.Screen name="ProductDetail" component={ProductDetailScreen} />
       <MerchantOrdersStack.Screen name="AccountSetup" component={AccountSetupScreen} />
       <MerchantOrdersStack.Screen name="Chat" component={ChatScreen} />
-            <MerchantMoiStack.Screen name="Account" component={AccountScreen} />
-      <MerchantMoiStack.Screen name="Settings" component={SettingsScreen} />
-      <MerchantMoiStack.Screen name="Notifications" component={NotificationsScreen} />
-    </MerchantOrdersStack.Navigator>
+       <MerchantOrdersStack.Screen name="Account" component={AccountScreen} />
+      <MerchantOrdersStack.Screen name="Settings" component={SettingsScreen} />
+      <MerchantOrdersStack.Screen name="Notifications" component={NotificationsScreen} />
+          </MerchantOrdersStack.Navigator>
   );
 }
-
 // Le profil est partagé entre les deux modes — seul l'endroit d'où on y
 // accède change.
 function MerchantMoiStackNavigator() {
@@ -226,6 +245,19 @@ function MerchantMoiStackNavigator() {
       <MerchantMoiStack.Screen name="Cart" component={CartScreen} />
       <MerchantMoiStack.Screen name="Checkout" component={CheckoutScreen} />
       <MerchantMoiStack.Screen name="Chat" component={ChatScreen} />
+            <MerchantMoiStack.Screen name="Account" component={AccountScreen} />
+      <MerchantMoiStack.Screen name="Settings" component={SettingsScreen} />
+      <MerchantMoiStack.Screen name="Notifications" component={NotificationsScreen} />
+      <MerchantMoiStack.Screen name="Faq" component={FaqScreen} />
+      <MerchantMoiStack.Screen name="Legal" component={LegalScreen} />
+      <MerchantMoiStack.Screen name="Support" component={SupportScreen} />
+      <MerchantMoiStack.Screen name="Favorites" component={FavoritesScreen} />
+      <MerchantMoiStack.Screen name="Suggestions" component={SuggestionsScreen} />
+<MerchantMoiStack.Screen name="ReportUser" component={ReportUserScreen} />
+<MerchantMoiStack.Screen name="Infos" component={InfosScreen} />
+<MerchantMoiStack.Screen name="Coupons" component={CouponsScreen} />
+<MerchantMoiStack.Screen name="Blog" component={BlogScreen} />
+<MerchantMoiStack.Screen name="BlogPost" component={BlogPostScreen} />
     </MerchantMoiStack.Navigator>
   );
 }

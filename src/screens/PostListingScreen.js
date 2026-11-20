@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Alert,
   Image,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,11 +22,62 @@ import { categories } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { analyzeListing } from '../lib/moderation';
+import { checkMessage } from '../lib/chatGuard';
+import GradientHeader from '../components/GradientHeader';
 
 const conditions = ['Neuf', 'Bon état', 'Usé'];
-const delais = ['1-2 jours', '3-5 jours', '1 semaine', 'Plus d\'une semaine'];
+const delais = ['1-2 jours', '3-5 jours', '1 semaine', "Plus d'une semaine"];
 const MIN_PHOTOS = 4;
 const MAX_PHOTOS = 8;
+const TITLE_MAX = 80;
+const DESC_MAX = 1000;
+
+const digits = (s) => String(s || '').replace(/\D/g, '');
+const money = (s) => (digits(s) ? Number(digits(s)).toLocaleString('fr-FR') : '');
+
+function Card({ icon, title, subtitle, children }) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHead}>
+        <View style={styles.cardIcon}>
+          <Ionicons name={icon} size={16} color={colors.purple} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          {subtitle ? <Text style={styles.cardSub}>{subtitle}</Text> : null}
+        </View>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function Err({ text }) {
+  if (!text) return null;
+  return (
+    <View style={styles.errRow}>
+      <Ionicons name="alert-circle" size={13} color={colors.danger} />
+      <Text style={styles.errText}>{text}</Text>
+    </View>
+  );
+}
+
+function Chips({ options, value, onChange }) {
+  return (
+    <View style={styles.pillRow}>
+      {options.map((c) => (
+        <TouchableOpacity
+          key={c}
+          onPress={() => onChange(c)}
+          style={[styles.pill, value === c && styles.pillActive]}
+          activeOpacity={0.8}
+        >
+          <Text style={[styles.pillText, value === c && styles.pillTextActive]}>{c}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
 
 export default function PostListingScreen({ navigation }) {
   const [title, setTitle] = useState('');
@@ -40,6 +94,25 @@ export default function PostListingScreen({ navigation }) {
   const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
+  const [tried, setTried] = useState(false);
+
+  const errors = useMemo(() => {
+    const e = {};
+    if (title.trim().length < 3) e.title = 'Donne un titre à ton article (3 lettres minimum).';
+    else if (checkMessage(title)) e.title = 'Pas de numéro, email ou lien dans le titre.';
+    if (checkMessage(description)) {
+      e.description = "Pas de numéro, email, lien ni WhatsApp dans la description : les acheteurs te contactent via Zuno.";
+    }
+    if (!digits(price) || Number(digits(price)) <= 0) e.price = 'Indique un prix en FCFA.';
+    if (showPromo && promoPrice.trim() && Number(digits(promoPrice)) >= Number(digits(price))) {
+      e.promo = 'Le prix promo doit être inférieur au prix normal.';
+    }
+    if (city.trim().length < 2) e.city = 'Indique ta ville ou ton quartier.';
+    return e;
+  }, [title, description, price, promoPrice, showPromo, city]);
+
+  const missingPhotos = Math.max(0, MIN_PHOTOS - photos.length);
+  const show = (k) => (tried || (k === 'description' && description.length > 0) ? errors[k] : undefined);
 
   const handlePickImages = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -70,6 +143,10 @@ export default function PostListingScreen({ navigation }) {
     }
   };
 
+  const makeMain = (uri) => {
+    setPhotos((prev) => [uri, ...prev.filter((p) => p !== uri)]);
+  };
+
   const removePhoto = (uri) => {
     setPhotos((prev) => prev.filter((p) => p !== uri));
   };
@@ -96,8 +173,9 @@ export default function PostListingScreen({ navigation }) {
     const ok = await ensureAccountComplete(navigation, 'publier une annonce');
     if (!ok) return;
 
-    if (!title.trim() || !price.trim() || !city.trim()) {
-      Alert.alert('Champs manquants', 'Titre, prix et ville sont obligatoires.');
+    setTried(true);
+    if (Object.keys(errors).length > 0) {
+      Alert.alert('Il manque des informations', 'Complète les champs marqués en rouge.');
       return;
     }
 
@@ -106,11 +184,6 @@ export default function PostListingScreen({ navigation }) {
         'Plus de photos nécessaires',
         `Ajoute au moins ${MIN_PHOTOS} photos pour bien présenter ton article (${photos.length}/${MIN_PHOTOS} pour l'instant).`
       );
-      return;
-    }
-
-    if (showPromo && promoPrice.trim() && Number(promoPrice) >= Number(price)) {
-      Alert.alert('Prix promo invalide', 'Le prix promo doit être inférieur au prix normal.');
       return;
     }
 
@@ -146,7 +219,7 @@ export default function PostListingScreen({ navigation }) {
       title: title.trim(),
       description: description.trim(),
       category,
-      price: Number(price),
+      price: Number(digits(price)),
     });
 
     const moderationStatus =
@@ -163,14 +236,14 @@ export default function PostListingScreen({ navigation }) {
         vendeur_id: myId,
         title: title.trim(),
         description: description.trim(),
-        price: Number(price),
+        price: Number(digits(price)),
         city: city.trim(),
         category,
         condition,
         delai_livraison: delaiLivraison,
         photo_url: photoUrls[0],
         photos: photoUrls,
-        promo_price: showPromo && promoPrice.trim() ? Number(promoPrice) : null,
+        promo_price: showPromo && promoPrice.trim() ? Number(digits(promoPrice)) : null,
         seller_certified: true,
         status: 'disponible',
         moderation_status: moderationStatus,
@@ -241,204 +314,319 @@ export default function PostListingScreen({ navigation }) {
     setShowPromo(false);
     setPromoPrice('');
     setCertified(false);
+    setTried(false);
   };
 
+  const canPublish = photos.length >= MIN_PHOTOS && certified;
+  const steps = [
+    { ok: photos.length >= MIN_PHOTOS, label: `${Math.min(photos.length, MIN_PHOTOS)}/${MIN_PHOTOS} photos` },
+    { ok: title.trim().length >= 3 && !errors.title, label: 'Titre' },
+    { ok: !!digits(price) && !errors.price, label: 'Prix' },
+    { ok: city.trim().length >= 2, label: 'Ville' },
+    { ok: certified, label: 'Certification' },
+  ];
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
-      <Text style={styles.heading}>Nouvelle annonce</Text>
-
-      <View style={styles.photoHeaderRow}>
-        <Text style={styles.label}>
-          Photos ({photos.length}/{MIN_PHOTOS} minimum)
-        </Text>
-      </View>
-
-      <View style={styles.photoGrid}>
-        {photos.map((uri) => (
-          <View key={uri} style={styles.photoTile}>
-            <Image source={{ uri }} style={styles.photoImage} />
-            <TouchableOpacity style={styles.removeBadge} onPress={() => removePhoto(uri)}>
-              <Ionicons name="close" size={14} color={colors.white} />
-            </TouchableOpacity>
-          </View>
-        ))}
-        {photos.length < MAX_PHOTOS && (
-          <TouchableOpacity style={styles.addTile} onPress={handlePickImages}>
-            <Ionicons name="camera-outline" size={22} color={colors.textMuted} />
-            <Text style={styles.addTileText}>Ajouter</Text>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <GradientHeader style={styles.header}>
+        {navigation.canGoBack() ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={10}>
+            <Ionicons name="arrow-back" size={22} color={colors.white} />
           </TouchableOpacity>
+        ) : (
+          <View style={{ width: 22 }} />
         )}
-      </View>
-      {photos.length < MIN_PHOTOS && (
-        <Text style={styles.photoHint}>
-          Encore {MIN_PHOTOS - photos.length} photo{MIN_PHOTOS - photos.length > 1 ? 's' : ''} pour
-          pouvoir publier — plusieurs angles rassurent les acheteurs.
-        </Text>
-      )}
+        <Text style={styles.headerTitle}>Nouvelle annonce</Text>
+        <View style={{ width: 22 }} />
+      </GradientHeader>
 
-      <TextInput
-        placeholder="Titre de l'article"
-        placeholderTextColor={colors.textMuted}
-        value={title}
-        onChangeText={setTitle}
-        style={[styles.input, { marginTop: spacing.md }]}
-      />
-
-      <Text style={styles.label}>Présentation de l'article</Text>
-      <TextInput
-        placeholder="Décris l'article : état détaillé, raison de la vente, ce qui est inclus…"
-        placeholderTextColor={colors.textMuted}
-        value={description}
-        onChangeText={setDescription}
-        style={styles.textarea}
-        multiline
-        numberOfLines={4}
-      />
-
-      <TextInput
-        placeholder="Prix en FCFA"
-        placeholderTextColor={colors.textMuted}
-        value={price}
-        onChangeText={setPrice}
-        keyboardType="numeric"
-        style={styles.input}
-      />
-
-      <TouchableOpacity style={styles.promoToggle} onPress={() => setShowPromo((v) => !v)}>
-        <Ionicons
-          name={showPromo ? 'checkbox' : 'square-outline'}
-          size={18}
-          color={showPromo ? colors.orange : colors.textMuted}
-        />
-        <Text style={styles.promoToggleText}>Ajouter un prix promo (facultatif)</Text>
-      </TouchableOpacity>
-      {showPromo && (
-        <TextInput
-          placeholder="Prix promo en FCFA (inférieur au prix normal)"
-          placeholderTextColor={colors.textMuted}
-          value={promoPrice}
-          onChangeText={setPromoPrice}
-          keyboardType="numeric"
-          style={styles.input}
-        />
-      )}
-
-      <Text style={styles.label}>Catégorie</Text>
-      <View style={styles.pillRow}>
-        {categories.map((c) => (
-          <TouchableOpacity
-            key={c}
-            onPress={() => setCategory(c)}
-            style={[styles.pill, category === c && styles.pillActive]}
-          >
-            <Text style={[styles.pillText, category === c && styles.pillTextActive]}>{c}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {category === 'Véhicules et pièces' ? (
-        <View style={styles.heavyNotice}>
-          <Ionicons name="information-circle-outline" size={16} color={colors.purple} />
-          <Text style={styles.heavyNoticeText}>
-            La livraison de cet article sera à négocier directement avec l'acheteur après l'achat
-            (au lieu des options de livraison habituelles).
-          </Text>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        {/* Étapes */}
+        <View style={styles.stepsRow}>
+          {steps.map((s) => (
+            <View key={s.label} style={[styles.stepChip, s.ok && styles.stepChipOk]}>
+              <Ionicons
+                name={s.ok ? 'checkmark-circle' : 'ellipse-outline'}
+                size={13}
+                color={s.ok ? colors.success : colors.textMuted}
+              />
+              <Text style={[styles.stepText, s.ok && styles.stepTextOk]}>{s.label}</Text>
+            </View>
+          ))}
         </View>
-      ) : (
-        <TouchableOpacity style={styles.promoToggle} onPress={() => setIsHeavyManual((v) => !v)}>
-          <Ionicons
-            name={isHeavyManual ? 'checkbox' : 'square-outline'}
-            size={18}
-            color={isHeavyManual ? colors.orange : colors.textMuted}
+
+        <Card
+          icon="images-outline"
+          title="Photos"
+          subtitle={`Au moins ${MIN_PHOTOS}, jusqu'à ${MAX_PHOTOS}. La première est la photo principale.`}
+        >
+          <View style={styles.photoGrid}>
+            {photos.map((uri, i) => (
+              <TouchableOpacity key={uri} style={styles.photoTile} onPress={() => makeMain(uri)} activeOpacity={0.9}>
+                <Image source={{ uri }} style={styles.photoImage} />
+                {i === 0 ? (
+                  <View style={styles.mainBadge}>
+                    <Text style={styles.mainBadgeText}>Principale</Text>
+                  </View>
+                ) : null}
+                <TouchableOpacity style={styles.removeBadge} onPress={() => removePhoto(uri)} hitSlop={6}>
+                  <Ionicons name="close" size={14} color={colors.white} />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+            {photos.length < MAX_PHOTOS && (
+              <TouchableOpacity style={styles.addTile} onPress={handlePickImages}>
+                <Ionicons name="camera-outline" size={22} color={colors.purple} />
+                <Text style={styles.addTileText}>Ajouter</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {missingPhotos > 0 ? (
+            <Text style={[styles.hint, tried && { color: colors.danger }]}>
+              Encore {missingPhotos} photo{missingPhotos > 1 ? 's' : ''} pour pouvoir publier — plusieurs angles
+              rassurent les acheteurs.
+            </Text>
+          ) : (
+            <Text style={[styles.hint, { color: colors.success }]}>Photos OK. Touche une photo pour la mettre en principale.</Text>
+          )}
+        </Card>
+
+        <Card icon="create-outline" title="L'article">
+          <Text style={styles.label}>Titre <Text style={styles.star}>*</Text></Text>
+          <TextInput
+            placeholder="Ex : iPhone 12 128 Go noir"
+            placeholderTextColor={colors.textMuted}
+            value={title}
+            onChangeText={setTitle}
+            maxLength={TITLE_MAX}
+            style={[styles.input, show('title') && styles.inputError]}
           />
-          <Text style={styles.promoToggleText}>
-            Article lourd ou encombrant (+50kg) — livraison à négocier avec l'acheteur
+          <View style={styles.counterRow}>
+            <Err text={show('title')} />
+            <Text style={styles.counter}>{title.length}/{TITLE_MAX}</Text>
+          </View>
+
+          <Text style={styles.label}>Présentation</Text>
+          <TextInput
+            placeholder="État détaillé, raison de la vente, ce qui est inclus…"
+            placeholderTextColor={colors.textMuted}
+            value={description}
+            onChangeText={setDescription}
+            maxLength={DESC_MAX}
+            style={[styles.textarea, show('description') && styles.inputError]}
+            multiline
+            numberOfLines={4}
+          />
+          <View style={styles.counterRow}>
+            <Err text={show('description')} />
+            <Text style={styles.counter}>{description.length}/{DESC_MAX}</Text>
+          </View>
+        </Card>
+
+        <Card icon="cash-outline" title="Prix">
+          <Text style={styles.label}>Prix en FCFA <Text style={styles.star}>*</Text></Text>
+          <View style={[styles.priceBox, show('price') && styles.inputError]}>
+            <TextInput
+              placeholder="0"
+              placeholderTextColor={colors.textMuted}
+              value={money(price)}
+              onChangeText={(t) => setPrice(digits(t))}
+              keyboardType="numeric"
+              style={styles.priceInput}
+            />
+            <Text style={styles.priceUnit}>FCFA</Text>
+          </View>
+          <Err text={show('price')} />
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Ajouter un prix promo</Text>
+              <Text style={styles.hint}>Facultatif : attire plus d'acheteurs.</Text>
+            </View>
+            <Switch
+              value={showPromo}
+              onValueChange={setShowPromo}
+              trackColor={{ false: colors.border, true: colors.orange }}
+              thumbColor={colors.white}
+            />
+          </View>
+          {showPromo ? (
+            <>
+              <View style={[styles.priceBox, errors.promo && styles.inputError]}>
+                <TextInput
+                  placeholder="Prix promo"
+                  placeholderTextColor={colors.textMuted}
+                  value={money(promoPrice)}
+                  onChangeText={(t) => setPromoPrice(digits(t))}
+                  keyboardType="numeric"
+                  style={styles.priceInput}
+                />
+                <Text style={styles.priceUnit}>FCFA</Text>
+              </View>
+              <Err text={errors.promo} />
+            </>
+          ) : null}
+        </Card>
+
+        <Card icon="pricetags-outline" title="Détails">
+          <Text style={styles.label}>Catégorie</Text>
+          <Chips options={categories} value={category} onChange={setCategory} />
+
+          <Text style={styles.label}>État</Text>
+          <Chips options={conditions} value={condition} onChange={setCondition} />
+
+          <Text style={styles.label}>Ville, quartier <Text style={styles.star}>*</Text></Text>
+          <TextInput
+            placeholder="Ex : Plateau, Niamey"
+            placeholderTextColor={colors.textMuted}
+            value={city}
+            onChangeText={setCity}
+            style={[styles.input, show('city') && styles.inputError]}
+          />
+          <Err text={show('city')} />
+        </Card>
+
+        <Card icon="car-outline" title="Livraison">
+          {category === 'Véhicules et pièces' ? (
+            <View style={styles.heavyNotice}>
+              <Ionicons name="information-circle-outline" size={16} color={colors.purple} />
+              <Text style={styles.heavyNoticeText}>
+                La livraison de cet article sera à négocier directement avec l'acheteur après l'achat
+                (au lieu des options de livraison habituelles).
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchTitle}>Article lourd ou encombrant (+50 kg)</Text>
+                <Text style={styles.hint}>Livraison à négocier avec l'acheteur.</Text>
+              </View>
+              <Switch
+                value={isHeavyManual}
+                onValueChange={setIsHeavyManual}
+                trackColor={{ false: colors.border, true: colors.orange }}
+                thumbColor={colors.white}
+              />
+            </View>
+          )}
+          <Text style={styles.label}>Délai de livraison estimé</Text>
+          <Chips options={delais} value={delaiLivraison} onChange={setDelaiLivraison} />
+        </Card>
+
+        <TouchableOpacity
+          style={[styles.certifyRow, tried && !certified && styles.certifyError]}
+          onPress={() => setCertified((v) => !v)}
+          activeOpacity={0.85}
+        >
+          <Ionicons
+            name={certified ? 'checkbox' : 'square-outline'}
+            size={22}
+            color={certified ? colors.orange : colors.textMuted}
+          />
+          <Text style={styles.certifyText}>
+            Je certifie être seul responsable de l'état et de la provenance de cet article, et
+            confirme qu'il ne s'agit pas d'un article interdit sur Zuno.
           </Text>
         </TouchableOpacity>
-      )}
+        <View style={{ height: 90 }} />
+      </ScrollView>
 
-      <Text style={styles.label}>État</Text>
-      <View style={styles.pillRow}>
-        {conditions.map((c) => (
-          <TouchableOpacity
-            key={c}
-            onPress={() => setCondition(c)}
-            style={[styles.pill, condition === c && styles.pillActive]}
-          >
-            <Text style={[styles.pillText, condition === c && styles.pillTextActive]}>{c}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={[styles.publishButton, !canPublish && styles.publishButtonDisabled]}
+          onPress={handlePublish}
+          disabled={saving}
+          activeOpacity={0.85}
+        >
+          {saving ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <ActivityIndicator color={colors.white} size="small" />
+              <Text style={styles.publishButtonText}>{uploadProgress || 'Publication…'}</Text>
+            </View>
+          ) : (
+            <>
+              <Ionicons name="rocket-outline" size={18} color={colors.white} />
+              <Text style={styles.publishButtonText}>Publier l'annonce</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </View>
-
-      <TextInput
-        placeholder="Ville, quartier"
-        placeholderTextColor={colors.textMuted}
-        value={city}
-        onChangeText={setCity}
-        style={[styles.input, { marginTop: spacing.sm }]}
-      />
-
-      <Text style={styles.label}>Délai de livraison estimé</Text>
-      <View style={styles.pillRow}>
-        {delais.map((d) => (
-          <TouchableOpacity
-            key={d}
-            onPress={() => setDelaiLivraison(d)}
-            style={[styles.pill, delaiLivraison === d && styles.pillActive]}
-          >
-            <Text style={[styles.pillText, delaiLivraison === d && styles.pillTextActive]}>{d}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.certifyRow} onPress={() => setCertified((v) => !v)}>
-        <Ionicons
-          name={certified ? 'checkbox' : 'square-outline'}
-          size={20}
-          color={certified ? colors.orange : colors.textMuted}
-        />
-        <Text style={styles.certifyText}>
-          Je certifie être seul responsable de l'état et de la provenance de cet article, et
-          confirme qu'il ne s'agit pas d'un article interdit sur Zuno.
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={[styles.publishButton, photos.length < MIN_PHOTOS && styles.publishButtonDisabled]}
-        onPress={handlePublish}
-        disabled={saving}
-      >
-        {saving ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <ActivityIndicator color={colors.white} size="small" />
-            <Text style={styles.publishButtonText}>{uploadProgress || 'Publication…'}</Text>
-          </View>
-        ) : (
-          <Text style={styles.publishButtonText}>Publier l'annonce</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 18, fontWeight: '600', marginBottom: spacing.md, color: colors.textPrimary },
-  photoHeaderRow: { marginBottom: spacing.xs },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  photoTile: {
-    width: '23%',
-    aspectRatio: 1,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    position: 'relative',
+  header: {
+    paddingTop: 50,
+    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
+  headerTitle: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  body: { padding: spacing.lg },
+
+  stepsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: spacing.md },
+  stepChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepChipOk: { backgroundColor: colors.successBg, borderColor: colors.successBg },
+  stepText: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  stepTextOk: { color: colors.success },
+
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  cardHead: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
+  cardIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.tintPurple,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  cardSub: { fontSize: 11, color: colors.textMuted, marginTop: 1 },
+
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  photoTile: { width: '23%', aspectRatio: 1, borderRadius: radius.sm, overflow: 'hidden', position: 'relative' },
   photoImage: { width: '100%', height: '100%' },
+  mainBadge: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 2,
+    alignItems: 'center',
+  },
+  mainBadgeText: { color: colors.white, fontSize: 9, fontWeight: '700' },
   removeBadge: {
     position: 'absolute',
     top: 4,
     right: 4,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: radius.pill,
     width: 20,
     height: 20,
@@ -449,62 +637,83 @@ const styles = StyleSheet.create({
     width: '23%',
     aspectRatio: 1,
     borderRadius: radius.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderColor: colors.border,
+    borderColor: colors.purple,
+    backgroundColor: colors.tintPurple,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addTileText: { color: colors.textMuted, fontSize: 10, marginTop: 2 },
-  photoHint: { color: colors.textMuted, fontSize: 12, marginTop: spacing.sm },
+  addTileText: { color: colors.purple, fontSize: 10, fontWeight: '700', marginTop: 2 },
+  hint: { color: colors.textMuted, fontSize: 12, marginTop: spacing.sm },
+
+  label: { fontSize: 13, fontWeight: '600', color: colors.textPrimary, marginTop: spacing.sm, marginBottom: 6 },
+  star: { color: colors.danger, fontWeight: '800' },
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    height: 44,
+    height: 46,
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    color: colors.textPrimary,
+    fontSize: 14,
   },
   textarea: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
-    minHeight: 90,
+    minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: spacing.sm,
+    color: colors.textPrimary,
+    fontSize: 14,
   },
-  label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginTop: spacing.sm, marginBottom: spacing.xs },
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+  inputError: { borderColor: colors.danger },
+  counterRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 4 },
+  counter: { fontSize: 11, color: colors.textMuted, marginLeft: 'auto' },
+  errRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4, flex: 1, marginTop: 4 },
+  errText: { flex: 1, fontSize: 12, color: colors.danger },
+
+  priceBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    marginTop: 2,
+  },
+  priceInput: { flex: 1, height: 52, fontSize: 20, fontWeight: '800', color: colors.textPrimary },
+  priceUnit: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.sm },
+  switchTitle: { fontSize: 13, fontWeight: '600', color: colors.textPrimary },
+
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs },
   pill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
   },
   pillActive: { backgroundColor: colors.orange, borderColor: colors.orange },
-  pillText: { fontSize: 12, color: colors.textPrimary },
-  pillTextActive: { color: colors.white, fontWeight: '600' },
-  publishButton: {
-    backgroundColor: colors.orange,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  publishButtonDisabled: { opacity: 0.5 },
-  publishButtonText: { color: colors.white, fontWeight: '600' },
-  promoToggle: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  pillText: { fontSize: 12.5, color: colors.textPrimary },
+  pillTextActive: { color: colors.white, fontWeight: '700' },
+
   heavyNotice: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, backgroundColor: colors.surface,
-    borderRadius: radius.md, padding: spacing.sm, marginBottom: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    backgroundColor: colors.tintPurple,
+    borderRadius: radius.md,
+    padding: spacing.sm,
   },
-  heavyNoticeText: { flex: 1, fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
-  promoToggleText: { fontSize: 13, color: colors.textSecondary },
+  heavyNoticeText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 17 },
+
   certifyRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -512,9 +721,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
-    marginTop: spacing.md,
   },
+  certifyError: { borderColor: colors.danger },
   certifyText: { flex: 1, fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
+
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: spacing.md,
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  publishButton: {
+    backgroundColor: colors.orange,
+    borderRadius: radius.md,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  publishButtonDisabled: { opacity: 0.55 },
+  publishButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
 });
