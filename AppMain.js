@@ -13,8 +13,13 @@ import { colors, spacing, theme } from './src/theme/colors';
 import { supabase } from './src/lib/supabase';
 import { getDeviceUserId } from './src/lib/deviceUser';
 import { registerForPush } from './src/lib/push';
+import { installAutoTranslate } from './src/lib/autoTranslate';
+import { usePrefs } from './src/lib/prefs';
+
+installAutoTranslate();
 
 export default function AppMain() {
+  const { lang } = usePrefs();
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [banInfo, setBanInfo] = useState({ checked: false, banned: false, reason: '' });
@@ -94,7 +99,7 @@ export default function AppMain() {
   }
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider key={lang}>
       <AuthProvider>
         <ModeProvider>
           <StatusBar style="light" />
