@@ -340,6 +340,7 @@
       <button type="button" class="tab-btn" data-tab="infos"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>Infos aux utilisateurs<span class="badge" id="badge-infos"></span></button>
       <button type="button" class="tab-btn" data-tab="kyc"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Identification KYC</button>
       <button type="button" class="tab-btn" data-tab="connexions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.5-7.1L21 3v5h-5"/><path d="M8 12l3 3 5-6"/></svg>Connexions WhatsApp</button>
+      <button type="button" class="tab-btn" data-tab="legal"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>Textes légaux</button>
       <button type="button" class="tab-btn" data-tab="identites"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Vérification d'identité<span class="badge" id="badge-identites"></span></button>
       <div class="nav-label" id="nav-admin-label" style="display:none">Administration</div>
       <button type="button" class="tab-btn" data-tab="equipe" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Équipe</button>
@@ -365,6 +366,7 @@
 
     <div class="panel" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-legal"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-kyc"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-connexions"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
@@ -2369,7 +2371,7 @@ async function processReversement(id, status) {
 const PAGE_INFO = {
   overview: ["Vue d'ensemble", ''],
   commandes: ['Commandes', 'Suis chaque commande du paiement à la livraison.'],
-  litiges: ['Litiges', 'Signalements ouverts par les acheteurs.'],
+  litiges: ['Litiges', 'Problèmes signalés par les acheteurs (dans les 24 h après livraison ou retrait).'],
   demandes: ['Comptes marchands', "Demandes d'ouverture, et création d'un compte à la demande d'un utilisateur."],
   equipe: ['Équipe', "Les profils du back-office et ce que chacun peut gérer."],
   paiements: ['Paiements', "Tout l'argent qui entre et qui sort, réseau par réseau."],
@@ -2386,9 +2388,10 @@ const PAGE_INFO = {
   comptes: ['Comptes', 'Recherche et détails de chaque compte.'],
   blog: ['Blog', 'Articles visibles dans Compte → Blog.'],
   suggestions: ['Suggestions', 'Idées et remarques envoyées par les utilisateurs.'],
-  signalements: ['Signalements', 'Utilisateurs signalés depuis l’application.'],
+  signalements: ['Signalements', 'Utilisateurs signalés depuis l’application. À traiter sous 24 h.'],
   infos: ['Infos aux utilisateurs', 'Alertes et nouveautés affichées dans Compte → Infos.'],
   identites: ["Vérification d'identité", "Pièces d'identité en attente de validation."],
+  legal: ['Textes légaux', 'Version et date de mise à jour de chaque texte : CGU, confidentialité, retours…'],
   kyc: ['Identification KYC', "Dossiers d'identité, création de comptes clients et validation."],
   connexions: ['Connexions WhatsApp', 'Santé des codes de connexion et comptes vérifiés.'],
 };
@@ -2425,6 +2428,7 @@ function showTab(name) {
   if (name === 'infos') loadInfos();
   if (name === 'blog') loadBlog();
   if (name === 'kyc') loadKyc();
+  if (name === 'legal') loadLegal();
   if (name === 'connexions') loadConnexions();
 }
 
@@ -3045,7 +3049,7 @@ const TEAM_SECTIONS = [
   ['reversements', 'Versements marchands'], ['paniers', 'Paniers'], ['moderation', 'Modération'], ['articles', 'Articles'],
   ['publicites', 'Publicités'], ['boosts', 'Mises en avant'], ['promos', 'Promos'], ['campagnes', 'Campagnes'],
   ['utilisateurs', 'Utilisateurs'], ['marchands', 'Marchands'], ['demandes', 'Comptes marchands'],
-  ['comptes', 'Comptes'], ['identites', "Vérification d'identité"], ['kyc', 'Identification KYC'], ['connexions', 'Connexions WhatsApp'],
+  ['comptes', 'Comptes'], ['identites', "Vérification d'identité"], ['kyc', 'Identification KYC'], ['legal', 'Textes légaux'], ['connexions', 'Connexions WhatsApp'],
   ['blog', 'Blog'], ['suggestions', 'Suggestions'], ['signalements', 'Signalements'], ['infos', 'Infos aux utilisateurs'],
 ];
 const TEAM_PRESETS = {
@@ -3777,6 +3781,51 @@ async function kycFn(name, body) {
   }
   if (data && data.error) throw new Error(data.error);
   return data;
+}
+
+
+/* ---------- Textes légaux : versions ---------- */
+const LEGAL_KINDS = {
+  cgu: 'Conditions générales (CGU)', confidentialite: 'Politique de confidentialité',
+  retour: 'Politique de retour', remboursement: 'Politique de remboursement', annulation: "Politique d'annulation",
+};
+async function loadLegal() {
+  const panel = document.getElementById('panel-legal');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  let rows;
+  try { rows = (await kycFn('admin-legal', { action: 'list' })).rows || []; }
+  catch (e) { panel.innerHTML = '<div class="empty">Erreur : ' + esc(e.message) + '</div>'; return; }
+  const day = (iso) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+  const cards = Object.keys(LEGAL_KINDS).map((k) => {
+    const hist = rows.filter((r) => r.kind === k);
+    const cur = hist[0];
+    return '<div class="card"><p class="card-title">' + LEGAL_KINDS[k] + '</p>'
+      + (cur ? '<p class="card-sub">Version <b>' + esc(cur.version) + '</b> · mise à jour le ' + day(cur.published_at) + '</p>'
+        + '<p class="card-meta">' + esc(cur.note || '') + '</p>' : '<p class="card-sub">Aucune version enregistrée.</p>')
+      + '<div class="actions"><button class="btn" onclick="legalForm(\'' + k + '\')">Nouvelle version</button></div>'
+      + (hist.length > 1 ? '<details style="margin-top:10px"><summary class="muted" style="cursor:pointer">Historique (' + hist.length + ')</summary><ul class="klog">'
+        + hist.map((r) => '<li><b>' + esc(r.version) + '</b> · ' + day(r.published_at) + ' · ' + esc(r.note || '') + '</li>').join('') + '</ul></details>' : '')
+      + '</div>';
+  }).join('');
+  panel.innerHTML =
+    '<div class="card" style="margin-bottom:16px;"><p class="card-sub" style="margin:0">Quand tu modifies un texte (dans le document Word puis dans l\'appli), enregistre ici une nouvelle version avec une phrase sur ce qui a changé. Tu gardes ainsi la trace de ce que les utilisateurs ont pu accepter et à quelle date.</p>'
+    + '<p class="card-sub" style="margin:10px 0 0"><b>Règle en vigueur :</b> un problème sur une commande doit être signalé dans les <b>24 h</b> après la livraison ou le retrait.</p></div>'
+    + '<div id="legal-form"></div><div class="grid-list">' + cards + '</div>';
+}
+function legalForm(kind) {
+  document.getElementById('legal-form').innerHTML =
+    '<div class="card" style="margin-bottom:16px;"><p class="card-title" style="margin-bottom:10px;">Nouvelle version — ' + LEGAL_KINDS[kind] + '</p>'
+    + '<input type="text" id="lg-version" placeholder="Numéro de version (ex : 1.1)">'
+    + '<input type="text" id="lg-note" placeholder="Ce qui a changé (une phrase)">'
+    + '<div class="actions"><button class="btn btn-approve" onclick="legalPublish(\'' + kind + '\')">Enregistrer</button>'
+    + '<button class="btn" onclick="document.getElementById(\'legal-form\').innerHTML=\'\'">Annuler</button></div></div>';
+  window.scrollTo(0, 0);
+}
+async function legalPublish(kind) {
+  try {
+    await kycFn('admin-legal', { action: 'publish', kind, version: document.getElementById('lg-version').value, note: document.getElementById('lg-note').value });
+    loadLegal();
+  } catch (e) { alert(e.message); }
 }
 
 </script>
