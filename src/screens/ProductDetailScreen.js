@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AvatarGlyph } from '../components/Avatar';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
@@ -372,7 +373,7 @@ export default function ProductDetailScreen({ route, navigation }) {
         <View style={styles.avatar}>
           {seller.avatarIcon ? (
             <View style={[styles.avatarIconWrap, { backgroundColor: seller.avatarColor }]}>
-              <Ionicons name={seller.avatarIcon} size={20} color={colors.white} />
+              <AvatarGlyph icon={seller.avatarIcon} size={20} />
             </View>
           ) : seller.photo ? (
             <Image source={{ uri: seller.photo }} style={styles.avatarImage} />

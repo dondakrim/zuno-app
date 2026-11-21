@@ -22,7 +22,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
-import { AVATAR_PALETTE } from '../components/Avatar';
+import { AVATAR_PALETTE, AvatarGlyph } from '../components/Avatar';
 import PhoneInput from '../components/PhoneInput';
 import GradientHeader from '../components/GradientHeader';
 
@@ -238,7 +238,7 @@ export default function EditProfileScreen({ navigation }) {
             <View style={styles.avatarWrap}>
               {avatarIcon ? (
                 <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
-                  <Ionicons name={avatarIcon} size={38} color={colors.white} />
+                  <AvatarGlyph icon={avatarIcon} size={38} />
                 </View>
               ) : displayPhoto ? (
                 <Image source={{ uri: displayPhoto }} style={styles.avatar} />
@@ -285,6 +285,7 @@ export default function EditProfileScreen({ navigation }) {
                 <Text style={styles.paletteTitle}>Choisis un avatar</Text>
                 <FlatList
                   data={AVATAR_PALETTE}
+                  showsVerticalScrollIndicator={false}
                   numColumns={4}
                   keyExtractor={(item) => item.icon}
                   columnWrapperStyle={{ gap: spacing.sm, marginBottom: spacing.sm }}
@@ -293,7 +294,7 @@ export default function EditProfileScreen({ navigation }) {
                       style={[styles.paletteItem, { backgroundColor: item.color }]}
                       onPress={() => handlePickIcon(item)}
                     >
-                      <Ionicons name={item.icon} size={26} color={colors.white} />
+                      <AvatarGlyph icon={item.icon} size={26} />
                     </TouchableOpacity>
                   )}
                 />
@@ -511,7 +512,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
-  paletteCard: { width: '100%', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg },
+  paletteCard: { width: '100%', maxHeight: '82%', backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.lg },
   paletteTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md, textAlign: 'center' },
   paletteItem: { flex: 1, aspectRatio: 1, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
   paletteCancel: { marginTop: spacing.sm, paddingVertical: spacing.sm, alignItems: 'center' },

@@ -167,6 +167,8 @@ function MoiStackNavigator() {
 <MoiStack.Screen name="BlogPost" component={BlogPostScreen} />
       <MoiStack.Screen name="Notifications" component={NotificationsScreen} />
       <MoiStack.Screen name="Chat" component={ChatScreen} />
+      <MoiStack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
+      <MoiStack.Screen name="OtpVerify" component={OtpVerifyScreen} />
     </MoiStack.Navigator>
   );
 }
@@ -228,6 +230,8 @@ function MerchantOrdersStackNavigator() {
        <MerchantOrdersStack.Screen name="Account" component={AccountScreen} />
       <MerchantOrdersStack.Screen name="Settings" component={SettingsScreen} />
       <MerchantOrdersStack.Screen name="Notifications" component={NotificationsScreen} />
+      <MerchantOrdersStack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
+      <MerchantOrdersStack.Screen name="OtpVerify" component={OtpVerifyScreen} />
           </MerchantOrdersStack.Navigator>
   );
 }
@@ -258,6 +262,8 @@ function MerchantMoiStackNavigator() {
 <MerchantMoiStack.Screen name="Coupons" component={CouponsScreen} />
 <MerchantMoiStack.Screen name="Blog" component={BlogScreen} />
 <MerchantMoiStack.Screen name="BlogPost" component={BlogPostScreen} />
+      <MerchantMoiStack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
+      <MerchantMoiStack.Screen name="OtpVerify" component={OtpVerifyScreen} />
     </MerchantMoiStack.Navigator>
   );
 }

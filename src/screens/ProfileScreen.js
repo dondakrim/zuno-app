@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AvatarGlyph } from '../components/Avatar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
@@ -265,7 +266,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.avatar}>
             {profile.avatar_icon ? (
               <View style={[styles.avatarIconWrap, { backgroundColor: profile.avatar_color }]}>
-                <Ionicons name={profile.avatar_icon} size={36} color={colors.white} />
+                <AvatarGlyph icon={profile.avatar_icon} size={36} />
               </View>
             ) : profile.photo_url ? (
               <Image source={{ uri: profile.photo_url }} style={styles.avatarImage} />

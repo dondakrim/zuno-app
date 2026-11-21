@@ -5,7 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const TEAM_DOMAIN = 'team.zuno.invalid';
 const PAGES = [
   'overview', 'commandes', 'litiges', 'paiements', 'reversements', 'paniers', 'moderation', 'articles',
-  'publicites', 'boosts', 'promos', 'campagnes', 'utilisateurs', 'marchands', 'demandes', 'comptes', 'identites',
+  'publicites', 'boosts', 'promos', 'campagnes', 'utilisateurs', 'marchands', 'demandes', 'comptes', 'identites', 'kyc', 'connexions',
 ];
 const cors = {
   'Access-Control-Allow-Origin': '*',

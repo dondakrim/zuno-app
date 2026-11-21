@@ -43,8 +43,8 @@ const GROUPS = [
   {
     title: 'Informations légales',
     items: [
-      { label: 'Conditions générales', icon: 'document-text-outline', tone: 'purple', kind: 'url', url: TERMS_URL },
-      { label: 'Politique de confidentialité', icon: 'shield-checkmark-outline', tone: 'purple', kind: 'url', url: PRIVACY_URL },
+      { label: 'Conditions générales', icon: 'document-text-outline', tone: 'purple', kind: 'route', route: 'Legal', params: { kind: 'cgu' } },
+      { label: 'Politique de confidentialité', icon: 'shield-checkmark-outline', tone: 'purple', kind: 'route', route: 'Legal', params: { kind: 'confidentialite' } },
       { label: 'Politique de retour', icon: 'return-up-back-outline', tone: 'purple', kind: 'route', route: 'Legal', params: { kind: 'retour' } },
       { label: 'Politique de remboursement', icon: 'cash-outline', tone: 'purple', kind: 'route', route: 'Legal', params: { kind: 'remboursement' } },
       { label: 'Politique d’annulation', icon: 'close-circle-outline', tone: 'purple', kind: 'route', route: 'Legal', params: { kind: 'annulation' } },
@@ -70,6 +70,7 @@ const TONES = {
 export default function AccountScreen({ navigation }) {
   const { t } = usePrefs();
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
 
   useFocusEffect(
     useCallback(() => {
@@ -77,6 +78,8 @@ export default function AccountScreen({ navigation }) {
       (async () => {
         try {
           const id = await getDeviceUserId();
+          const { data: { session } } = await supabase.auth.getSession();
+          if (alive) setPhone(session?.user && !session.user.is_anonymous ? (session.user.phone ? '+' + String(session.user.phone).replace(/^\+/, '') : '') : '');
           const { data } = await supabase.from('users').select('nom').eq('id', id).maybeSingle();
           if (alive && data && data.nom && data.nom !== 'Toi (test)') setName(data.nom);
         } catch (e) { /* l'écran reste utilisable sans le nom */ }
@@ -142,15 +145,22 @@ export default function AccountScreen({ navigation }) {
           </View>
         ))}
 
-        <TouchableOpacity
-          style={s.loginBtn}
-          activeOpacity={0.85}
-          onPress={() => Alert.alert(t('Se connecter'), t('La connexion avec compte arrive bientôt.'))}
-          accessibilityRole="button"
-        >
-          <Ionicons name="log-in-outline" size={20} color="#fff" />
-          <Text style={s.loginText}>{t('Se connecter')}</Text>
-        </TouchableOpacity>
+        {phone ? (
+          <View style={[s.loginBtn, { backgroundColor: colors.successBg, elevation: 0 }]}>
+            <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+            <Text style={[s.loginText, { color: colors.success }]}>{t('Connecté')} · {phone}</Text>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={s.loginBtn}
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('PhoneLogin')}
+            accessibilityRole="button"
+          >
+            <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+            <Text style={s.loginText}>{t('Se connecter avec WhatsApp')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </ScrollView>
   );

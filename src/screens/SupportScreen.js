@@ -8,10 +8,10 @@ import InfoHeader from '../components/InfoHeader';
 // ✏️ REMPLIS tes vraies coordonnées ici. Un champ vide = le bouton est caché.
 // WHATSAPP : numéro avec l'indicatif, sans + ni espaces (ex. '22790000000')
 const CONTACT = {
-  WHATSAPP: '',
+  WHATSAPP: '34627137449',
   PHONE: '',
-  EMAIL: '',
-  HOURS: 'Lundi – Samedi, 8h – 18h',
+  EMAIL: 'contact@zunomarket.store',
+  HOURS: 'Lundi – Samedi, 7h – 23h',
 };
 
 const open = (url) =>

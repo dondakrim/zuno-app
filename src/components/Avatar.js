@@ -1,25 +1,78 @@
 import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
-// La palette proposée dans "Modifier mon profil" — icône + couleur de
-// fond, comme alternative à une vraie photo. Réutilisée aussi pour
-// l'affichage (ProfileScreen, fiche produit...).
+// Avatars proposés dans "Modifier mon profil" : emojis et personnages, sur un
+// fond pastel. L'avatar est enregistré dans la colonne avatar_icon sous la
+// forme "emoji:🦁" (aucun changement de base de données). Les anciens
+// avatars (noms d'icônes comme "paw") continuent de s'afficher normalement.
 export const AVATAR_PALETTE = [
-  { icon: 'person', color: colors.purple },
-  { icon: 'happy', color: colors.orange },
-  { icon: 'sparkles', color: colors.success },
-  { icon: 'planet', color: '#0B6BA8' },
-  { icon: 'paw', color: '#8B5CF6' },
-  { icon: 'leaf', color: '#16A34A' },
-  { icon: 'flame', color: '#DC2626' },
-  { icon: 'star', color: '#D97706' },
-  { icon: 'rocket', color: '#0891B2' },
-  { icon: 'flower', color: '#DB2777' },
-  { icon: 'football', color: '#65A30D' },
-  { icon: 'diamond', color: '#4F46E5' },
+  { icon: 'emoji:🧑🏿', color: '#FDE8D4' },
+  { icon: 'emoji:🧑🏾', color: '#E3F2FD' },
+  { icon: 'emoji:🧑🏽', color: '#FDE2EC' },
+  { icon: 'emoji:👩🏿', color: '#EDE7F6' },
+  { icon: 'emoji:👩🏾', color: '#FFF3D6' },
+  { icon: 'emoji:👩🏽', color: '#E0F5EC' },
+  { icon: 'emoji:👨🏿', color: '#E0F5EC' },
+  { icon: 'emoji:👨🏾', color: '#FDE8D4' },
+  { icon: 'emoji:👨🏽', color: '#E3F2FD' },
+  { icon: 'emoji:🧕🏾', color: '#FDE2EC' },
+  { icon: 'emoji:🧕🏿', color: '#EDE7F6' },
+  { icon: 'emoji:👳🏾', color: '#FFF3D6' },
+  { icon: 'emoji:👴🏾', color: '#E3F2FD' },
+  { icon: 'emoji:👵🏾', color: '#FDE2EC' },
+  { icon: 'emoji:👧🏾', color: '#FFF3D6' },
+  { icon: 'emoji:👦🏿', color: '#E0F5EC' },
+  { icon: 'emoji:👶🏿', color: '#EDE7F6' },
+  { icon: 'emoji:🧔🏿', color: '#FDE8D4' },
+  { icon: 'emoji:🦁', color: '#FFF3D6' },
+  { icon: 'emoji:🐪', color: '#FDE8D4' },
+  { icon: 'emoji:🐘', color: '#E3F2FD' },
+  { icon: 'emoji:🦒', color: '#FFF3D6' },
+  { icon: 'emoji:🐎', color: '#EDE7F6' },
+  { icon: 'emoji:🐐', color: '#E0F5EC' },
+  { icon: 'emoji:🦅', color: '#E3F2FD' },
+  { icon: 'emoji:🐊', color: '#E0F5EC' },
+  { icon: 'emoji:🦓', color: '#EDE7F6' },
+  { icon: 'emoji:🐆', color: '#FFF3D6' },
+  { icon: 'emoji:🌴', color: '#E0F5EC' },
+  { icon: 'emoji:🌍', color: '#E3F2FD' },
+  { icon: 'emoji:🌅', color: '#FDE8D4' },
+  { icon: 'emoji:🌵', color: '#E0F5EC' },
+  { icon: 'emoji:🌺', color: '#FDE2EC' },
+  { icon: 'emoji:🌙', color: '#EDE7F6' },
+  { icon: 'emoji:⚽', color: '#E0F5EC' },
+  { icon: 'emoji:☕', color: '#FDE8D4' },
+  { icon: 'emoji:🚀', color: '#E3F2FD' },
+  { icon: 'emoji:💎', color: '#EDE7F6' },
+  { icon: 'emoji:🎧', color: '#FDE2EC' },
+  { icon: 'emoji:📱', color: '#E3F2FD' },
+  { icon: 'emoji:🛍️', color: '#FFF3D6' },
+  { icon: 'emoji:🧿', color: '#E3F2FD' },
+  { icon: 'emoji:⭐', color: '#FFF3D6' },
+  { icon: 'emoji:🔥', color: '#FDE8D4' },
+  { icon: 'emoji:👑', color: '#FFF3D6' },
+  { icon: 'emoji:🎨', color: '#FDE2EC' },
 ];
+
+export const isEmojiAvatar = (icon) => typeof icon === 'string' && icon.indexOf('emoji:') === 0;
+
+// Dessine le contenu d'un avatar : un emoji ou une ancienne icône.
+// "size" est la taille que l'on donnerait à une icône ; l'emoji s'adapte.
+export function AvatarGlyph({ icon, size = 24, color = colors.white }) {
+  if (isEmojiAvatar(icon)) {
+    return (
+      <Text
+        allowFontScaling={false}
+        style={{ fontSize: size * 1.1, lineHeight: size * 1.35, textAlign: 'center', includeFontPadding: false }}
+      >
+        {icon.slice(6)}
+      </Text>
+    );
+  }
+  return <Ionicons name={icon} size={size} color={color} />;
+}
 
 export default function Avatar({ photoUrl, avatarIcon, avatarColor, size = 56 }) {
   const style = [
@@ -38,7 +91,7 @@ export default function Avatar({ photoUrl, avatarIcon, avatarColor, size = 56 })
   if (avatarIcon) {
     return (
       <View style={[style, { backgroundColor: avatarColor || colors.purple }]}>
-        <Ionicons name={avatarIcon} size={size * 0.55} color={colors.white} />
+        <AvatarGlyph icon={avatarIcon} size={size * (isEmojiAvatar(avatarIcon) ? 0.52 : 0.55)} />
       </View>
     );
   }

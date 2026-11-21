@@ -4,7 +4,214 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zuno — Admin</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js">
+/* ================= KYC + Connexions WhatsApp (lot 15) ================= */
+const KYC_DOC_TYPES = ["Carte nationale d'identité", 'Passeport', 'Permis de conduire', 'Carte de séjour', 'Autre'];
+const KYC_STATUS = {
+  en_attente: ['À vérifier', 'st-warn'], verifiee: ['Vérifié', 'st-ok'], rejetee: ['Refusé', 'st-bad'],
+};
+let kycFilter = 'en_attente';
+let kycPaths = {};   // photos téléversées pas encore enregistrées
+let kycCurrent = null;
+
+async function kycCall(body) {
+  const { data, error } = await sb.functions.invoke('admin-kyc', { body });
+  if (error) {
+    let msg = error.message;
+    try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_e) {}
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+function fmtDateTime(iso) {
+  return iso ? new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+async function loadKyc(search) {
+  const panel = document.getElementById('panel-kyc');
+  kycCurrent = null;
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  let res;
+  try { res = await kycCall({ action: 'list', status: kycFilter === 'tous' ? null : kycFilter, search: search || '' }); }
+  catch (e) { panel.innerHTML = '<div class="empty">Erreur : ' + esc(e.message) + '</div>'; return; }
+  const chips = [['en_attente', 'À vérifier'], ['verifiee', 'Vérifiés'], ['rejetee', 'Refusés'], ['tous', 'Tous']]
+    .map(([k, l]) => '<button type="button" class="chip' + (kycFilter === k ? ' active' : '') + '" onclick="kycFilter=\'' + k + '\';loadKyc(document.getElementById(\'kyc-search\').value)">' + l + '</button>').join('');
+  const rows = res.rows.map((r) => {
+    const st = KYC_STATUS[r.status] || ['', 'st-none'];
+    return '<tr class="clickable" onclick="openKyc(\'' + r.user_id + '\')"><td>' + esc([r.prenom, r.nom].filter(Boolean).join(' ') || 'Sans nom') + '</td><td>'
+      + esc(r.doc_type || '—') + '</td><td class="muted">' + esc(r.doc_number || '—') + '</td><td class="muted">' + esc(r.whatsapp || '') + '</td><td class="muted">'
+      + fmtDateTime(r.updated_at) + '</td><td><span class="st ' + st[1] + '">' + st[0] + '</span></td></tr>';
+  }).join('');
+  const app = (res.app_pending || []).map((u) =>
+    '<tr class="clickable" onclick="openKyc(\'' + u.id + '\')"><td>' + esc(u.nom || 'Sans nom') + '</td><td class="muted">' + esc(u.telephone || '') + '</td><td class="muted">' + esc(u.ville || '') + '</td><td><span class="st st-warn">Photo reçue de l\'appli</span></td></tr>').join('');
+  panel.innerHTML =
+    '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">'
+    + '<input type="text" id="kyc-search" placeholder="Chercher : nom, n° de pièce, WhatsApp" style="flex:1;min-width:200px;margin:0;" onkeydown="if(event.key===\'Enter\')loadKyc(this.value)">'
+    + '<button class="btn btn-approve" onclick="loadKyc(document.getElementById(\'kyc-search\').value)">Chercher</button>'
+    + '<button class="btn btn-approve" style="background:var(--purple)" onclick="kycNewAccount()">+ Créer un compte</button></div></div>'
+    + '<div class="chips">' + chips + '</div>'
+    + '<div id="kyc-new"></div>'
+    + '<div class="table-box" style="margin-bottom:16px;"><div class="table-head"><h2>Dossiers KYC</h2></div><div class="scroll-x"><table class="t"><thead><tr><th>Nom</th><th>Pièce</th><th>Numéro</th><th>WhatsApp</th><th>Mis à jour</th><th>Statut</th></tr></thead><tbody>'
+    + (rows || '<tr><td colspan="6" class="muted">Aucun dossier.</td></tr>') + '</tbody></table></div></div>'
+    + (app ? '<div class="table-box"><div class="table-head"><h2>Demandes envoyées depuis l\'appli</h2></div><p class="box-note" style="padding:0 12px;">Photo seule, sans dossier : ouvre-la pour compléter les informations.</p><div class="scroll-x"><table class="t"><thead><tr><th>Nom</th><th>Téléphone</th><th>Ville</th><th>Statut</th></tr></thead><tbody>' + app + '</tbody></table></div></div>' : '');
+}
+
+function kycNewAccount() {
+  document.getElementById('kyc-new').innerHTML =
+    '<div class="card" style="margin-bottom:16px;"><p class="card-title" style="margin-bottom:6px;">Créer un compte pour un client</p>'
+    + '<p class="card-sub" style="margin-bottom:12px;">Le client pourra ensuite se connecter avec ce numéro WhatsApp (code reçu par message). Mets l\'indicatif pays, ex : +227…</p>'
+    + '<input type="text" id="kn-phone" placeholder="Numéro WhatsApp avec indicatif (+227…)" inputmode="tel">'
+    + '<input type="text" id="kn-nom" placeholder="Nom complet">'
+    + '<input type="text" id="kn-ville" placeholder="Ville (facultatif)">'
+    + '<div class="actions"><button class="btn btn-approve" id="kn-btn" onclick="kycCreateAccount()">Créer le compte</button>'
+    + '<button class="btn" onclick="document.getElementById(\'kyc-new\').innerHTML=\'\'">Annuler</button></div></div>';
+}
+async function kycCreateAccount() {
+  const btn = document.getElementById('kn-btn'); btn.disabled = true;
+  try {
+    const r = await kycCall({ action: 'create_account', phone: document.getElementById('kn-phone').value,
+      nom: document.getElementById('kn-nom').value, ville: document.getElementById('kn-ville').value });
+    openKyc(r.user_id);
+  } catch (e) { alert(e.message); btn.disabled = false; }
+}
+
+const KYC_FIELDS = [
+  ['nom', 'Nom'], ['prenom', 'Prénom(s)'], ['genre', 'Genre', ['', 'Masculin', 'Féminin']],
+  ['date_naissance', 'Date de naissance', 'date'], ['lieu_naissance', 'Lieu de naissance'],
+  ['pays_residence', 'Pays de résidence'], ['ville_residence', 'Ville de résidence'],
+  ['doc_type', 'Type de pièce', KYC_DOC_TYPES.slice()], ['doc_number', 'Numéro de la pièce'], ['doc_authority', 'Autorité émettrice'],
+  ['doc_issued_at', 'Date de délivrance', 'date'], ['doc_expires_at', "Date d'expiration", 'date'], ['doc_issue_place', 'Lieu de délivrance'],
+  ['whatsapp', 'WhatsApp'], ['email', 'Email'], ['profession', 'Profession'],
+  ['marital_status', 'Situation matrimoniale', ['', 'Célibataire', 'Marié(e)', 'Divorcé(e)', 'Veuf(ve)']], ['address', 'Adresse'],
+];
+
+async function openKyc(uid) {
+  const panel = document.getElementById('panel-kyc');
+  panel.innerHTML = '<div class="loading">Ouverture du dossier…</div>';
+  kycPaths = {};
+  let d;
+  try { d = await kycCall({ action: 'get', user_id: uid }); }
+  catch (e) { panel.innerHTML = '<div class="empty">Erreur : ' + esc(e.message) + '</div>'; return; }
+  kycCurrent = d;
+  const r = d.record || {};
+  const st = KYC_STATUS[r.status] || ['Nouveau', 'st-none'];
+  const fields = KYC_FIELDS.map(([k, label, opt]) => {
+    let v = r[k];
+    if (v == null) {
+      if (k === 'nom') v = d.user.nom && d.user.nom !== 'Toi (test)' ? d.user.nom : '';
+      else if (k === 'whatsapp') v = d.user.telephone && !String(d.user.telephone).startsWith('local-') ? d.user.telephone : '';
+      else if (k === 'ville_residence') v = d.user.ville || '';
+      else if (k === 'pays_residence') v = 'Niger';
+      else v = '';
+    }
+    let input;
+    if (Array.isArray(opt)) input = '<select id="kf-' + k + '">' + opt.map((o) => '<option' + (o === v ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>';
+    else input = '<input id="kf-' + k + '" type="' + (opt === 'date' ? 'date' : 'text') + '" value="' + esc(v) + '">';
+    return '<div class="kf"><label>' + label + '</label>' + input + '</div>';
+  }).join('');
+  const tile = (kind, label, url) =>
+    '<div class="kp"><p class="kp-l">' + label + '</p><div class="kp-box" id="kp-' + kind + '">'
+    + (url ? '<a href="' + url + '" target="_blank" rel="noopener"><img src="' + url + '"></a>' : '<span class="muted">Aucune photo</span>') + '</div>'
+    + '<input type="file" accept="image/*" onchange="kycUpload(\'' + kind + '\', this)"></div>';
+  const events = (d.events || []).map((e) => '<li><b>' + esc(e.admin_name || '—') + '</b> · ' + esc(e.action) + (e.detail ? ' (' + esc(e.detail) + ')' : '') + ' <span class="muted">' + fmtDateTime(e.created_at) + '</span></li>').join('');
+  panel.innerHTML =
+    '<button type="button" class="back-btn" onclick="loadKyc()">← Retour aux dossiers</button>'
+    + '<div class="card" style="margin-bottom:16px;"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">'
+    + '<div><p class="card-title">' + esc(d.user.nom || 'Sans nom') + '</p><p class="card-sub">' + esc(d.user.telephone || '') + '</p></div>'
+    + '<span class="st ' + st[1] + '">' + st[0] + '</span></div>'
+    + (r.status === 'rejetee' && r.reject_reason ? '<p class="card-meta" style="color:var(--danger)">Motif du refus : ' + esc(r.reject_reason) + '</p>' : '')
+    + (d.urls.app_photo ? '<p class="card-meta" style="margin-top:10px">Photo envoyée depuis l\'appli :</p><a href="' + d.urls.app_photo + '" target="_blank" rel="noopener"><img class="id-photo" src="' + d.urls.app_photo + '"></a>' : '')
+    + '</div>'
+    + '<div class="card" style="margin-bottom:16px;"><p class="card-title" style="margin-bottom:12px;">Informations</p><div class="kgrid">' + fields + '</div></div>'
+    + '<div class="card" style="margin-bottom:16px;"><p class="card-title" style="margin-bottom:12px;">Photos de la pièce</p><div class="kgrid">'
+    + tile('front', 'Pièce — recto', d.urls.front) + tile('back', 'Pièce — verso', d.urls.back) + tile('selfie', 'Selfie avec la pièce', d.urls.selfie) + '</div></div>'
+    + '<div class="card" style="margin-bottom:16px;"><div class="actions" style="margin-top:0">'
+    + '<button class="btn btn-approve" style="background:var(--purple)" onclick="kycSave()">Enregistrer</button>'
+    + '<button class="btn btn-approve" onclick="kycDecide(\'verifiee\')">Valider l\'identité</button></div>'
+    + '<div style="margin-top:14px;"><input type="text" id="kyc-reason" placeholder="Raison du refus (ex : photo floue)"><button class="btn btn-reject" onclick="kycDecide(\'rejetee\')">Refuser</button></div></div>'
+    + '<div class="card"><p class="card-title" style="margin-bottom:8px;">Historique</p><ul class="klog">' + (events || '<li class="muted">Rien pour l\'instant.</li>') + '</ul></div>';
+}
+
+async function kycUpload(kind, input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  if (f.size > 8 * 1024 * 1024) { alert('Photo trop lourde (8 Mo max).'); input.value = ''; return; }
+  const box = document.getElementById('kp-' + kind);
+  box.innerHTML = '<span class="muted">Envoi…</span>';
+  try {
+    const up = await kycCall({ action: 'upload_url', user_id: kycCurrent.user.id, kind, ext: f.type === 'image/png' ? 'png' : 'jpg' });
+    const { error } = await sb.storage.from('identity-documents').uploadToSignedUrl(up.path, up.token, f);
+    if (error) throw new Error(error.message);
+    kycPaths[kind] = up.path;
+    box.innerHTML = '<img src="' + URL.createObjectURL(f) + '"><span class="muted" style="display:block">Envoyée — pense à Enregistrer</span>';
+  } catch (e) { box.innerHTML = '<span class="muted">Échec : ' + esc(e.message) + '</span>'; }
+}
+function kycCollect() {
+  const fields = {};
+  KYC_FIELDS.forEach(([k]) => { const el = document.getElementById('kf-' + k); if (el) fields[k] = el.value; });
+  return fields;
+}
+async function kycSave(silent) {
+  try {
+    await kycCall({ action: 'save', user_id: kycCurrent.user.id, fields: kycCollect(), paths: kycPaths });
+    if (!silent) { await openKyc(kycCurrent.user.id); }
+    return true;
+  } catch (e) { alert(e.message); return false; }
+}
+async function kycDecide(decision) {
+  const reason = document.getElementById('kyc-reason').value;
+  if (decision === 'rejetee' && !reason.trim()) { alert('Écris la raison du refus.'); return; }
+  if (!confirm(decision === 'verifiee' ? 'Valider cette identité ?' : 'Refuser ce dossier ?')) return;
+  if (!(await kycSave(true))) return;
+  try {
+    await kycCall({ action: 'decide', user_id: kycCurrent.user.id, decision, reason });
+    loadKyc();
+  } catch (e) { alert(e.message); }
+}
+
+/* ---------- Connexions WhatsApp ---------- */
+let cxStatus = '';
+async function loadConnexions(search) {
+  const panel = document.getElementById('panel-connexions');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try {
+    const [s, l] = await Promise.all([
+      kycFn('admin-otp', { action: 'stats' }),
+      kycFn('admin-otp', { action: 'list', status: cxStatus, search: search || '' }),
+    ]);
+    const st = s.stats || {};
+    const fail = Number(st.failed_24h || 0);
+    const kpi = (label, v, sub) => '<div class="kpi"><div class="kpi-label">' + label + '</div><div class="kpi-value">' + fmt(v) + '</div><div class="muted" style="font-size:12px">' + sub + '</div></div>';
+    const chips = [['', 'Tous'], ['envoye', 'Envoyés'], ['echec', 'En échec']]
+      .map(([k, lb]) => '<button type="button" class="chip' + (cxStatus === k ? ' active' : '') + '" onclick="cxStatus=\'' + k + '\';loadConnexions(document.getElementById(\'cx-search\').value)">' + lb + '</button>').join('');
+    const rows = (l.rows || []).map((r) =>
+      '<tr><td class="muted">' + fmtDateTime(r.created_at) + '</td><td>' + esc(r.phone) + '</td><td><span class="st ' + (r.status === 'envoye' ? 'st-ok' : 'st-bad') + '">' + (r.status === 'envoye' ? 'Envoyé' : 'Échec') + '</span></td><td class="muted" style="white-space:normal;max-width:380px">' + esc(r.error_detail || '') + '</td></tr>').join('');
+    panel.innerHTML =
+      '<div class="kgrid" style="margin-bottom:16px;">'
+      + kpi('Comptes avec numéro vérifié', st.verified_users, 'vrais utilisateurs WhatsApp')
+      + kpi('Comptes anonymes', st.anonymous_users, 'sans numéro (visiteurs)')
+      + kpi('Codes envoyés (24 h)', st.sent_24h, '7 jours : ' + fmt(st.sent_7d))
+      + kpi('Échecs (24 h)', fail, fail > 0 ? '<span style="color:var(--danger)">à vérifier côté Meta</span>' : 'tout va bien') + '</div>'
+      + '<div class="card" style="margin-bottom:16px;"><p class="card-sub">Pour des raisons de sécurité, les codes ne sont jamais affichés ici. Si un client ne reçoit rien : regarde la ligne de son numéro. Échec = problème côté WhatsApp/Meta ; Envoyé = le message est parti, demande-lui de vérifier WhatsApp (numéro, connexion) ou de demander un nouveau code.</p></div>'
+      + '<div class="card" style="margin-bottom:16px;"><div style="display:flex;gap:10px;flex-wrap:wrap;"><input type="text" id="cx-search" placeholder="Chercher un numéro (au moins 3 chiffres)" style="flex:1;min-width:200px;margin:0;" onkeydown="if(event.key===\'Enter\')loadConnexions(this.value)">'
+      + '<button class="btn btn-approve" onclick="loadConnexions(document.getElementById(\'cx-search\').value)">Chercher</button></div></div>'
+      + '<div class="chips">' + chips + '</div>'
+      + '<div class="table-box"><div class="table-head"><h2>Derniers envois</h2></div><div class="scroll-x"><table class="t"><thead><tr><th>Date</th><th>Numéro</th><th>Statut</th><th>Détail</th></tr></thead><tbody>'
+      + (rows || '<tr><td colspan="4" class="muted">Aucun envoi enregistré pour l\'instant.</td></tr>') + '</tbody></table></div></div>';
+  } catch (e) { panel.innerHTML = '<div class="empty">Erreur : ' + esc(e.message) + '</div>'; }
+}
+async function kycFn(name, body) {
+  const { data, error } = await sb.functions.invoke(name, { body });
+  if (error) {
+    let msg = error.message;
+    try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (_e) {}
+    throw new Error(msg);
+  }
+  if (data && data.error) throw new Error(data.error);
+  return data;
+}
+
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
@@ -282,6 +489,13 @@
   .perm-grid input { width: auto; margin: 0; }
   .preset-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
   .team-form label.lbl { display: block; font-size: 13px; color: var(--text-secondary); margin: 8px 0 6px; }
+  .kgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .kf label, .kp-l { display: block; font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+  .kf input, .kf select { margin-bottom: 0; width: 100%; }
+  .kp-box { border: 1px dashed var(--border); border-radius: 10px; min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px; margin-bottom: 8px; text-align: center; }
+  .kp-box img { max-width: 100%; max-height: 180px; border-radius: 8px; }
+  .klog { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.8; }
+  .muted { color: var(--text-muted); }
 </style>
 </head>
 <body>
@@ -331,6 +545,8 @@
       <button type="button" class="tab-btn" data-tab="suggestions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.3 1 2.5h6c0-1.2.3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>Suggestions<span class="badge" id="badge-suggestions"></span></button>
       <button type="button" class="tab-btn" data-tab="signalements"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h12l-2 4 2 4H5"/></svg>Signalements<span class="badge" id="badge-signalements"></span></button>
       <button type="button" class="tab-btn" data-tab="infos"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11v2a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg>Infos aux utilisateurs<span class="badge" id="badge-infos"></span></button>
+      <button type="button" class="tab-btn" data-tab="kyc"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Identification KYC</button>
+      <button type="button" class="tab-btn" data-tab="connexions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3.5-7.1L21 3v5h-5"/><path d="M8 12l3 3 5-6"/></svg>Connexions WhatsApp</button>
       <button type="button" class="tab-btn" data-tab="identites"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Vérification d'identité<span class="badge" id="badge-identites"></span></button>
       <div class="nav-label" id="nav-admin-label" style="display:none">Administration</div>
       <button type="button" class="tab-btn" data-tab="equipe" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Équipe</button>
@@ -356,6 +572,8 @@
 
     <div class="panel" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-kyc"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-connexions"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-identites"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-boosts"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-utilisateurs">
@@ -2378,6 +2596,8 @@ const PAGE_INFO = {
   signalements: ['Signalements', 'Utilisateurs signalés depuis l’application.'],
   infos: ['Infos aux utilisateurs', 'Alertes et nouveautés affichées dans Compte → Infos.'],
   identites: ["Vérification d'identité", "Pièces d'identité en attente de validation."],
+  kyc: ['Identification KYC', "Dossiers d'identité, création de comptes clients et validation."],
+  connexions: ['Connexions WhatsApp', 'Santé des codes de connexion et comptes vérifiés.'],
 };
 
 function overviewSubtitle() {
@@ -2411,6 +2631,8 @@ function showTab(name) {
   if (name === 'signalements') loadSignalements();
   if (name === 'infos') loadInfos();
   if (name === 'blog') loadBlog();
+  if (name === 'kyc') loadKyc();
+  if (name === 'connexions') loadConnexions();
 }
 
 document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -3030,11 +3252,12 @@ const TEAM_SECTIONS = [
   ['reversements', 'Versements marchands'], ['paniers', 'Paniers'], ['moderation', 'Modération'], ['articles', 'Articles'],
   ['publicites', 'Publicités'], ['boosts', 'Mises en avant'], ['promos', 'Promos'], ['campagnes', 'Campagnes'],
   ['utilisateurs', 'Utilisateurs'], ['marchands', 'Marchands'], ['demandes', 'Comptes marchands'],
-  ['comptes', 'Comptes'], ['identites', "Vérification d'identité"],
+  ['comptes', 'Comptes'], ['identites', "Vérification d'identité"], ['kyc', 'Identification KYC'], ['connexions', 'Connexions WhatsApp'],
   ['blog', 'Blog'], ['suggestions', 'Suggestions'], ['signalements', 'Signalements'], ['infos', 'Infos aux utilisateurs'],
 ];
 const TEAM_PRESETS = {
-  support: ['Support client', ['overview', 'commandes', 'litiges', 'paniers', 'utilisateurs']],
+  support: ['Support client', ['overview', 'commandes', 'litiges', 'paniers', 'utilisateurs', 'kyc', 'connexions']],
+  agent: ['Agent clients (KYC)', ['overview', 'kyc', 'connexions', 'utilisateurs']],
   moderation: ['Modération', ['overview', 'moderation', 'articles', 'identites', 'utilisateurs']],
   finance: ['Finance', ['overview', 'commandes', 'paiements', 'reversements']],
   marketing: ['Marketing', ['overview', 'publicites', 'boosts', 'promos', 'campagnes']],

@@ -12,11 +12,13 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { AvatarGlyph } from '../components/Avatar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Updates from 'expo-updates';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius, theme } from '../theme/colors';
 import GradientHeader from '../components/GradientHeader';
+import LegalScreen from './LegalScreen';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, deleteAccountAndReset, resetIdentity } from '../lib/deviceUser';
 import { usePrefs, LANGS, CURRENCIES } from '../lib/prefs';
@@ -68,6 +70,7 @@ export default function SettingsScreen({ navigation }) {
   const [profile, setProfile] = useState(null);
   const [dark, setDark] = useState(theme.mode === 'dark');
   const [picker, setPicker] = useState(null); // 'lang' | 'currency' | null
+  const [legalKind, setLegalKind] = useState(null); // 'cgu' | 'confidentialite' | null
   const { t, lang, currency, setLang, setCurrency } = usePrefs();
   const langLabel = (LANGS.find((l) => l.code === lang) || LANGS[0]).label;
   const currencyLabel = (CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0]).short;
@@ -188,7 +191,7 @@ export default function SettingsScreen({ navigation }) {
           <View style={styles.avatar}>
             {profile?.avatar_icon ? (
               <View style={[styles.avatarFill, { backgroundColor: profile.avatar_color }]}>
-                <Ionicons name={profile.avatar_icon} size={24} color={colors.white} />
+                <AvatarGlyph icon={profile.avatar_icon} size={24} />
               </View>
             ) : profile?.photo_url ? (
               <Image source={{ uri: profile.photo_url }} style={styles.avatarImage} />
@@ -232,12 +235,12 @@ export default function SettingsScreen({ navigation }) {
           <Row
             icon="shield-checkmark-outline"
             label={t('Politique de confidentialité')}
-            onPress={() => Linking.openURL(PRIVACY_URL)}
+            onPress={() => setLegalKind('confidentialite')}
           />
           <Row
             icon="document-text-outline"
             label={t("Conditions d'utilisation")}
-            onPress={() => Linking.openURL(TERMS_URL)}
+            onPress={() => setLegalKind('cgu')}
             last
           />
         </Group>
@@ -273,6 +276,15 @@ export default function SettingsScreen({ navigation }) {
           <Text style={styles.footerText}>Version 1.0.0</Text>
         </View>
       </ScrollView>
+
+      <Modal visible={!!legalKind} animationType="slide" onRequestClose={() => setLegalKind(null)}>
+        {legalKind ? (
+          <LegalScreen
+            navigation={{ goBack: () => setLegalKind(null) }}
+            route={{ params: { kind: legalKind } }}
+          />
+        ) : null}
+      </Modal>
 
       <Modal visible={!!picker} transparent animationType="fade" onRequestClose={() => setPicker(null)}>
         <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setPicker(null)}>

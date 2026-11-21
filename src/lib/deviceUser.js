@@ -50,7 +50,13 @@ export async function getDeviceUserId() {
     );
 
   if (error) {
-    console.error('Erreur création identité:', error, 'id utilisé :', id);
+    console.error(
+      'Erreur création identité — message :', error.message,
+      '| code :', error.code,
+      '| détails :', error.details,
+      '| indice :', error.hint,
+      '| id utilisé :', id
+    );
   }
 
   return id;
