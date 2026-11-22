@@ -9,6 +9,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ModeProvider } from './src/context/ModeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import InterestsScreen from './src/screens/onboarding/InterestsScreen';
+import SuspendedScreen from './src/components/SuspendedScreen';
 import { colors, spacing, theme } from './src/theme/colors';
 import { supabase } from './src/lib/supabase';
 import { getDeviceUserId } from './src/lib/deviceUser';
@@ -83,18 +84,20 @@ export default function AppMain() {
   }
 
   if (banInfo.banned) {
+    // Revérifie le statut (par exemple après une réactivation depuis le tableau de bord).
+    const recheckBan = async () => {
+      try {
+        const myId = await getDeviceUserId();
+        const { data } = await supabase.from('users').select('is_banned, ban_reason').eq('id', myId).maybeSingle();
+        setBanInfo({ checked: true, banned: data?.is_banned || false, reason: data?.ban_reason || '' });
+      } catch (e) {
+        console.log('Erreur revérification bannissement :', e.message);
+      }
+    };
     return (
-      <View style={bannedStyles.container}>
-        <Text style={bannedStyles.title}>Compte suspendu</Text>
-        <Text style={bannedStyles.text}>
-          Ton accès à Zuno a été suspendu suite à une ou plusieurs violations des conditions
-          d'utilisation.
-        </Text>
-        {banInfo.reason ? <Text style={bannedStyles.reason}>Motif : {banInfo.reason}</Text> : null}
-        <Text style={bannedStyles.text}>
-          Si tu penses qu'il s'agit d'une erreur, contacte-nous à contact@zunomarket.store.
-        </Text>
-      </View>
+      <SafeAreaProvider>
+        <SuspendedScreen reason={banInfo.reason} onRetry={recheckBan} />
+      </SafeAreaProvider>
     );
   }
 
@@ -113,16 +116,3 @@ export default function AppMain() {
     </SafeAreaProvider>
   );
 }
-
-const bannedStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  title: { fontSize: 20, fontWeight: '700', color: colors.danger, marginBottom: spacing.md },
-  text: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md, lineHeight: 20 },
-  reason: { fontSize: 13, color: colors.textPrimary, fontWeight: '600', marginBottom: spacing.md, textAlign: 'center' },
-});
