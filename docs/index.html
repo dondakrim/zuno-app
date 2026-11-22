@@ -399,8 +399,14 @@
     <div class="panel" id="panel-comptes">
       <div class="card" style="margin-bottom: 16px;">
         <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email)…" oninput="loadComptes()">
+        <select id="comptes-filter" onchange="loadComptes()" style="margin-top:10px; width:100%;">
+          <option value="all">Tous les comptes</option>
+          <option value="banned">Suspendus seulement</option>
+          <option value="tests">Comptes de test seulement</option>
+        </select>
         <button class="btn btn-approve" style="width:100%; padding:10px; margin-top:10px;" onclick="exportAllAccountsCSV()">Exporter tous les comptes (CSV)</button>
       </div>
+      <div id="comptes-cleanup"></div>
       <div id="comptes-list"><div class="loading">Chargement…</div></div>
       <div id="compte-detail-page" class="detail-page"></div>
     </div>
@@ -1001,6 +1007,81 @@ async function setBan(userId, banned, reason) {
   });
   loadUsers();
   loadMerchants();
+  if (typeof loadComptes === 'function') loadComptes();
+}
+
+/* ---------- Suppression de comptes (super-admin) ---------- */
+function isTestAccount(u) {
+  const t = u.telephone || '';
+  return t.indexOf('local-') === 0 || t.indexOf('deleted-') === 0;
+}
+let cleanupIds = [];
+async function openCleanupTests() {
+  const box = document.getElementById('comptes-cleanup');
+  const ids = Object.values(comptesData).filter(isTestAccount).map((u) => u.id);
+  if (ids.length === 0) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="card" style="margin-bottom:16px;"><div class="loading">Analyse des comptes de test…</div></div>';
+  let rows;
+  try { rows = (await kycFn('admin-accounts', { action: 'check', ids })).rows || []; }
+  catch (e) { box.innerHTML = '<div class="error-box">' + esc(e.message) + '</div>'; return; }
+  const ok = rows.filter((r) => r.out_verdict === 'supprimable');
+  const kept = rows.filter((r) => r.out_verdict !== 'supprimable');
+  cleanupIds = ok.map((r) => r.out_id);
+  box.innerHTML = '<div class="card" style="margin-bottom:16px;">'
+    + '<p class="card-title" style="margin-bottom:6px;">Nettoyage des comptes de test</p>'
+    + '<p class="card-sub" style="margin:0 0 10px"><b>' + ok.length + '</b> compte(s) de test sans aucune activité peuvent être supprimés définitivement. <b>' + kept.length + '</b> sont gardés (annonces, commandes, messages… liés).</p>'
+    + (kept.length ? '<details style="margin-bottom:10px"><summary class="muted" style="cursor:pointer">Voir les comptes gardés</summary><ul class="klog">'
+      + kept.map((r) => '<li><b>' + esc(r.out_nom || 'Sans nom') + '</b> · ' + esc(r.out_telephone || '') + ' · ' + esc(r.out_detail || '') + '</li>').join('') + '</ul></details>' : '')
+    + '<div class="actions">'
+    + (ok.length ? '<button class="btn btn-reject" onclick="runCleanupTests()">Supprimer ces ' + ok.length + ' comptes</button>' : '')
+    + '<button class="btn" onclick="document.getElementById(\'comptes-cleanup\').innerHTML=\'\'">Fermer</button></div>'
+    + '<p class="card-meta" style="margin-top:10px">Suppression définitive : impossible à annuler. Les téléphones qui utilisent encore une de ces identités de test en recréeront une nouvelle à l\'ouverture de l\'appli.</p></div>';
+}
+async function runCleanupTests() {
+  if (!cleanupIds.length) return;
+  if (!confirm('Supprimer définitivement ' + cleanupIds.length + ' comptes de test ?\nCette action est irréversible.')) return;
+  const box = document.getElementById('comptes-cleanup');
+  box.innerHTML = '<div class="card" style="margin-bottom:16px;"><div class="loading">Suppression en cours…</div></div>';
+  try {
+    const rows = (await kycFn('admin-accounts', { action: 'delete', ids: cleanupIds })).rows || [];
+    const done = rows.filter((r) => r.out_verdict === 'supprime').length;
+    const failed = rows.length - done;
+    box.innerHTML = '<div class="card" style="margin-bottom:16px;"><p class="card-sub" style="margin:0">✓ ' + done + ' compte(s) supprimé(s)' + (failed ? ' · ' + failed + ' gardé(s)' : '') + '.</p></div>';
+    cleanupIds = [];
+    loadComptes();
+  } catch (e) { box.innerHTML = '<div class="error-box">' + esc(e.message) + '</div>'; }
+}
+async function deleteAccountPermanent(userId) {
+  const u = comptesData[userId];
+  const name = (u && (u.boutique_nom || u.nom)) || 'ce compte';
+  let r;
+  try { r = ((await kycFn('admin-accounts', { action: 'check', ids: [userId] })).rows || [])[0]; }
+  catch (e) { alert(e.message); return; }
+  if (!r) { alert('Compte introuvable.'); return; }
+  if (r.out_verdict !== 'supprimable') {
+    alert('Impossible de supprimer ' + name + ' : ' + (r.out_detail || r.out_verdict) + '.\n\nCe compte a de l\'activité (annonces, commandes, messages…). Suspends-le plutôt : il ne pourra plus utiliser l\'appli.');
+    return;
+  }
+  if (!confirm('Supprimer définitivement ' + name + ' ?\nCette action est irréversible.')) return;
+  try { await kycFn('admin-accounts', { action: 'delete', ids: [userId] }); }
+  catch (e) { alert(e.message); return; }
+  closeCompteDetail();
+  loadComptes();
+}
+
+async function banFromComptes(userId) {
+  const u = comptesData[userId];
+  const name = (u && (u.boutique_nom || u.nom)) || 'ce compte';
+  if (!confirm('Suspendre et bloquer ' + name + ' ?\n\nLa personne ne pourra plus utiliser l\'appli et son numéro sera bloqué pour tout nouveau compte.')) return;
+  const reason = prompt('Motif de la suspension (la personne le verra) :', 'Non-respect des conditions d\'utilisation de Zuno.');
+  if (reason === null) return;
+  await setBan(userId, true, reason.trim() || 'Compte suspendu par l\'équipe Zuno.');
+  closeCompteDetail();
+}
+async function unbanFromComptes(userId) {
+  if (!confirm('Réactiver ce compte ?')) return;
+  await setBan(userId, false, null);
+  closeCompteDetail();
 }
 
 // Reprend automatiquement la session si déjà connecté (évite de se
@@ -1361,7 +1442,11 @@ async function loadComptes() {
   if (error) { list.innerHTML = '<div class="empty">Erreur : ' + error.message + '</div>'; return; }
   if (!data) { list.innerHTML = '<div class="empty">Aucun compte.</div>'; return; }
 
+  const onlyBanned = document.getElementById('comptes-filter')?.value === 'banned';
+  const onlyTests = document.getElementById('comptes-filter')?.value === 'tests';
   const filtered = data.filter((u) => {
+    if (onlyBanned && !u.is_banned) return false;
+    if (onlyTests && !isTestAccount(u)) return false;
     if (!search) return true;
     return (u.nom || '').toLowerCase().includes(search)
       || (u.telephone || '').toLowerCase().includes(search)
@@ -1374,7 +1459,9 @@ async function loadComptes() {
 
   if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucun compte ne correspond.</div>'; return; }
 
-  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)</p>' +
+  const nbTests = data.filter(isTestAccount).length;
+  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)'
+    + (ME.is_super && nbTests > 0 ? ' · <a href="#" onclick="openCleanupTests(); return false;" style="color:var(--danger); font-weight:700;">Nettoyer les ' + nbTests + ' comptes de test</a>' : '') + '</p>' +
     '<div class="grid-list">' + filtered.map((u) => `
     <div class="grid-card" data-id="${u.id}">
       ${renderAvatarHtml(u, 40)}
@@ -1444,7 +1531,13 @@ async function showCompteDetail(userId) {
         <button class="btn btn-approve" onclick="sendNotificationTo('${u.id}', '')">Envoyer une notification</button>
         ${u.email ? '<button class="btn btn-approve" onclick="sendEmailTo(\'' + u.email + '\', \'\')">Envoyer un email</button>' : ''}
         <button class="btn btn-approve" onclick="exportAccountHistory('${u.id}', '${(u.nom || 'compte').replace(/'/g, "\\'")}')">Exporter l'historique</button>
+        ${u.is_banned
+          ? `<button class="btn btn-approve" onclick="unbanFromComptes('${u.id}')">Réactiver le compte</button>`
+          : `<button class="btn btn-reject" onclick="banFromComptes('${u.id}')">Suspendre / bloquer ce compte</button>`
+        }
+        ${ME.is_super ? `<button class="btn btn-reject" onclick="deleteAccountPermanent('${u.id}')">Supprimer définitivement</button>` : ''}
       </div>
+      <p class="card-meta" style="margin-top:10px;">Un compte suspendu ne peut plus utiliser l'appli (écran « Compte suspendu » avec le motif). Son numéro de téléphone et son WhatsApp sont aussi bloqués : un nouveau compte créé avec le même numéro est suspendu automatiquement.</p>
     </div>
   `;
 
