@@ -28,6 +28,9 @@ import GradientHeader from '../components/GradientHeader';
 import EventsSection from '../components/EventsSection';
 import { useCategories, useCategoryTree } from '../lib/useCategories';
 
+// Fonds doux alternés pour les pastilles de catégories.
+const CATEGORY_TINTS = ['#EEE9FF', '#FFF0E3', '#E4F5EE', '#E6F0FB', '#FCE9F1', '#FFF6D9'];
+
 const CATEGORY_ICONS = {
   'Mode et vêtements': 'shirt-outline',
   'Électronique et téléphones': 'phone-portrait-outline',
@@ -140,21 +143,15 @@ export default function HomeScreen({ navigation }) {
     [wishlistIds, loadWishlist, navigation]
   );
 
-  // Les avis sont liés au vendeur, pas à un article précis : on calcule
-  // une moyenne par vendeur en une seule requête, plutôt qu'une par carte.
+  // Les avis sont liés aux commandes : la vue `seller_ratings` (base de données)
+  // calcule la moyenne par vendeur, sans les avis masqués.
   const loadSellerRatings = useCallback(async (currentListings) => {
     const vendeurIds = [...new Set(currentListings.map((l) => l.vendeur_id).filter(Boolean))];
     if (vendeurIds.length === 0) return;
-    const { data } = await supabase.from('reviews').select('cible_id, note').in('cible_id', vendeurIds);
-    const totals = {};
-    (data || []).forEach((r) => {
-      if (!totals[r.cible_id]) totals[r.cible_id] = { sum: 0, count: 0 };
-      totals[r.cible_id].sum += r.note;
-      totals[r.cible_id].count += 1;
-    });
+    const { data } = await supabase.from('seller_ratings').select('vendeur_id, avg_note').in('vendeur_id', vendeurIds);
     const averages = {};
-    Object.keys(totals).forEach((id) => {
-      averages[id] = totals[id].sum / totals[id].count;
+    (data || []).forEach((r) => {
+      averages[r.vendeur_id] = Number(r.avg_note);
     });
     setSellerRatings(averages);
   }, []);
@@ -345,31 +342,33 @@ export default function HomeScreen({ navigation }) {
               data={categories}
               keyExtractor={(item) => item}
               style={styles.categoryRow}
-              contentContainerStyle={{ gap: spacing.md }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('CategoryListing', { category: item })}
-                  style={styles.categoryItem}
-                >
-                  <View style={styles.categoryIcon}>
-                    {(() => {
-                      const dbIcon = categoryTree.find((c) => c.label === item)?.icon;
-                      return dbIcon && dbIcon !== '🏷️' ? (
-                        <Text style={{ fontSize: 22 }}>{dbIcon}</Text>
+              contentContainerStyle={{ gap: spacing.sm, paddingVertical: 2 }}
+              renderItem={({ item, index }) => {
+                const dbIcon = categoryTree.find((c) => c.label === item)?.icon;
+                const tint = CATEGORY_TINTS[index % CATEGORY_TINTS.length];
+                return (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('CategoryListing', { category: item })}
+                    style={styles.categoryItem}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[styles.categoryIcon, { backgroundColor: tint }]}>
+                      {dbIcon ? (
+                        <Text style={styles.categoryEmoji}>{dbIcon}</Text>
                       ) : (
                         <Ionicons
                           name={CATEGORY_ICONS[item] || 'pricetag-outline'}
-                          size={20}
+                          size={24}
                           color={colors.purple}
                         />
-                      );
-                    })()}
-                  </View>
-                  <Text style={styles.categoryLabel} numberOfLines={1}>
-                    {item.split(' ')[0]}
-                  </Text>
-                </TouchableOpacity>
-              )}
+                      )}
+                    </View>
+                    <Text style={styles.categoryLabel} numberOfLines={2}>
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }}
             />
 
             <FlatList
@@ -666,20 +665,18 @@ const styles = StyleSheet.create({
   },
   body: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   categoryRow: { flexGrow: 0 },
-  categoryItem: { alignItems: 'center', width: 64 },
+  categoryItem: { alignItems: 'center', width: 76 },
   categoryIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    width: 58,
+    height: 58,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
+  categoryEmoji: { fontSize: 26 },
   categoryIconActive: { backgroundColor: colors.orange, borderColor: colors.orange },
-  categoryLabel: { fontSize: 11, color: colors.textSecondary, textAlign: 'center' },
+  categoryLabel: { fontSize: 11, fontWeight: '600', color: colors.textPrimary, textAlign: 'center', lineHeight: 14, minHeight: 28 },
   categoryLabelActive: { color: colors.orange, fontWeight: '700' },
   adSlide: {
     height: 110,

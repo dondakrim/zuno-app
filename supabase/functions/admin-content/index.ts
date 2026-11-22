@@ -111,14 +111,21 @@ Deno.serve(async (req) => {
         return json({ ok: true, rows: data || [], counts });
       }
       if (act === 'import') {
+        // Catégories d'origine de l'appli + celles déjà utilisées par des articles.
+        const DEFAULTS: [string, string][] = [
+          ['Mode et vêtements', '👕'], ['Électronique et téléphones', '📱'], ['Maison et électroménager', '🏠'],
+          ['Véhicules et pièces', '🚗'], ['Autres', '📦'],
+        ];
         const { data: ls } = await db.from('listings').select('category').limit(20000);
-        const names = [...new Set((ls || []).map((l: any) => String(l.category || '').trim()).filter(Boolean))].sort();
-        const { data: ex } = await db.from('app_categories').select('label, parent');
+        const used = [...new Set((ls || []).map((l: any) => String(l.category || '').trim()).filter(Boolean))];
+        const all: [string, string][] = [...DEFAULTS];
+        used.sort().forEach((n) => { if (!all.some(([l]) => l.toLowerCase() === n.toLowerCase())) all.splice(all.length - 1, 0, [n, '🏷️']); });
+        const { data: ex } = await db.from('app_categories').select('label, parent, position');
         const have = new Set((ex || []).filter((e: any) => !e.parent).map((e: any) => e.label.toLowerCase()));
-        const add = names.filter((n) => !have.has(n.toLowerCase()));
+        const base = (ex || []).length;
+        const add = all.map(([label, icon], i) => ({ label, icon, position: base + i })).filter((c) => !have.has(c.label.toLowerCase()));
         if (add.length) {
-          const base = (ex || []).length;
-          const { error } = await db.from('app_categories').insert(add.map((label, i) => ({ label, position: base + i })));
+          const { error } = await db.from('app_categories').insert(add);
           if (error) throw new Fail(error.message);
         }
         return json({ ok: true, added: add.length });
@@ -167,7 +174,18 @@ Deno.serve(async (req) => {
         if (body.max_note) q = q.lte('note', int(body.max_note));
         const { data, error } = await q;
         if (error) throw new Fail(error.message);
-        return json({ ok: true, rows: data || [] });
+        // Le vendeur noté = vendeur de l'article de la commande (avis → commande → article).
+        const rows: any[] = data || [];
+        const oids = [...new Set(rows.map((r) => r.order_id).filter(Boolean))];
+        if (oids.length) {
+          const { data: ords } = await db.from('orders').select('id, listing_id').in('id', oids);
+          const lids = [...new Set((ords || []).map((o: any) => o.listing_id).filter(Boolean))];
+          const { data: lst } = lids.length ? await db.from('listings').select('id, vendeur_id').in('id', lids) : { data: [] as any[] };
+          const sellerOfListing = new Map((lst || []).map((l: any) => [l.id, l.vendeur_id]));
+          const listingOfOrder = new Map((ords || []).map((o: any) => [o.id, o.listing_id]));
+          rows.forEach((r) => { r.cible_id = sellerOfListing.get(listingOfOrder.get(r.order_id)) || null; });
+        }
+        return json({ ok: true, rows });
       }
       if (act === 'hide' || act === 'unhide') {
         if (!UUID.test(String(body.id))) throw new Fail('Identifiant invalide.');
