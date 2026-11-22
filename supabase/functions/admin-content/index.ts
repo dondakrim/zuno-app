@@ -162,7 +162,7 @@ Deno.serve(async (req) => {
     /* ---------------- Avis ---------------- */
     if (res === 'reviews') {
       if (act === 'list') {
-        let q = db.from('reviews').select('id, created_at, note, commentaire, auteur_id, cible_id, hidden, hidden_reason').order('created_at', { ascending: false }).limit(300);
+        let q = db.from('reviews').select('*').order('created_at', { ascending: false }).limit(300);
         if (body.only_hidden) q = q.eq('hidden', true);
         if (body.max_note) q = q.lte('note', int(body.max_note));
         const { data, error } = await q;

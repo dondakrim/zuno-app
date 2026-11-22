@@ -4243,7 +4243,8 @@ async function loadAvis() {
   const panel = document.getElementById('panel-avis');
   panel.innerHTML = '<div class="loading">Chargement…</div>';
   try { AV_ROWS = (await cFn('reviews', 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
-  AV_NAMES = await userNamesById(AV_ROWS.flatMap((r) => [r.auteur_id, r.cible_id]));
+  AV_ROWS.forEach((r) => { r._t = r.cible_id || r.vendeur_id || r.seller_id || r.target_id || r.reviewed_id || r.destinataire_id || null; });
+  AV_NAMES = await userNamesById(AV_ROWS.flatMap((r) => [r.auteur_id, r._t]));
   panel.innerHTML = '<div class="actions" style="margin:0 0 14px">'
     + '<select id="av-filter" onchange="avRender()" style="width:auto"><option value="all">Tous les avis</option><option value="low">Notes de 1 à 2 ★</option><option value="hidden">Avis masqués</option></select>'
     + '<input type="text" id="av-q" placeholder="Rechercher dans les commentaires…" oninput="avRender()" style="max-width:320px"></div>'
@@ -4259,7 +4260,7 @@ function avRender() {
   document.getElementById('av-list').innerHTML = rows.map((r) => '<div class="card"' + (r.hidden ? ' style="opacity:.65"' : '') + '>'
     + '<p class="card-title">' + '★'.repeat(r.note || 0) + '<span class="muted">' + '★'.repeat(5 - (r.note || 0)) + '</span>' + (r.hidden ? ' <span class="pill">Masqué</span>' : '') + '</p>'
     + '<p class="card-sub">' + esc(r.commentaire || '(sans commentaire)') + '</p>'
-    + '<p class="card-meta">' + esc(nameOf(AV_NAMES, r.auteur_id)) + ' → ' + esc(nameOf(AV_NAMES, r.cible_id)) + ' · ' + esc(dateTime(r.created_at)) + (r.hidden_reason ? ' · Motif : ' + esc(r.hidden_reason) : '') + '</p>'
+    + '<p class="card-meta">' + esc(nameOf(AV_NAMES, r.auteur_id)) + ' → ' + esc(nameOf(AV_NAMES, r._t)) + ' · ' + esc(dateTime(r.created_at)) + (r.hidden_reason ? ' · Motif : ' + esc(r.hidden_reason) : '') + '</p>'
     + '<div class="actions">' + (r.hidden
       ? '<button type="button" class="btn" onclick="avSet(\'' + r.id + '\',false)">Réafficher</button>'
       : '<button type="button" class="btn btn-reject" onclick="avSet(\'' + r.id + '\',true)">Masquer</button>') + '</div></div>').join('')
