@@ -3,30 +3,27 @@ import { supabase } from './supabase';
 export const TRUST_BADGE_THRESHOLD = 10;
 
 // Note moyenne d'un ARTICLE précis (pas du vendeur en général) : les avis
-// sont liés à une commande, et chaque commande à une annonce précise —
-// on peut donc remonter jusqu'à l'annonce sans rien changer au schéma.
+// sont liés à une commande, et chaque commande à une annonce précise.
+// La vue `listing_ratings` (base de données) calcule la moyenne sans les avis masqués.
 export async function getListingRating(listingId) {
-  const { data } = await supabase
-    .from('reviews')
-    .select('note, orders!inner(listing_id)')
-    .eq('orders.listing_id', listingId);
-  if (!data || data.length === 0) return { average: null, count: 0 };
-  const total = data.reduce((sum, r) => sum + r.note, 0);
-  return { average: total / data.length, count: data.length };
+  const { data, error } = await supabase
+    .from('listing_ratings')
+    .select('avg_note, n')
+    .eq('listing_id', listingId)
+    .maybeSingle();
+  if (error || !data) return { average: null, count: 0 };
+  return { average: Number(data.avg_note), count: data.n };
 }
 
-// Récupère la note moyenne et le nombre d'avis reçus par un vendeur.
+// Note moyenne et nombre d'avis reçus par un vendeur (via la vue `seller_ratings`).
 export async function getSellerRating(vendeurId) {
   const { data, error } = await supabase
-    .from('reviews')
-    .select('note')
-    .eq('cible_id', vendeurId);
-
-  if (error || !data || data.length === 0) {
-    return { average: null, count: 0 };
-  }
-  const total = data.reduce((sum, r) => sum + r.note, 0);
-  return { average: total / data.length, count: data.length };
+    .from('seller_ratings')
+    .select('avg_note, n')
+    .eq('vendeur_id', vendeurId)
+    .maybeSingle();
+  if (error || !data) return { average: null, count: 0 };
+  return { average: Number(data.avg_note), count: data.n };
 }
 
 // Compte les ventes réellement finalisées (livrées ou récupérées) d'un

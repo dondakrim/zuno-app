@@ -188,7 +188,6 @@ export default function ProfileScreen({ navigation }) {
     const { error } = await supabase.from('reviews').insert({
       order_id: reviewModal.id,
       auteur_id: myId,
-      cible_id: reviewModal.listings?.vendeur_id,
       note: reviewStars,
       commentaire: reviewComment.trim() || null,
     });
