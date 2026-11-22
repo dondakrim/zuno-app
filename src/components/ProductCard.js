@@ -1,8 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
-import { usePrefs } from '../lib/prefs';
+import { useCart } from '../lib/cartState';
+import { warrantyLabel } from '../lib/warranty';
 
 const CONDITION_INFO = {
   Neuf: { icon: 'sparkles', color: colors.success },
@@ -16,9 +18,10 @@ const CONDITION_INFO = {
 // Zuno) — c'est la meilleure approximation disponible d'une note par
 // article.
 export default function ProductCard({ listing, sellerRating, isWishlisted, onToggleWishlist, onPress }) {
-  const { formatPrice } = usePrefs();
   const hasPromo = listing.promo_price && Number(listing.promo_price) < Number(listing.price);
   const conditionInfo = CONDITION_INFO[listing.condition];
+  const navigation = useNavigation();
+  const { inCart, busy, toggle } = useCart(listing.id, navigation);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
@@ -70,15 +73,39 @@ export default function ProductCard({ listing, sellerRating, isWishlisted, onTog
 
       <Text style={styles.title} numberOfLines={2}>{listing.title}</Text>
 
-      <View style={styles.priceRow}>
-        {hasPromo && (
-          <Text style={styles.oldPrice}>
-            {formatPrice(listing.price)}
+      {Number(listing.warranty_days) > 0 ? (
+        <View style={styles.warrantyRow}>
+          <Ionicons name="shield-checkmark" size={11} color={colors.success} />
+          <Text style={styles.warrantyText}>Garantie {warrantyLabel(listing.warranty_days)}</Text>
+        </View>
+      ) : null}
+
+      <View style={styles.bottomRow}>
+        <View style={styles.priceRow}>
+          {hasPromo && (
+            <Text style={styles.oldPrice}>
+              {Number(listing.price).toLocaleString('fr-FR')} FCFA
+            </Text>
+          )}
+          <Text style={styles.price}>
+            {Number(hasPromo ? listing.promo_price : listing.price).toLocaleString('fr-FR')} FCFA
           </Text>
-        )}
-        <Text style={styles.price}>
-          {formatPrice(hasPromo ? listing.promo_price : listing.price)}
-        </Text>
+        </View>
+        <TouchableOpacity
+          style={[styles.cartButton, inCart && styles.cartButtonActive]}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            toggle();
+          }}
+          disabled={busy}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons
+            name={inCart ? 'cart' : 'cart-outline'}
+            size={16}
+            color={inCart ? colors.white : colors.purple}
+          />
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -141,7 +168,20 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 2 },
   ratingText: { fontSize: 11, color: colors.textSecondary, fontWeight: '600' },
   title: { fontSize: 13, color: colors.textPrimary, lineHeight: 17, marginBottom: 4 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' },
+  warrantyRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 4 },
+  warrantyText: { fontSize: 10, fontWeight: '700', color: colors.success },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  priceRow: { flex: 1, flexDirection: 'row', alignItems: 'baseline', gap: 6, flexWrap: 'wrap' },
+  cartButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.purple,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartButtonActive: { backgroundColor: colors.purple },
   oldPrice: {
     fontSize: 11,
     color: colors.textMuted,

@@ -24,6 +24,7 @@ import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { analyzeListing } from '../lib/moderation';
 import { checkMessage } from '../lib/chatGuard';
 import GradientHeader from '../components/GradientHeader';
+import { WARRANTY_OPTIONS } from '../lib/warranty';
 
 const conditions = ['Neuf', 'Bon état', 'Usé'];
 const delais = ['1-2 jours', '3-5 jours', '1 semaine', "Plus d'une semaine"];
@@ -90,6 +91,9 @@ export default function PostListingScreen({ navigation }) {
   const [delaiLivraison, setDelaiLivraison] = useState(delais[0]);
   const [showPromo, setShowPromo] = useState(false);
   const [promoPrice, setPromoPrice] = useState('');
+  const [hasWarranty, setHasWarranty] = useState(null); // null = pas encore répondu
+  const [warrantyLabelChoice, setWarrantyLabelChoice] = useState(null);
+  const [warrantyNote, setWarrantyNote] = useState('');
   const [certified, setCertified] = useState(false);
   const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
@@ -108,8 +112,13 @@ export default function PostListingScreen({ navigation }) {
       e.promo = 'Le prix promo doit être inférieur au prix normal.';
     }
     if (city.trim().length < 2) e.city = 'Indique ta ville ou ton quartier.';
+    if (hasWarranty === null) e.warranty = 'Indique si ton article a une garantie (oui ou non).';
+    if (hasWarranty && !warrantyLabelChoice) e.warrantyDuration = 'Choisis la durée de la garantie.';
+    if (hasWarranty && warrantyNote.trim() && checkMessage(warrantyNote)) {
+      e.warrantyNote = 'Pas de numéro, email ni lien dans la garantie.';
+    }
     return e;
-  }, [title, description, price, promoPrice, showPromo, city]);
+  }, [title, description, price, promoPrice, showPromo, city, hasWarranty, warrantyLabelChoice, warrantyNote]);
 
   const missingPhotos = Math.max(0, MIN_PHOTOS - photos.length);
   const show = (k) => (tried || (k === 'description' && description.length > 0) ? errors[k] : undefined);
@@ -241,6 +250,8 @@ export default function PostListingScreen({ navigation }) {
         category,
         condition,
         delai_livraison: delaiLivraison,
+        warranty_days: hasWarranty ? (WARRANTY_OPTIONS.find((o) => o.label === warrantyLabelChoice)?.days || 0) : 0,
+        warranty_note: hasWarranty && warrantyNote.trim() ? warrantyNote.trim().slice(0, 150) : null,
         photo_url: photoUrls[0],
         photos: photoUrls,
         promo_price: showPromo && promoPrice.trim() ? Number(digits(promoPrice)) : null,
@@ -323,6 +334,7 @@ export default function PostListingScreen({ navigation }) {
     { ok: title.trim().length >= 3 && !errors.title, label: 'Titre' },
     { ok: !!digits(price) && !errors.price, label: 'Prix' },
     { ok: city.trim().length >= 2, label: 'Ville' },
+    { ok: hasWarranty !== null && (!hasWarranty || !!warrantyLabelChoice), label: 'Garantie' },
     { ok: certified, label: 'Certification' },
   ];
 
@@ -477,6 +489,38 @@ export default function PostListingScreen({ navigation }) {
 
           <Text style={styles.label}>État</Text>
           <Chips options={conditions} value={condition} onChange={setCondition} />
+
+          <Text style={styles.label}>Garantie <Text style={styles.star}>*</Text></Text>
+          <Chips
+            options={['Oui', 'Non']}
+            value={hasWarranty === null ? null : hasWarranty ? 'Oui' : 'Non'}
+            onChange={(v) => {
+              setHasWarranty(v === 'Oui');
+              if (v === 'Non') { setWarrantyLabelChoice(null); setWarrantyNote(''); }
+            }}
+          />
+          <Err text={show('warranty')} />
+          {hasWarranty ? (
+            <>
+              <Text style={styles.label}>Durée de la garantie <Text style={styles.star}>*</Text></Text>
+              <Chips
+                options={WARRANTY_OPTIONS.map((o) => o.label)}
+                value={warrantyLabelChoice}
+                onChange={setWarrantyLabelChoice}
+              />
+              <Err text={show('warrantyDuration')} />
+              <Text style={styles.label}>Ce que couvre la garantie (facultatif)</Text>
+              <TextInput
+                placeholder="Ex : pannes de moteur, pas les chocs"
+                placeholderTextColor={colors.textMuted}
+                value={warrantyNote}
+                onChangeText={setWarrantyNote}
+                maxLength={150}
+                style={[styles.input, show('warrantyNote') && styles.inputError]}
+              />
+              <Err text={show('warrantyNote')} />
+            </>
+          ) : null}
 
           <Text style={styles.label}>Ville, quartier <Text style={styles.star}>*</Text></Text>
           <TextInput

@@ -344,6 +344,7 @@
       <button type="button" class="tab-btn" data-tab="identites"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.5-2 5.5-2 6 0M14 10h4M14 14h4"/></svg>Vérification d'identité<span class="badge" id="badge-identites"></span></button>
       <div class="nav-label" id="nav-admin-label" style="display:none">Administration</div>
       <button type="button" class="tab-btn" data-tab="equipe" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>Équipe</button>
+      <button type="button" class="tab-btn" data-tab="reglages" style="display:none"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Réglages</button>
       <div class="sidebar-foot">
         <div class="admin-mail" id="admin-mail"></div>
         <button type="button" class="logout-btn" id="logout-btn">Se déconnecter</button>
@@ -359,6 +360,7 @@
     <div class="panel" id="panel-paiements"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-demandes"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-equipe"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-reglages"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-suggestions"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-signalements"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-infos"><div class="loading">Chargement…</div></div>
@@ -900,7 +902,7 @@ async function loadUsers() {
 
   const [{ data: blockedListings }, { data: users }] = await Promise.all([
     sb.from('listings').select('vendeur_id').eq('moderation_status', 'blocked'),
-    sb.from('users').select('id, nom, telephone, whatsapp, email, is_banned, ban_reason'),
+    sb.from('users').select('id, nom, telephone, whatsapp, email, is_banned, ban_reason, photo_url, avatar_icon, avatar_color, boutique_nom'),
   ]);
 
   const blockedCounts = {};
@@ -927,7 +929,8 @@ async function loadUsers() {
 
   grid.innerHTML = '<div class="grid-list">' + risky.map((u) => `
     <div class="grid-card" data-id="${u.id}">
-      <p class="card-title">${u.nom || 'Sans nom'}</p>
+      ${renderAvatarHtml(u, 40)}
+      <p class="card-title" style="margin-top:8px;">${u.nom || 'Sans nom'}</p>
       <p class="card-sub">📞 ${u.telephone || '—'}</p>
       <span class="pill">${u.blockedCount} annonce(s) bloquée(s)</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
@@ -951,6 +954,7 @@ function showUtilisateurDetail(userId) {
   page.innerHTML = `
     <button class="detail-back" onclick="closeUtilisateurDetail()">← Retour à la liste</button>
     <div class="detail-header">
+      ${renderAvatarHtml(u, 64)}
       <p class="detail-title">${u.nom || 'Sans nom'}</p>
     </div>
 
@@ -1009,6 +1013,24 @@ sb.auth.getSession().then(({ data: { session } }) => {
 
 let articlesData = {};
 
+// Garantie proposée par le vendeur (warranty_days : vide = ancienne annonce, 0 = aucune)
+function warrantyDuration(d) {
+  d = Number(d);
+  if (d % 365 === 0) return d / 365 + (d / 365 > 1 ? ' ans' : ' an');
+  if (d % 30 === 0) return d / 30 + ' mois';
+  return d + ' jours';
+}
+function warrantyText(l) {
+  if (l.warranty_days === null || l.warranty_days === undefined) return 'Non renseignée (ancienne annonce)';
+  if (Number(l.warranty_days) <= 0) return 'Sans garantie';
+  return warrantyDuration(l.warranty_days) + (l.warranty_note ? ' — ' + l.warranty_note : '');
+}
+function warrantyPill(l) {
+  if (l.warranty_days === null || l.warranty_days === undefined) return '';
+  if (Number(l.warranty_days) <= 0) return '<span class="pill">Sans garantie</span>';
+  return '<span class="pill" style="background:var(--success, #1E9E5A); color:#fff;">Garantie ' + warrantyDuration(l.warranty_days) + '</span>';
+}
+
 async function loadArticles() {
   const grid = document.getElementById('articles-grid');
   const search = (document.getElementById('articles-search')?.value || '').toLowerCase();
@@ -1050,6 +1072,7 @@ async function loadArticles() {
       <p class="card-title">${l.title}</p>
       <p class="card-sub">${Number(l.price).toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span>
+      ${warrantyPill(l)}
       ${isHidden ? '<span class="pill" style="background:var(--danger); color:#fff;">Masquée</span>' : ''}
       ${isBoosted ? '<span class="pill" style="background:var(--orange); color:#fff;">En vedette</span>' : ''}
       <button class="btn btn-approve voir-plus-btn" onclick="showArticleDetail('${l.id}')">Voir plus</button>
@@ -1090,6 +1113,7 @@ async function showArticleDetail(id) {
       <div class="detail-row"><span>État</span><span>${l.condition || '—'}</span></div>
       <div class="detail-row"><span>Lieu</span><span>${l.city || '—'}</span></div>
       <div class="detail-row"><span>Délai livraison</span><span>${l.delai_livraison || '—'}</span></div>
+      <div class="detail-row"><span>Garantie</span><span>${esc(warrantyText(l))}</span></div>
       <div class="detail-row"><span>Statut</span><span>${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span></div>
     </div>
 
@@ -2064,6 +2088,12 @@ function renderAvatarHtml(u, size) {
   if (u.photo_url) {
     return '<img class="detail-avatar" src="' + u.photo_url + '" style="width:' + size + 'px; height:' + size + 'px;">';
   }
+  // Avatar emoji choisi dans l'appli : avatar_icon = "emoji:🦁"
+  if (typeof u.avatar_icon === 'string' && u.avatar_icon.indexOf('emoji:') === 0) {
+    const emoji = u.avatar_icon.slice(6);
+    const bgE = u.avatar_color || '#EDE7F6';
+    return '<div class="detail-avatar-icon" style="width:' + size + 'px; height:' + size + 'px; background:' + bgE + '; font-size:' + Math.round(size * 0.55) + 'px;">' + emoji + '</div>';
+  }
   const initiale = (u.boutique_nom || u.nom || '?').charAt(0).toUpperCase();
   const bg = u.avatar_color || '#2E0B8C';
   return '<div class="detail-avatar-icon" style="width:' + size + 'px; height:' + size + 'px; background:' + bg + '; font-size:' + Math.round(size * 0.4) + 'px;">' + initiale + '</div>';
@@ -2374,6 +2404,7 @@ const PAGE_INFO = {
   litiges: ['Litiges', 'Problèmes signalés par les acheteurs (dans les 24 h après livraison ou retrait).'],
   demandes: ['Comptes marchands', "Demandes d'ouverture, et création d'un compte à la demande d'un utilisateur."],
   equipe: ['Équipe', "Les profils du back-office et ce que chacun peut gérer."],
+  reglages: ['Réglages', "Coordonnées du service client affichées dans l'appli."],
   paiements: ['Paiements', "Tout l'argent qui entre et qui sort, réseau par réseau."],
   reversements: ['Versements marchands', 'Demandes de reversement à traiter.'],
   paniers: ['Paniers', 'Paniers en cours des acheteurs.'],
@@ -2423,6 +2454,7 @@ function showTab(name) {
   if (name === 'paiements') loadPaiements();
   if (name === 'demandes') loadDemandes();
   if (name === 'equipe') loadEquipe();
+  if (name === 'reglages') loadReglages();
   if (name === 'suggestions') loadSuggestions();
   if (name === 'signalements') loadSignalements();
   if (name === 'infos') loadInfos();
@@ -3063,7 +3095,7 @@ let ME = { is_super: true, perms: new Set(), legacy: true };
 let teamRows = [];
 
 function can(tab) {
-  if (tab === 'equipe') return !!ME.is_super;
+  if (tab === 'equipe' || tab === 'reglages') return !!ME.is_super;
   return !!ME.is_super || ME.perms.has(tab);
 }
 function firstAllowedTab() {
@@ -3821,6 +3853,51 @@ function legalForm(kind) {
     + '<button class="btn" onclick="document.getElementById(\'legal-form\').innerHTML=\'\'">Annuler</button></div></div>';
   window.scrollTo(0, 0);
 }
+/* ---------- Réglages : contact du service client (super-admin) ---------- */
+async function loadReglages() {
+  const panel = document.getElementById('panel-reglages');
+  if (!can('reglages')) { panel.innerHTML = ''; return; }
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  let rows;
+  try { rows = (await kycFn('admin-settings', { action: 'list' })).rows || []; }
+  catch (e) {
+    panel.innerHTML = '<div class="error-box">' + esc(e.message) + '<br>Vérifie que le fichier reglages.sql a été lancé et que la fonction admin-settings est déployée.</div>';
+    return;
+  }
+  const v = {}; rows.forEach((r) => { v[r.key] = r.value || ''; });
+  const last = rows.map((r) => r.updated_at).filter(Boolean).sort().pop();
+  panel.innerHTML =
+    '<div class="card" style="max-width:640px;">'
+    + '<p class="card-title" style="margin-bottom:6px;">Service client</p>'
+    + '<p class="card-sub" style="margin:0 0 12px">Ces coordonnées s\'affichent dans l\'appli, page « Service clients ». Un champ vide cache le bouton correspondant.</p>'
+    + '<div class="team-form">'
+    + '<label class="lbl">WhatsApp (indicatif du pays + numéro, sans + ni espaces)</label><input type="text" id="rg-whatsapp" inputmode="numeric" placeholder="34627137449" value="' + esc(v.support_whatsapp || '') + '">'
+    + '<label class="lbl">Téléphone (facultatif, pour le bouton Appeler)</label><input type="text" id="rg-phone" placeholder="+34627137449" value="' + esc(v.support_phone || '') + '">'
+    + '<label class="lbl">E-mail</label><input type="text" id="rg-email" placeholder="contact@zunomarket.store" value="' + esc(v.support_email || '') + '">'
+    + '<label class="lbl">Horaires de réponse</label><input type="text" id="rg-hours" placeholder="Lundi – Samedi, 7h – 23h" value="' + esc(v.support_hours || '') + '">'
+    + '</div>'
+    + '<div class="actions" style="margin-top:14px"><button class="btn btn-approve" id="rg-save" onclick="saveReglages()">Enregistrer</button></div>'
+    + '<p class="card-meta" id="rg-msg" style="margin-top:10px">' + (last ? 'Dernière modification le ' + new Date(last).toLocaleString('fr-FR') : '') + '</p>'
+    + '</div>';
+}
+async function saveReglages() {
+  const btn = document.getElementById('rg-save');
+  btn.disabled = true;
+  try {
+    await kycFn('admin-settings', { action: 'save', values: {
+      support_whatsapp: document.getElementById('rg-whatsapp').value,
+      support_phone: document.getElementById('rg-phone').value,
+      support_email: document.getElementById('rg-email').value,
+      support_hours: document.getElementById('rg-hours').value,
+    } });
+    await loadReglages();
+    document.getElementById('rg-msg').textContent = '✓ Enregistré. Visible dans l\'appli à la prochaine ouverture de la page Service clients.';
+  } catch (e) {
+    alert(e.message);
+    btn.disabled = false;
+  }
+}
+
 async function legalPublish(kind) {
   try {
     await kycFn('admin-legal', { action: 'publish', kind, version: document.getElementById('lg-version').value, note: document.getElementById('lg-note').value });

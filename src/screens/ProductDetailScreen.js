@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AvatarGlyph } from '../components/Avatar';
 import { colors, spacing, radius } from '../theme/colors';
@@ -8,6 +8,8 @@ import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import { ILLEGAL_KEYWORDS } from '../lib/moderation';
 import { usePrefs } from '../lib/prefs';
 import ReportUserModal from '../components/ReportUserModal';
+import { warrantyLabel } from '../lib/warranty';
+import { useCart } from '../lib/cartState';
 import { getSellerRating, getListingRating, countCompletedSales, TRUST_BADGE_THRESHOLD } from '../lib/reputation';
 
 const REPORT_CATEGORIES = [...Object.keys(ILLEGAL_KEYWORDS), 'AUTRE'];
@@ -23,6 +25,7 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteId, setFavoriteId] = useState(null);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const { inCart: cartItemId, toggle: handleToggleCart } = useCart(listing.id, navigation);
   const [wishlistId, setWishlistId] = useState(null);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
@@ -111,6 +114,7 @@ export default function ProductDetailScreen({ route, navigation }) {
       }
     }
     loadWishlistState();
+
     return () => {
       cancelled = true;
     };
@@ -346,6 +350,20 @@ export default function ProductDetailScreen({ route, navigation }) {
       <View style={styles.badge}>
         <Text style={styles.badgeText}>{listing.condition}</Text>
       </View>
+      {Number(listing.warranty_days) > 0 ? (
+        <View style={[styles.badge, styles.heavyBadge]}>
+          <Ionicons name="shield-checkmark" size={12} color={colors.success} />
+          <Text style={styles.badgeText}> Garantie {warrantyLabel(listing.warranty_days)}</Text>
+        </View>
+      ) : listing.warranty_days === 0 ? (
+        <View style={[styles.badge, styles.heavyBadge]}>
+          <Ionicons name="shield-outline" size={12} color={colors.textMuted} />
+          <Text style={[styles.badgeText, { color: colors.textMuted }]}> Sans garantie</Text>
+        </View>
+      ) : null}
+      {Number(listing.warranty_days) > 0 && listing.warranty_note ? (
+        <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm }}>{listing.warranty_note}</Text>
+      ) : null}
       {listing.is_heavy && (
         <View style={[styles.badge, styles.heavyBadge]}>
           <Ionicons name="cube-outline" size={12} color={colors.purple} />
@@ -401,18 +419,20 @@ export default function ProductDetailScreen({ route, navigation }) {
               : 'Vendeur non identifié'}
           </Text>
         </View>
-        {seller.whatsapp && (
-          <TouchableOpacity
-            onPress={() => {
-              const digits = seller.whatsapp.replace(/[^0-9]/g, '');
-              const message = encodeURIComponent(`Bonjour, je suis intéressé(e) par « ${listing.title} » sur Zuno.`);
-              Linking.openURL(`https://wa.me/${digits}?text=${message}`);
-            }}
-            style={styles.whatsappButton}
-          >
-            <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={handleToggleCart}
+          style={[styles.cartButton, cartItemId && styles.cartButtonActive]}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name={cartItemId ? 'cart' : 'cart-outline'}
+            size={18}
+            color={cartItemId ? '#fff' : colors.purple}
+          />
+          <Text style={[styles.cartButtonText, cartItemId && { color: '#fff' }]}>
+            {cartItemId ? 'Voir le panier' : 'Panier'}
+          </Text>
+        </TouchableOpacity>
         <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
           <Ionicons
             name={isFavorite ? 'heart' : 'heart-outline'}
@@ -662,7 +682,19 @@ const styles = StyleSheet.create({
   sellerMeta: { fontSize: 12, color: colors.textSecondary },
   sellerSubMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
   favoriteButton: { padding: spacing.xs },
-  whatsappButton: { padding: spacing.xs },
+  cartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill || 999,
+    borderWidth: 1,
+    borderColor: colors.purple,
+    marginRight: spacing.xs,
+  },
+  cartButtonActive: { backgroundColor: colors.purple },
+  cartButtonText: { color: colors.purple, fontSize: 12, fontWeight: '700' },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   iconButton: { padding: spacing.xs },
   offerLink: {

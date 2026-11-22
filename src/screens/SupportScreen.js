@@ -1,13 +1,14 @@
 // Service clients — src/screens/SupportScreen.js
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Linking, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme/colors';
 import InfoHeader from '../components/InfoHeader';
+import { supabase } from '../lib/supabase';
 
-// ✏️ REMPLIS tes vraies coordonnées ici. Un champ vide = le bouton est caché.
-// WHATSAPP : numéro avec l'indicatif, sans + ni espaces (ex. '22790000000')
-const CONTACT = {
+// Valeurs de secours si le tableau de bord est injoignable.
+// Les vraies coordonnées se modifient dans le tableau de bord > Réglages.
+const DEFAULT_CONTACT = {
   WHATSAPP: '34627137449',
   PHONE: '',
   EMAIL: 'contact@zunomarket.store',
@@ -18,6 +19,24 @@ const open = (url) =>
   Linking.openURL(url).catch(() => Alert.alert('Impossible d’ouvrir', 'Vérifie que l’application est installée.'));
 
 export default function SupportScreen({ navigation }) {
+  const [CONTACT, setContact] = useState(DEFAULT_CONTACT);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from('app_settings').select('key, value').like('key', 'support_%');
+      if (cancelled || error || !data || data.length === 0) return;
+      const m = Object.fromEntries(data.map((r) => [r.key, r.value || '']));
+      setContact({
+        WHATSAPP: m.support_whatsapp ?? DEFAULT_CONTACT.WHATSAPP,
+        PHONE: m.support_phone ?? DEFAULT_CONTACT.PHONE,
+        EMAIL: m.support_email ?? DEFAULT_CONTACT.EMAIL,
+        HOURS: m.support_hours ?? DEFAULT_CONTACT.HOURS,
+      });
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const buttons = [
     CONTACT.WHATSAPP && { icon: 'logo-whatsapp', label: 'WhatsApp', sub: 'Réponse rapide', color: '#25D366', onPress: () => open(`https://wa.me/${CONTACT.WHATSAPP}`) },
     CONTACT.PHONE && { icon: 'call-outline', label: 'Appeler', sub: CONTACT.PHONE, color: colors.purple, onPress: () => open(`tel:${CONTACT.PHONE}`) },
