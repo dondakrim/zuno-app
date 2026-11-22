@@ -998,8 +998,13 @@ async function banUser(userId) {
 }
 
 async function setBan(userId, banned, reason) {
-  const { error } = await sb.from('users').update({ is_banned: banned, ban_reason: reason }).eq('id', userId);
+  const { data: upd, error } = await sb.from('users').update({ is_banned: banned, ban_reason: reason }).eq('id', userId).select('is_banned').maybeSingle();
   if (error) { alert('Erreur : ' + error.message); return; }
+  if (!banned && upd && upd.is_banned) {
+    alert('Le compte est resté suspendu : la base l\'a remis en suspension (un autre compte suspendu a le même numéro ?). Lance le fichier correctif-reactivation.sql dans Supabase, puis réessaie.');
+    loadComptes();
+    return;
+  }
   if (!banned) {
     // Réactivation : la demande éventuelle est marquée comme traitée.
     await sb.from('reactivation_requests').update({ status: 'traitee', handled_at: new Date().toISOString() }).eq('user_id', userId).eq('status', 'ouverte');
