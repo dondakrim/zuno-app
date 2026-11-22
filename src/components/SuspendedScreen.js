@@ -1,7 +1,7 @@
 // Écran affiché à une personne dont le compte est suspendu : image de marque,
 // motif, boutons pour joindre l'équipe (WhatsApp / e-mail) et bannière Zuno.
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, Linking, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, TextInput, StyleSheet, Linking, Alert, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,7 +34,9 @@ export default function SuspendedScreen({ reason, onRetry }) {
   const [ads, setAds] = useState(FALLBACK_ADS);
   const [adIndex, setAdIndex] = useState(0);
   const [checking, setChecking] = useState(false);
-  const [userRef, setUserRef] = useState('');
+  const [userId, setUserId] = useState('');
+  const [reqState, setReqState] = useState('idle'); // idle | sending | sent
+  const [reqMessage, setReqMessage] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +58,12 @@ export default function SuspendedScreen({ reason, onRetry }) {
         }
         if (adRows && adRows.length) setAds(adRows);
         const id = sess?.session?.user?.id;
-        if (id) setUserRef(id.slice(0, 8));
+        if (id) {
+          setUserId(id);
+          const { data: open } = await supabase
+            .from('reactivation_requests').select('id').eq('user_id', id).eq('status', 'ouverte').maybeSingle();
+          if (!cancelled && open) setReqState('sent');
+        }
       } catch (e) {
         // on garde les valeurs de secours
       }
@@ -71,7 +78,32 @@ export default function SuspendedScreen({ reason, onRetry }) {
     return () => clearInterval(t);
   }, [ads]);
 
-  const intro = `Bonjour, mon compte Zuno est suspendu${reason ? ` (motif : ${reason})` : ''}. Pouvez-vous m'aider ?${userRef ? ` Référence : ${userRef}` : ''}`;
+  // Revérifie le statut toutes les 30 s : une réactivation prend effet sans rien toucher.
+  useEffect(() => {
+    if (!onRetry) return undefined;
+    const t = setInterval(() => { onRetry(); }, 30000);
+    return () => clearInterval(t);
+  }, [onRetry]);
+
+  // Référence du compte : 8 caractères, ex. 71FC-EAE7 (cherchable dans le tableau de bord).
+  const hex = userId.replace(/-/g, '').slice(0, 8).toUpperCase();
+  const userRef = hex ? `${hex.slice(0, 4)}-${hex.slice(4, 8)}` : '';
+
+  const sendRequest = async () => {
+    if (!userId || reqState !== 'idle') return;
+    setReqState('sending');
+    const { error } = await supabase
+      .from('reactivation_requests')
+      .insert({ user_id: userId, message: reqMessage.trim().slice(0, 300) || null });
+    if (error && error.code !== '23505') {
+      setReqState('idle');
+      Alert.alert('Envoi impossible', "Vérifie ta connexion et réessaie. Tu peux aussi écrire à l'équipe par WhatsApp ou e-mail.");
+      return;
+    }
+    setReqState('sent'); // 23505 = une demande est déjà ouverte : c'est bien reçu
+  };
+
+  const intro = `Bonjour, mon compte Zuno est suspendu${reason ? ` (motif : ${reason})` : ''}. Pouvez-vous m'aider ?${userRef ? ` Référence du compte : ${userRef}` : ''}`;
 
   const retry = async () => {
     if (!onRetry || checking) return;
@@ -106,7 +138,45 @@ export default function SuspendedScreen({ reason, onRetry }) {
             </View>
           ) : null}
 
-          <Text style={styles.help}>Tu penses qu'il s'agit d'une erreur ? Contacte l'équipe Zuno :</Text>
+          {userRef ? (
+            <View style={styles.refBox}>
+              <Text style={styles.refLabel}>RÉFÉRENCE DU COMPTE</Text>
+              <Text style={styles.refValue} selectable>{userRef}</Text>
+              <Text style={styles.refHint}>Donne ce code à l'équipe Zuno pour qu'elle retrouve ton compte.</Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.help}>Tu penses qu'il s'agit d'une erreur ? Demande à l'équipe de réexaminer ton compte :</Text>
+
+          {reqState === 'sent' ? (
+            <View style={styles.sentBox}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={styles.sentText}>Demande envoyée. L'équipe Zuno l'examine et te répondra.</Text>
+            </View>
+          ) : (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Explique en une phrase (facultatif)"
+                placeholderTextColor={colors.textMuted}
+                value={reqMessage}
+                onChangeText={setReqMessage}
+                maxLength={300}
+                multiline
+              />
+              <TouchableOpacity
+                style={[styles.btn, { backgroundColor: colors.purple }, reqState === 'sending' && { opacity: 0.6 }]}
+                activeOpacity={0.85}
+                onPress={sendRequest}
+                disabled={reqState === 'sending' || !userId}
+              >
+                <Ionicons name="paper-plane-outline" size={19} color="#fff" />
+                <Text style={styles.btnText}>{reqState === 'sending' ? 'Envoi…' : 'Demander la réactivation'}</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          <Text style={[styles.help, { marginTop: spacing.sm }]}>Ou contacte-nous directement :</Text>
 
           {contact.WHATSAPP ? (
             <TouchableOpacity
@@ -139,7 +209,7 @@ export default function SuspendedScreen({ reason, onRetry }) {
               {checking ? (
                 <ActivityIndicator color={colors.purple} />
               ) : (
-                <Text style={styles.retryText}>J'ai été réactivé : vérifier mon statut</Text>
+                <Text style={styles.retryText}>Vérifier mon statut maintenant</Text>
               )}
             </TouchableOpacity>
           ) : null}
@@ -209,6 +279,13 @@ const styles = StyleSheet.create({
   },
   reasonLabel: { fontSize: 10, fontWeight: '800', color: colors.danger, letterSpacing: 1, marginBottom: 2 },
   reasonText: { fontSize: 14, fontWeight: '600', color: colors.textPrimary, lineHeight: 20 },
+  refBox: { alignSelf: 'stretch', backgroundColor: '#F1EEFB', borderRadius: 14, padding: spacing.md, alignItems: 'center', marginBottom: spacing.md },
+  refLabel: { fontSize: 10, fontWeight: '800', color: colors.purple, letterSpacing: 1 },
+  refValue: { fontSize: 26, fontWeight: '800', color: colors.purple, letterSpacing: 3, marginVertical: 2 },
+  refHint: { fontSize: 11, color: colors.textSecondary, textAlign: 'center' },
+  input: { alignSelf: 'stretch', minHeight: 60, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: spacing.md, fontSize: 14, color: colors.textPrimary, marginBottom: spacing.sm, textAlignVertical: 'top' },
+  sentBox: { alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.successBg, borderRadius: 14, padding: spacing.md, marginBottom: spacing.sm },
+  sentText: { flex: 1, fontSize: 13, color: colors.success, fontWeight: '600' },
   help: { fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.md },
   btn: {
     alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', justifyContent: 'center',

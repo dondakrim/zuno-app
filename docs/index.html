@@ -398,11 +398,12 @@
     </div>
     <div class="panel" id="panel-comptes">
       <div class="card" style="margin-bottom: 16px;">
-        <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email)…" oninput="loadComptes()">
+        <input type="text" id="comptes-search" placeholder="Rechercher (nom, téléphone, email, référence du compte)…" oninput="loadComptes()">
         <select id="comptes-filter" onchange="loadComptes()" style="margin-top:10px; width:100%;">
           <option value="all">Tous les comptes</option>
           <option value="banned">Suspendus seulement</option>
           <option value="tests">Comptes de test seulement</option>
+          <option value="requests">Demandes de réactivation</option>
         </select>
         <button class="btn btn-approve" style="width:100%; padding:10px; margin-top:10px;" onclick="exportAllAccountsCSV()">Exporter tous les comptes (CSV)</button>
       </div>
@@ -999,6 +1000,10 @@ async function banUser(userId) {
 async function setBan(userId, banned, reason) {
   const { error } = await sb.from('users').update({ is_banned: banned, ban_reason: reason }).eq('id', userId);
   if (error) { alert('Erreur : ' + error.message); return; }
+  if (!banned) {
+    // Réactivation : la demande éventuelle est marquée comme traitée.
+    await sb.from('reactivation_requests').update({ status: 'traitee', handled_at: new Date().toISOString() }).eq('user_id', userId).eq('status', 'ouverte');
+  }
   await sb.from('notifications').insert({
     user_id: userId,
     title: banned ? 'Compte suspendu' : 'Compte réactivé',
@@ -1008,6 +1013,14 @@ async function setBan(userId, banned, reason) {
   loadUsers();
   loadMerchants();
   if (typeof loadComptes === 'function') loadComptes();
+}
+
+/* ---------- Référence de compte & demandes de réactivation ---------- */
+let reactivationData = {};
+// Référence courte affichée à la personne suspendue : 8 premiers caractères de l'identifiant, ex. 71FC-EAE7
+function accountRef(id) {
+  const h = String(id || '').replace(/-/g, '').slice(0, 8).toUpperCase();
+  return h.slice(0, 4) + '-' + h.slice(4, 8);
 }
 
 /* ---------- Suppression de comptes (super-admin) ---------- */
@@ -1444,10 +1457,20 @@ async function loadComptes() {
 
   const onlyBanned = document.getElementById('comptes-filter')?.value === 'banned';
   const onlyTests = document.getElementById('comptes-filter')?.value === 'tests';
+  const onlyRequests = document.getElementById('comptes-filter')?.value === 'requests';
+  // Demandes de réactivation ouvertes (envoyées par les comptes suspendus depuis l'appli)
+  reactivationData = {};
+  try {
+    const { data: reqs } = await sb.from('reactivation_requests').select('id, user_id, message, created_at').eq('status', 'ouverte');
+    (reqs || []).forEach((r) => { reactivationData[r.user_id] = r; });
+  } catch (_e) { /* table pas encore créée : on ignore */ }
   const filtered = data.filter((u) => {
     if (onlyBanned && !u.is_banned) return false;
     if (onlyTests && !isTestAccount(u)) return false;
+    if (onlyRequests && !reactivationData[u.id]) return false;
     if (!search) return true;
+    const refQ = search.replace(/[^0-9a-f]/g, '');
+    if (refQ.length >= 4 && String(u.id).replace(/-/g, '').toLowerCase().startsWith(refQ)) return true;
     return (u.nom || '').toLowerCase().includes(search)
       || (u.telephone || '').toLowerCase().includes(search)
       || (u.whatsapp || '').toLowerCase().includes(search)
@@ -1460,15 +1483,19 @@ async function loadComptes() {
   if (filtered.length === 0) { list.innerHTML = '<div class="empty">Aucun compte ne correspond.</div>'; return; }
 
   const nbTests = data.filter(isTestAccount).length;
-  list.innerHTML = '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)'
+  const nbReq = Object.keys(reactivationData).length;
+  list.innerHTML = (nbReq ? '<div class="card" style="margin-bottom:12px; border-left:4px solid var(--orange);"><p class="card-sub" style="margin:0"><b>' + nbReq + ' demande(s) de réactivation</b> en attente — <a href="#" onclick="document.getElementById(\'comptes-filter\').value=\'requests\'; loadComptes(); return false;" style="color:var(--orange); font-weight:700;">les voir</a></p></div>' : '')
+    + '<p class="card-meta" style="margin-bottom:10px;">' + filtered.length + ' compte(s)'
     + (ME.is_super && nbTests > 0 ? ' · <a href="#" onclick="openCleanupTests(); return false;" style="color:var(--danger); font-weight:700;">Nettoyer les ' + nbTests + ' comptes de test</a>' : '') + '</p>' +
     '<div class="grid-list">' + filtered.map((u) => `
     <div class="grid-card" data-id="${u.id}">
       ${renderAvatarHtml(u, 40)}
       <p class="card-title" style="margin-top:8px;">${u.boutique_nom || u.nom || 'Sans nom'}</p>
       <p class="card-sub">📞 ${u.telephone || '—'}</p>
+      <p class="card-meta">Réf. ${accountRef(u.id)}</p>
       <span class="pill">${u.identity_status === 'verifiee' ? 'Identifié' : 'Non identifié'}</span>
       ${u.is_banned ? '<span class="pill" style="background:var(--danger); color:#fff;">Suspendu</span>' : ''}
+      ${reactivationData[u.id] ? '<span class="pill" style="background:var(--orange); color:#fff;">Demande de réactivation</span>' : ''}
       <p class="card-meta">${u.last_seen_at ? 'Vu le ' + new Date(u.last_seen_at).toLocaleDateString('fr-FR') : 'Jamais reconnecté'}</p>
       <button class="btn btn-approve voir-plus-btn" onclick="showCompteDetail('${u.id}')">Voir plus</button>
     </div>
@@ -1499,6 +1526,7 @@ async function showCompteDetail(userId) {
 
     <div class="detail-section">
       <h4>Coordonnées</h4>
+      <div class="detail-row"><span>Référence du compte</span><span><b>${accountRef(u.id)}</b></span></div>
       <div class="detail-row"><span>Téléphone</span><span>${u.telephone || '—'}</span></div>
       <div class="detail-row"><span>WhatsApp</span><span>${u.whatsapp || '—'}</span></div>
       <div class="detail-row"><span>Email</span><span>${u.email || '—'}</span></div>
@@ -1524,6 +1552,12 @@ async function showCompteDetail(userId) {
       <h4>Pièce d'identité</h4>
       <p class="card-meta">Chargement…</p>
     </div>
+
+    ${reactivationData[u.id] ? `<div class="detail-section" style="border-left:4px solid var(--orange);">
+      <h4>Demande de réactivation</h4>
+      <div class="detail-row"><span>Envoyée le</span><span>${new Date(reactivationData[u.id].created_at).toLocaleString('fr-FR')}</span></div>
+      <div class="detail-row"><span>Message</span><span>${esc(reactivationData[u.id].message || '—')}</span></div>
+    </div>` : ''}
 
     <div class="detail-section">
       <h4>Actions</h4>
