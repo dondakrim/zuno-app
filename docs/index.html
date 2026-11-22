@@ -330,6 +330,11 @@
       <button type="button" class="tab-btn" data-tab="promos"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.2"/></svg>Promos</button>
       <button type="button" class="tab-btn" data-tab="blog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z"/><path d="M8 7h6M8 11h6"/></svg>Blog</button>
       <button type="button" class="tab-btn" data-tab="campagnes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 3L11 14"/><path d="M22 3l-7 18-4-7-7-4z"/></svg>Campagnes</button>
+      <button type="button" class="tab-btn" data-tab="evenements"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Événements</button>
+      <button type="button" class="tab-btn" data-tab="categories"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Catégories</button>
+      <button type="button" class="tab-btn" data-tab="avis"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Avis</button>
+      <button type="button" class="tab-btn" data-tab="motsbloques"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>Mots bloqués</button>
+      <button type="button" class="tab-btn" data-tab="faq"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>FAQ</button>
       <div class="nav-label">Communauté</div>
       <button type="button" class="tab-btn" data-tab="utilisateurs"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><path d="M17 5a3 3 0 0 1 0 6M22 20c0-3-2-5-4-5.5"/></svg>Utilisateurs</button>
       <button type="button" class="tab-btn" data-tab="marchands"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>Marchands</button>
@@ -365,6 +370,11 @@
     <div class="panel" id="panel-signalements"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-infos"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-blog"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-evenements"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-categories"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-avis"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-motsbloques"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-faq"><div class="loading">Chargement…</div></div>
 
     <div class="panel" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
@@ -2550,6 +2560,11 @@ const PAGE_INFO = {
   marchands: ['Marchands', 'Boutiques, ventes et statut.'],
   comptes: ['Comptes', 'Recherche et détails de chaque compte.'],
   blog: ['Blog', 'Articles visibles dans Compte → Blog.'],
+  evenements: ['Événements et collections', "Black Friday, fêtes… affichés sur l'accueil pendant leurs dates, puis retirés tout seuls."],
+  categories: ['Catégories', "Les catégories proposées dans l'appli : noms, icônes, ordre, visibilité."],
+  avis: ['Avis et notes', 'Tous les avis. Un avis masqué disparaît de l\'appli.'],
+  motsbloques: ['Mots et numéros bloqués', 'Ce qui est refusé dans les annonces et les messages.'],
+  faq: ['FAQ', "Questions fréquentes affichées dans Service clients."],
   suggestions: ['Suggestions', 'Idées et remarques envoyées par les utilisateurs.'],
   signalements: ['Signalements', 'Utilisateurs signalés depuis l’application. À traiter sous 24 h.'],
   infos: ['Infos aux utilisateurs', 'Alertes et nouveautés affichées dans Compte → Infos.'],
@@ -2591,6 +2606,11 @@ function showTab(name) {
   if (name === 'signalements') loadSignalements();
   if (name === 'infos') loadInfos();
   if (name === 'blog') loadBlog();
+  if (name === 'evenements') loadEvenements();
+  if (name === 'categories') loadCategories();
+  if (name === 'avis') loadAvis();
+  if (name === 'motsbloques') loadMotsBloques();
+  if (name === 'faq') loadFaq();
   if (name === 'kyc') loadKyc();
   if (name === 'legal') loadLegal();
   if (name === 'connexions') loadConnexions();
@@ -3214,14 +3234,14 @@ const TEAM_SECTIONS = [
   ['publicites', 'Publicités'], ['boosts', 'Mises en avant'], ['promos', 'Promos'], ['campagnes', 'Campagnes'],
   ['utilisateurs', 'Utilisateurs'], ['marchands', 'Marchands'], ['demandes', 'Comptes marchands'],
   ['comptes', 'Comptes'], ['identites', "Vérification d'identité"], ['kyc', 'Identification KYC'], ['legal', 'Textes légaux'], ['connexions', 'Connexions WhatsApp'],
-  ['blog', 'Blog'], ['suggestions', 'Suggestions'], ['signalements', 'Signalements'], ['infos', 'Infos aux utilisateurs'],
+  ['blog', 'Blog'], ['evenements', 'Événements'], ['categories', 'Catégories'], ['avis', 'Avis'], ['motsbloques', 'Mots bloqués'], ['faq', 'FAQ'], ['suggestions', 'Suggestions'], ['signalements', 'Signalements'], ['infos', 'Infos aux utilisateurs'],
 ];
 const TEAM_PRESETS = {
   support: ['Support client', ['overview', 'commandes', 'litiges', 'paniers', 'utilisateurs', 'kyc', 'connexions']],
   agent: ['Agent clients (KYC)', ['overview', 'kyc', 'connexions', 'utilisateurs']],
   moderation: ['Modération', ['overview', 'moderation', 'articles', 'identites', 'utilisateurs']],
   finance: ['Finance', ['overview', 'commandes', 'paiements', 'reversements']],
-  marketing: ['Marketing', ['overview', 'publicites', 'boosts', 'promos', 'campagnes']],
+  marketing: ['Marketing', ['overview', 'publicites', 'boosts', 'promos', 'campagnes', 'evenements']],
 };
 let ME = { is_super: true, perms: new Set(), legacy: true };
 let teamRows = [];
@@ -4029,6 +4049,303 @@ async function saveReglages() {
     btn.disabled = false;
   }
 }
+
+/* ============ Contenu : événements, catégories, avis, mots bloqués, FAQ ============ */
+const cFn = (resource, action, extra) => kycFn('admin-content', Object.assign({ resource, action }, extra || {}));
+const CT_HINT = '<br>Vérifie que le fichier contenu.sql a été lancé dans Supabase et que la fonction admin-content est déployée.';
+const ctErr = (panel, e) => { panel.innerHTML = '<div class="error-box">' + esc(e.message) + CT_HINT + '</div>'; };
+const ctInput = 'width:100%';
+const toLocalInput = (iso) => {
+  const d = new Date(iso); const p = (n) => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+};
+const fmtDate = (iso) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+/* ---------- Événements ---------- */
+let EV_ROWS = [], EV_ITEMS = [], EV_IMG = '', EV_SEARCH_T = null;
+async function loadEvenements() {
+  const panel = document.getElementById('panel-evenements');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try { EV_ROWS = (await cFn('events', 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
+  const now = Date.now();
+  const status = (e) => !e.active ? ['Désactivé', '#8A8499'] : now < +new Date(e.starts_at) ? ['À venir', '#B7791F'] : now > +new Date(e.ends_at) ? ['Terminé', '#8A8499'] : ['En cours', '#1E8E3E'];
+  const list = EV_ROWS.map((e) => {
+    const st = status(e);
+    return '<div class="card" style="border-left:6px solid ' + esc(e.color) + '">'
+      + '<p class="card-title">' + esc(e.emoji) + ' ' + esc(e.title) + ' <span class="pill" style="background:' + st[1] + ';color:#fff">' + st[0] + '</span></p>'
+      + (e.subtitle ? '<p class="card-sub">' + esc(e.subtitle) + '</p>' : '')
+      + '<p class="card-meta">Du ' + esc(fmtDate(e.starts_at)) + ' au ' + esc(fmtDate(e.ends_at)) + ' · ' + (e.items || []).length + ' article(s)</p>'
+      + '<div class="actions"><button type="button" class="btn" onclick="evEdit(\'' + e.id + '\')">Modifier</button>'
+      + '<button type="button" class="btn" onclick="evToggle(\'' + e.id + '\')">' + (e.active ? 'Désactiver' : 'Activer') + '</button>'
+      + '<button type="button" class="btn btn-reject" onclick="evDelete(\'' + e.id + '\')">Supprimer</button></div></div>';
+  }).join('');
+  panel.innerHTML = '<div class="actions" style="margin:0 0 14px"><button type="button" class="btn btn-approve" onclick="evNew()">+ Nouvel événement</button>'
+    + '<button type="button" class="btn" onclick="evNew(true)">Préparer le Black Friday</button></div>'
+    + '<div id="ev-form"></div>'
+    + (list || '<div class="empty">Aucun événement. Crée le premier : il s\'affichera sur l\'accueil de l\'appli pendant ses dates, puis disparaîtra tout seul.</div>');
+}
+function evNew(blackFriday) {
+  const y = new Date().getFullYear();
+  evForm(blackFriday
+    ? { title: 'Black Friday', subtitle: 'Les meilleures affaires du week-end', emoji: '🛍️', color: '#111827', starts_at: new Date(y, 10, 27, 0, 0).toISOString(), ends_at: new Date(y, 10, 30, 23, 59).toISOString(), active: true, items: [] }
+    : { title: '', subtitle: '', emoji: '🎉', color: '#7C3AED', starts_at: new Date().toISOString(), ends_at: new Date(Date.now() + 7 * DAY).toISOString(), active: true, items: [] });
+}
+function evEdit(id) { const e = EV_ROWS.find((x) => x.id === id); if (e) evForm(e); }
+function evForm(e) {
+  EV_ITEMS = (e.items || []).map((i) => ({ id: i.id, title: i.title, price: i.price, photo_url: i.photo_url }));
+  EV_IMG = e.image_url || '';
+  const box = document.getElementById('ev-form');
+  box.innerHTML = '<div class="card team-form" style="max-width:760px"><p class="card-title">' + (e.id ? 'Modifier l\'événement' : 'Nouvel événement') + '</p>'
+    + '<input type="hidden" id="ev-id" value="' + esc(e.id || '') + '">'
+    + '<label class="lbl">Titre (ex : Black Friday)</label><input type="text" id="ev-title" maxlength="80" value="' + esc(e.title) + '">'
+    + '<label class="lbl">Sous-titre</label><input type="text" id="ev-sub" maxlength="140" value="' + esc(e.subtitle || '') + '">'
+    + '<div class="kgrid"><div class="kf"><label>Emoji</label><input type="text" id="ev-emoji" maxlength="8" value="' + esc(e.emoji) + '"></div>'
+    + '<div class="kf"><label>Couleur</label><input type="color" id="ev-color" value="' + esc(e.color) + '" style="height:40px;padding:2px"></div>'
+    + '<div class="kf"><label>Début</label><input type="datetime-local" id="ev-start" value="' + toLocalInput(e.starts_at) + '"></div>'
+    + '<div class="kf"><label>Fin</label><input type="datetime-local" id="ev-end" value="' + toLocalInput(e.ends_at) + '"></div></div>'
+    + '<label class="lbl">Image de bannière (facultatif)</label><div id="ev-img-prev"></div>'
+    + '<input type="file" id="ev-img-file" accept="image/*" onchange="evPickImg(this)">'
+    + '<label class="lbl" style="margin-top:12px"><input type="checkbox" id="ev-active"' + (e.active !== false ? ' checked' : '') + '> Activé (visible pendant les dates)</label>'
+    + '<label class="lbl" style="margin-top:12px">Articles de la collection</label>'
+    + '<div id="ev-chosen"></div>'
+    + '<input type="text" id="ev-q" placeholder="Rechercher un article par son titre…" oninput="evSearchSoon()">'
+    + '<div id="ev-results" style="margin-top:6px"></div>'
+    + '<div class="actions"><button type="button" class="btn btn-approve" id="ev-save" onclick="evSave()">Enregistrer</button>'
+    + '<button type="button" class="btn" onclick="document.getElementById(\'ev-form\').innerHTML=\'\'">Annuler</button></div>'
+    + '<p class="card-meta" id="ev-msg" style="margin-top:8px"></p></div>';
+  evRenderChosen(); evRenderImg(); evSearch();
+  window.scrollTo(0, 0);
+}
+function evRenderImg() {
+  const el = document.getElementById('ev-img-prev'); if (!el) return;
+  el.innerHTML = EV_IMG ? '<img src="' + esc(EV_IMG) + '" style="max-width:100%;max-height:140px;border-radius:10px;margin-bottom:6px"><br><button type="button" class="btn" onclick="EV_IMG=\'\';evRenderImg()">Retirer l\'image</button>' : '';
+}
+async function evPickImg(input) {
+  const file = input.files && input.files[0]; if (!file) return;
+  const name = 'events/' + Date.now() + '-' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const { error } = await sb.storage.from('ad-images').upload(name, file, { cacheControl: '3600', upsert: false });
+  if (error) { alert('Envoi de l\'image impossible : ' + error.message); return; }
+  EV_IMG = sb.storage.from('ad-images').getPublicUrl(name).data.publicUrl;
+  evRenderImg();
+}
+function evRenderChosen() {
+  const el = document.getElementById('ev-chosen'); if (!el) return;
+  el.innerHTML = EV_ITEMS.length ? EV_ITEMS.map((i, n) =>
+    '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">'
+    + (i.photo_url ? '<img src="' + esc(i.photo_url) + '" style="width:36px;height:36px;border-radius:8px;object-fit:cover">' : '<span style="width:36px"></span>')
+    + '<span style="flex:1;font-size:14px">' + esc(i.title || 'Article') + (i.price ? ' · ' + Number(i.price).toLocaleString('fr-FR') + ' FCFA' : '') + '</span>'
+    + '<button type="button" class="btn" ' + (n === 0 ? 'disabled' : '') + ' onclick="evMove(' + n + ',-1)">↑</button>'
+    + '<button type="button" class="btn" ' + (n === EV_ITEMS.length - 1 ? 'disabled' : '') + ' onclick="evMove(' + n + ',1)">↓</button>'
+    + '<button type="button" class="btn btn-reject" onclick="evRemove(' + n + ')">✕</button></div>').join('')
+    : '<p class="card-meta">Aucun article choisi pour l\'instant.</p>';
+}
+function evMove(n, d) { const m = n + d; if (m < 0 || m >= EV_ITEMS.length) return; [EV_ITEMS[n], EV_ITEMS[m]] = [EV_ITEMS[m], EV_ITEMS[n]]; evRenderChosen(); }
+function evRemove(n) { EV_ITEMS.splice(n, 1); evRenderChosen(); }
+function evSearchSoon() { clearTimeout(EV_SEARCH_T); EV_SEARCH_T = setTimeout(evSearch, 300); }
+async function evSearch() {
+  const el = document.getElementById('ev-results'); if (!el) return;
+  try {
+    const rows = (await cFn('events', 'search_listings', { q: document.getElementById('ev-q').value })).rows || [];
+    window.EV_FOUND = rows;
+    el.innerHTML = rows.map((l, n) => '<div style="display:flex;align-items:center;gap:8px;padding:5px 0">'
+      + '<span style="flex:1;font-size:13px">' + esc(l.title) + ' <span class="muted">· ' + esc(l.category || '') + '</span></span>'
+      + '<button type="button" class="btn" onclick="evAdd(' + n + ')">Ajouter</button></div>').join('') || '<p class="card-meta">Aucun résultat.</p>';
+  } catch (e) { el.innerHTML = '<p class="card-meta">' + esc(e.message) + '</p>'; }
+}
+function evAdd(n) { const l = (window.EV_FOUND || [])[n]; if (!l || EV_ITEMS.some((i) => i.id === l.id)) return; EV_ITEMS.push({ id: l.id, title: l.title, price: l.price, photo_url: l.photo_url }); evRenderChosen(); }
+async function evSave() {
+  const btn = document.getElementById('ev-save'); btn.disabled = true;
+  try {
+    await cFn('events', 'save', {
+      id: document.getElementById('ev-id').value || undefined,
+      title: document.getElementById('ev-title').value, subtitle: document.getElementById('ev-sub').value,
+      emoji: document.getElementById('ev-emoji').value, color: document.getElementById('ev-color').value,
+      starts_at: new Date(document.getElementById('ev-start').value).toISOString(),
+      ends_at: new Date(document.getElementById('ev-end').value).toISOString(),
+      active: document.getElementById('ev-active').checked, image_url: EV_IMG,
+      listing_ids: EV_ITEMS.map((i) => i.id),
+    });
+    await loadEvenements();
+  } catch (e) { alert(e.message); btn.disabled = false; }
+}
+async function evToggle(id) {
+  const e = EV_ROWS.find((x) => x.id === id); if (!e) return;
+  try {
+    await cFn('events', 'save', Object.assign({}, e, { active: !e.active, listing_ids: (e.items || []).map((i) => i.id) }));
+    loadEvenements();
+  } catch (er) { alert(er.message); }
+}
+async function evDelete(id) {
+  if (!confirm('Supprimer cet événement ? Les articles ne sont pas supprimés.')) return;
+  try { await cFn('events', 'delete', { id }); loadEvenements(); } catch (e) { alert(e.message); }
+}
+
+/* ---------- Catégories ---------- */
+let CAT_ROWS = [], CAT_COUNTS = {};
+async function loadCategories() {
+  const panel = document.getElementById('panel-categories');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try { const r = await cFn('categories', 'list'); CAT_ROWS = r.rows || []; CAT_COUNTS = r.counts || {}; } catch (e) { ctErr(panel, e); return; }
+  const mains = CAT_ROWS.filter((c) => !c.parent);
+  const row = (c, sub) => '<div class="card" style="' + (sub ? 'margin-left:28px;' : '') + (c.active ? '' : 'opacity:.6') + '">'
+    + '<p class="card-title">' + esc(c.icon) + ' ' + esc(c.label) + (c.active ? '' : ' <span class="pill">Masquée</span>') + '</p>'
+    + '<p class="card-meta">' + (sub ? 'Sous-catégorie de ' + esc(c.parent) : (CAT_COUNTS[c.label] || 0) + ' article(s)') + ' · ordre ' + c.position + '</p>'
+    + '<div class="actions"><button type="button" class="btn" onclick="catEdit(\'' + c.id + '\')">Modifier</button>'
+    + '<button type="button" class="btn" onclick="catToggle(\'' + c.id + '\')">' + (c.active ? 'Masquer' : 'Afficher') + '</button>'
+    + '<button type="button" class="btn btn-reject" onclick="catDelete(\'' + c.id + '\')">Supprimer</button></div></div>';
+  const list = mains.map((c) => row(c, false) + CAT_ROWS.filter((s2) => s2.parent === c.label).map((s2) => row(s2, true)).join('')).join('')
+    + CAT_ROWS.filter((c) => c.parent && !mains.some((m) => m.label === c.parent)).map((c) => row(c, true)).join('');
+  panel.innerHTML = '<div class="actions" style="margin:0 0 14px"><button type="button" class="btn btn-approve" onclick="catEdit()">+ Nouvelle catégorie</button>'
+    + '<button type="button" class="btn" onclick="catImport()">Importer les catégories des articles</button></div>'
+    + '<div id="cat-form"></div>'
+    + (CAT_ROWS.length ? '' : '<div class="card"><p class="card-sub" style="margin:0">Cette liste est vide : l\'appli utilise donc sa liste intégrée. Clique sur « Importer » pour reprendre les catégories déjà utilisées par les articles, puis modifie-les ici. Dès qu\'une catégorie existe ici, l\'appli suit cette liste.</p></div>')
+    + (list || '');
+}
+function catEdit(id) {
+  const c = CAT_ROWS.find((x) => x.id === id) || { label: '', icon: '🏷️', parent: '', position: CAT_ROWS.length, active: true };
+  const mains = CAT_ROWS.filter((x) => !x.parent && x.id !== c.id);
+  document.getElementById('cat-form').innerHTML = '<div class="card team-form" style="max-width:520px"><p class="card-title">' + (c.id ? 'Modifier' : 'Nouvelle catégorie') + '</p>'
+    + '<input type="hidden" id="cat-id" value="' + esc(c.id || '') + '">'
+    + '<label class="lbl">Nom</label><input type="text" id="cat-label" maxlength="40" value="' + esc(c.label) + '">'
+    + (c.id && !c.parent ? '<p class="card-meta">Si tu renommes, les articles de cette catégorie suivent automatiquement.</p>' : '')
+    + '<label class="lbl">Icône (un emoji)</label><input type="text" id="cat-icon" maxlength="8" value="' + esc(c.icon) + '">'
+    + '<label class="lbl">Fait partie de (vide = catégorie principale)</label><select id="cat-parent"><option value="">— Catégorie principale —</option>'
+    + mains.map((m) => '<option value="' + esc(m.label) + '"' + (m.label === c.parent ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</select>'
+    + '<label class="lbl">Ordre d\'affichage (0 = en premier)</label><input type="number" id="cat-pos" value="' + c.position + '">'
+    + '<label class="lbl"><input type="checkbox" id="cat-active"' + (c.active ? ' checked' : '') + '> Visible dans l\'appli</label>'
+    + '<div class="actions"><button type="button" class="btn btn-approve" onclick="catSave()">Enregistrer</button>'
+    + '<button type="button" class="btn" onclick="document.getElementById(\'cat-form\').innerHTML=\'\'">Annuler</button></div></div>';
+  window.scrollTo(0, 0);
+}
+async function catSave() {
+  try {
+    await cFn('categories', 'save', { id: document.getElementById('cat-id').value || undefined, label: document.getElementById('cat-label').value,
+      icon: document.getElementById('cat-icon').value, parent: document.getElementById('cat-parent').value,
+      position: document.getElementById('cat-pos').value, active: document.getElementById('cat-active').checked });
+    loadCategories();
+  } catch (e) { alert(e.message); }
+}
+async function catToggle(id) {
+  const c = CAT_ROWS.find((x) => x.id === id); if (!c) return;
+  try { await cFn('categories', 'save', Object.assign({}, c, { active: !c.active })); loadCategories(); } catch (e) { alert(e.message); }
+}
+async function catDelete(id) {
+  if (!confirm('Supprimer cette catégorie ? (impossible si des articles l\'utilisent encore)')) return;
+  try { await cFn('categories', 'delete', { id }); loadCategories(); } catch (e) { alert(e.message); }
+}
+async function catImport() {
+  try { const r = await cFn('categories', 'import'); alert(r.added + ' catégorie(s) importée(s).'); loadCategories(); } catch (e) { alert(e.message); }
+}
+
+/* ---------- Avis ---------- */
+let AV_ROWS = [], AV_NAMES = {};
+async function loadAvis() {
+  const panel = document.getElementById('panel-avis');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try { AV_ROWS = (await cFn('reviews', 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
+  AV_NAMES = await userNamesById(AV_ROWS.flatMap((r) => [r.auteur_id, r.cible_id]));
+  panel.innerHTML = '<div class="actions" style="margin:0 0 14px">'
+    + '<select id="av-filter" onchange="avRender()" style="width:auto"><option value="all">Tous les avis</option><option value="low">Notes de 1 à 2 ★</option><option value="hidden">Avis masqués</option></select>'
+    + '<input type="text" id="av-q" placeholder="Rechercher dans les commentaires…" oninput="avRender()" style="max-width:320px"></div>'
+    + '<div id="av-stats" class="card-meta"></div><div id="av-list"></div>';
+  avRender();
+}
+const nameOf = (m, id) => (m[id] && (m[id].boutique_nom || m[id].nom)) || 'Utilisateur';
+function avRender() {
+  const f = document.getElementById('av-filter').value, q = document.getElementById('av-q').value.trim().toLowerCase();
+  const rows = AV_ROWS.filter((r) => (f === 'all' || (f === 'low' && r.note <= 2) || (f === 'hidden' && r.hidden)) && (!q || String(r.commentaire || '').toLowerCase().includes(q)));
+  const avg = AV_ROWS.length ? (AV_ROWS.reduce((s2, r) => s2 + (r.note || 0), 0) / AV_ROWS.length).toFixed(1) : '—';
+  document.getElementById('av-stats').textContent = AV_ROWS.length + ' avis récents · moyenne ' + avg + ' / 5 · ' + AV_ROWS.filter((r) => r.hidden).length + ' masqué(s)';
+  document.getElementById('av-list').innerHTML = rows.map((r) => '<div class="card"' + (r.hidden ? ' style="opacity:.65"' : '') + '>'
+    + '<p class="card-title">' + '★'.repeat(r.note || 0) + '<span class="muted">' + '★'.repeat(5 - (r.note || 0)) + '</span>' + (r.hidden ? ' <span class="pill">Masqué</span>' : '') + '</p>'
+    + '<p class="card-sub">' + esc(r.commentaire || '(sans commentaire)') + '</p>'
+    + '<p class="card-meta">' + esc(nameOf(AV_NAMES, r.auteur_id)) + ' → ' + esc(nameOf(AV_NAMES, r.cible_id)) + ' · ' + esc(dateTime(r.created_at)) + (r.hidden_reason ? ' · Motif : ' + esc(r.hidden_reason) : '') + '</p>'
+    + '<div class="actions">' + (r.hidden
+      ? '<button type="button" class="btn" onclick="avSet(\'' + r.id + '\',false)">Réafficher</button>'
+      : '<button type="button" class="btn btn-reject" onclick="avSet(\'' + r.id + '\',true)">Masquer</button>') + '</div></div>').join('')
+    || '<div class="empty">Aucun avis ne correspond.</div>';
+}
+async function avSet(id, hide) {
+  let reason = '';
+  if (hide) { reason = prompt('Motif (facultatif) : faux avis, insultes, etc.') ; if (reason === null) return; }
+  try { await cFn('reviews', hide ? 'hide' : 'unhide', { id, reason }); const r = AV_ROWS.find((x) => x.id === id); if (r) { r.hidden = hide; r.hidden_reason = hide ? reason : null; } avRender(); } catch (e) { alert(e.message); }
+}
+
+/* ---------- Mots et numéros bloqués ---------- */
+let TM_ROWS = [];
+const normTxt = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+async function loadMotsBloques() {
+  const panel = document.getElementById('panel-motsbloques');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try { TM_ROWS = (await cFn('terms', 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
+  const chip = (t) => '<span class="pill" style="' + (t.active ? '' : 'opacity:.5;') + 'margin:0 6px 8px 0;padding:6px 10px">' + (t.kind === 'numero' ? '📞 ' : '') + esc(t.term)
+    + ' <a href="#" onclick="tmToggle(\'' + t.id + '\');return false" title="' + (t.active ? 'Désactiver' : 'Réactiver') + '" style="text-decoration:none;margin-left:6px">' + (t.active ? '⏸' : '▶') + '</a>'
+    + ' <a href="#" onclick="tmDel(\'' + t.id + '\');return false" title="Supprimer" style="text-decoration:none;margin-left:4px">✕</a></span>';
+  panel.innerHTML = '<div class="card team-form" style="max-width:720px"><p class="card-title">Ajouter</p>'
+    + '<p class="card-sub">Un contenu qui contient l\'un de ces éléments est refusé à la publication d\'une annonce ou à l\'envoi d\'un message. L\'équipe n\'est pas concernée. Effet immédiat, sans mise à jour de l\'appli.</p>'
+    + '<label class="lbl">Type</label><select id="tm-kind"><option value="mot">Mots ou expressions</option><option value="numero">Numéros de téléphone (6 chiffres minimum)</option></select>'
+    + '<label class="lbl">Un par ligne (ou séparés par des virgules)</label><textarea id="tm-terms" rows="4" style="width:100%"></textarea>'
+    + '<div class="actions"><button type="button" class="btn btn-approve" onclick="tmAdd()">Ajouter</button></div></div>'
+    + '<div class="card" style="max-width:720px"><p class="card-title">Tester un texte</p>'
+    + '<input type="text" id="tm-test" placeholder="Colle un message ou une annonce pour voir s\'il serait refusé…" oninput="tmTest()"><p class="card-meta" id="tm-result" style="margin-top:8px"></p></div>'
+    + '<div class="card"><p class="card-title">Liste actuelle (' + TM_ROWS.length + ')</p>'
+    + '<p class="card-sub">Les mots sont reconnus sans tenir compte des majuscules ni des accents, et seulement en mot entier (« con » ne bloque pas « contact »).</p>'
+    + (TM_ROWS.map(chip).join('') || '<p class="card-meta">Rien de bloqué pour l\'instant.</p>') + '</div>';
+}
+function tmTest() {
+  const txt = document.getElementById('tm-test').value, out = document.getElementById('tm-result');
+  if (!txt.trim()) { out.textContent = ''; return; }
+  const norm = normTxt(txt), digits = txt.replace(/[^0-9]/g, '');
+  const hit = TM_ROWS.find((t) => t.active && (t.kind === 'numero'
+    ? t.term.length >= 6 && digits.includes(t.term)
+    : new RegExp('(^|[^a-z0-9])' + t.term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^a-z0-9]|$)').test(norm)));
+  out.textContent = hit ? '⛔ Refusé à cause de : ' + hit.term : '✓ Autorisé';
+}
+async function tmAdd() {
+  try { await cFn('terms', 'add', { kind: document.getElementById('tm-kind').value, terms: document.getElementById('tm-terms').value }); loadMotsBloques(); } catch (e) { alert(e.message); }
+}
+async function tmToggle(id) { const t = TM_ROWS.find((x) => x.id === id); if (!t) return; try { await cFn('terms', 'toggle', { id, active: !t.active }); loadMotsBloques(); } catch (e) { alert(e.message); } }
+async function tmDel(id) { if (!confirm('Retirer cet élément de la liste ?')) return; try { await cFn('terms', 'delete', { id }); loadMotsBloques(); } catch (e) { alert(e.message); } }
+
+/* ---------- FAQ ---------- */
+let FQ_ROWS = [];
+async function loadFaq() {
+  const panel = document.getElementById('panel-faq');
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try { FQ_ROWS = (await cFn('faq', 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
+  const cats = [...new Set(FQ_ROWS.map((r) => r.category))];
+  panel.innerHTML = '<div class="actions" style="margin:0 0 14px"><button type="button" class="btn btn-approve" onclick="fqEdit()">+ Nouvelle question</button></div><div id="fq-form"></div>'
+    + (FQ_ROWS.length ? '' : '<div class="card"><p class="card-sub" style="margin:0">Aucune question ici : l\'appli affiche donc sa FAQ intégrée. Dès qu\'une question est ajoutée, l\'appli affiche uniquement cette liste.</p></div>')
+    + cats.map((c) => '<h3 style="margin:18px 0 8px">' + esc(c) + '</h3>' + FQ_ROWS.filter((r) => r.category === c).map((r) =>
+      '<div class="card"' + (r.active ? '' : ' style="opacity:.6"') + '><p class="card-title">' + esc(r.question) + (r.active ? '' : ' <span class="pill">Masquée</span>') + '</p>'
+      + '<p class="card-sub" style="white-space:pre-wrap">' + esc(r.answer) + '</p>'
+      + '<div class="actions"><button type="button" class="btn" onclick="fqEdit(\'' + r.id + '\')">Modifier</button>'
+      + '<button type="button" class="btn" onclick="fqToggle(\'' + r.id + '\')">' + (r.active ? 'Masquer' : 'Afficher') + '</button>'
+      + '<button type="button" class="btn btn-reject" onclick="fqDel(\'' + r.id + '\')">Supprimer</button></div></div>').join('')).join('');
+}
+function fqEdit(id) {
+  const r = FQ_ROWS.find((x) => x.id === id) || { question: '', answer: '', category: 'Général', position: FQ_ROWS.length, active: true };
+  const cats = [...new Set(FQ_ROWS.map((x) => x.category))];
+  document.getElementById('fq-form').innerHTML = '<div class="card team-form" style="max-width:720px"><p class="card-title">' + (r.id ? 'Modifier la question' : 'Nouvelle question') + '</p>'
+    + '<input type="hidden" id="fq-id" value="' + esc(r.id || '') + '">'
+    + '<label class="lbl">Rubrique</label><input type="text" id="fq-cat" list="fq-cats" maxlength="40" value="' + esc(r.category) + '"><datalist id="fq-cats">' + cats.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist>'
+    + '<label class="lbl">Question</label><input type="text" id="fq-q" maxlength="200" value="' + esc(r.question) + '">'
+    + '<label class="lbl">Réponse</label><textarea id="fq-a" rows="5" maxlength="2000" style="width:100%">' + esc(r.answer) + '</textarea>'
+    + '<label class="lbl">Ordre dans la rubrique</label><input type="number" id="fq-pos" value="' + r.position + '">'
+    + '<label class="lbl"><input type="checkbox" id="fq-active"' + (r.active ? ' checked' : '') + '> Visible dans l\'appli</label>'
+    + '<div class="actions"><button type="button" class="btn btn-approve" onclick="fqSave()">Enregistrer</button>'
+    + '<button type="button" class="btn" onclick="document.getElementById(\'fq-form\').innerHTML=\'\'">Annuler</button></div></div>';
+  window.scrollTo(0, 0);
+}
+async function fqSave() {
+  try {
+    await cFn('faq', 'save', { id: document.getElementById('fq-id').value || undefined, category: document.getElementById('fq-cat').value, question: document.getElementById('fq-q').value,
+      answer: document.getElementById('fq-a').value, position: document.getElementById('fq-pos').value, active: document.getElementById('fq-active').checked });
+    loadFaq();
+  } catch (e) { alert(e.message); }
+}
+async function fqToggle(id) { const r = FQ_ROWS.find((x) => x.id === id); if (!r) return; try { await cFn('faq', 'save', Object.assign({}, r, { active: !r.active })); loadFaq(); } catch (e) { alert(e.message); } }
+async function fqDel(id) { if (!confirm('Supprimer cette question ?')) return; try { await cFn('faq', 'delete', { id }); loadFaq(); } catch (e) { alert(e.message); } }
 
 async function legalPublish(kind) {
   try {
