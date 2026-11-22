@@ -18,13 +18,15 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
-import { categories } from '../data/mockListings';
+import { categories as DEFAULT_CATEGORIES } from '../data/mockListings';
 import { supabase } from '../lib/supabase';
 import { useMode } from '../context/ModeContext';
 import { PHONE_AUTH_ENABLED } from '../config';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import MasonrySection from '../components/MasonrySection';
 import GradientHeader from '../components/GradientHeader';
+import EventsSection from '../components/EventsSection';
+import { useCategories, useCategoryTree } from '../lib/useCategories';
 
 const CATEGORY_ICONS = {
   'Mode et vêtements': 'shirt-outline',
@@ -61,6 +63,9 @@ const COUNTRIES = [
 
 export default function HomeScreen({ navigation }) {
   const { switchMode } = useMode();
+  // Catégories pilotées par le tableau de bord (liste intégrée tant qu'il est vide).
+  const categories = useCategories(DEFAULT_CATEGORIES);
+  const categoryTree = useCategoryTree();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState(null);
   const [listings, setListings] = useState([]);
@@ -347,11 +352,18 @@ export default function HomeScreen({ navigation }) {
                   style={styles.categoryItem}
                 >
                   <View style={styles.categoryIcon}>
-                    <Ionicons
-                      name={CATEGORY_ICONS[item] || 'pricetag-outline'}
-                      size={20}
-                      color={colors.purple}
-                    />
+                    {(() => {
+                      const dbIcon = categoryTree.find((c) => c.label === item)?.icon;
+                      return dbIcon && dbIcon !== '🏷️' ? (
+                        <Text style={{ fontSize: 22 }}>{dbIcon}</Text>
+                      ) : (
+                        <Ionicons
+                          name={CATEGORY_ICONS[item] || 'pricetag-outline'}
+                          size={20}
+                          color={colors.purple}
+                        />
+                      );
+                    })()}
                   </View>
                   <Text style={styles.categoryLabel} numberOfLines={1}>
                     {item.split(' ')[0]}
@@ -411,6 +423,13 @@ export default function HomeScreen({ navigation }) {
               />
             ) : (
               <>
+                <EventsSection
+                  getSellerRating={getSellerRating}
+                  wishlistIds={wishlistIds}
+                  onToggleWishlist={handleToggleWishlist}
+                  onPressItem={(item) => navigation.navigate('ProductDetail', { listing: item })}
+                />
+
                 <MasonrySection
                   title="Articles en vedette"
                   items={featured}

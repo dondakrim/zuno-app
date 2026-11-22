@@ -17,7 +17,7 @@ function remaining(endsAt) {
   return `Se termine dans ${d} jour${d > 1 ? 's' : ''}`;
 }
 
-export default function EventsSection() {
+export default function EventsSection({ getSellerRating, wishlistIds, onToggleWishlist, onPressItem }) {
   const navigation = useNavigation();
   const [events, setEvents] = useState([]);
 
@@ -63,7 +63,13 @@ export default function EventsSection() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
             {e.items.map((item) => (
               <View key={item.id} style={styles.cell}>
-                <ProductCard listing={item} onPress={() => navigation.navigate('ProductDetail', { listing: item })} />
+                <ProductCard
+                  listing={item}
+                  sellerRating={getSellerRating ? getSellerRating(item.vendeur_id) : undefined}
+                  isWishlisted={wishlistIds ? wishlistIds.has(item.id) : false}
+                  onToggleWishlist={onToggleWishlist ? () => onToggleWishlist(item) : undefined}
+                  onPress={() => (onPressItem ? onPressItem(item) : navigation.navigate('ProductDetail', { listing: item }))}
+                />
               </View>
             ))}
           </ScrollView>
@@ -75,11 +81,11 @@ export default function EventsSection() {
 
 const styles = StyleSheet.create({
   block: { marginBottom: spacing.md },
-  banner: { marginHorizontal: spacing.md, borderRadius: 18, padding: spacing.md, overflow: 'hidden', minHeight: 84, justifyContent: 'center' },
+  banner: { marginTop: spacing.md, borderRadius: 18, padding: spacing.md, overflow: 'hidden', minHeight: 84, justifyContent: 'center' },
   shade: { backgroundColor: 'rgba(0,0,0,0.35)', margin: -spacing.md, padding: spacing.md, minHeight: 84, justifyContent: 'center' },
   title: { color: '#fff', fontSize: 20, fontWeight: '800' },
   sub: { color: 'rgba(255,255,255,0.9)', fontSize: 13, marginTop: 2 },
   timer: { color: '#fff', fontSize: 12, fontWeight: '700', marginTop: 6 },
-  row: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.sm },
+  row: { paddingTop: spacing.sm, gap: spacing.sm },
   cell: { width: 170 },
 });
