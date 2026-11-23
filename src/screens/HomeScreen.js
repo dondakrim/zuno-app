@@ -16,6 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, spacing, radius } from '../theme/colors';
 import { categories as DEFAULT_CATEGORIES } from '../data/mockListings';
@@ -208,6 +209,11 @@ export default function HomeScreen({ navigation }) {
       const bBoosted = b.boost_until && new Date(b.boost_until) > now;
       if (aBoosted && !bBoosted) return -1;
       if (!aBoosted && bBoosted) return 1;
+      // Ensuite, les annonces du pays choisi passent avant les autres.
+      const aHere = a.country === country.code;
+      const bHere = b.country === country.code;
+      if (aHere && !bHere) return -1;
+      if (!aHere && bHere) return 1;
       const priorityDiff = (b.priority || 0) - (a.priority || 0);
       if (priorityDiff !== 0) return priorityDiff;
       return b.price - a.price;
@@ -229,7 +235,18 @@ export default function HomeScreen({ navigation }) {
     }
     setCountry(c);
     setCountryModalVisible(false);
+    AsyncStorage.setItem('zuno_country', c.code).catch(() => {});
   };
+
+  // Retrouve le pays choisi lors d'une précédente visite.
+  useEffect(() => {
+    AsyncStorage.getItem('zuno_country')
+      .then((code) => {
+        const saved = COUNTRIES.find((c) => c.code === code && c.available);
+        if (saved) setCountry(saved);
+      })
+      .catch(() => {});
+  }, []);
 
   const openMenu = async () => {
     setMenuVisible(true);
