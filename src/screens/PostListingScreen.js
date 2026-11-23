@@ -26,6 +26,16 @@ import { checkMessage } from '../lib/chatGuard';
 import GradientHeader from '../components/GradientHeader';
 import { WARRANTY_OPTIONS } from '../lib/warranty';
 
+// Pays où se trouve l'article (le vendeur doit en choisir un).
+const POST_COUNTRIES = [
+  { code: 'NE', label: '🇳🇪 Niger' },
+  { code: 'ML', label: '🇲🇱 Mali' },
+  { code: 'BF', label: '🇧🇫 Burkina Faso' },
+  { code: 'BJ', label: '🇧🇯 Bénin' },
+  { code: 'CI', label: "🇨🇮 Côte d'Ivoire" },
+  { code: 'TG', label: '🇹🇬 Togo' },
+];
+
 const conditions = ['Neuf', 'Bon état', 'Usé'];
 const delais = ['1-2 jours', '3-5 jours', '1 semaine', "Plus d'une semaine"];
 const MIN_PHOTOS = 4;
@@ -85,6 +95,7 @@ export default function PostListingScreen({ navigation }) {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [city, setCity] = useState('');
+  const [countryCode, setCountryCode] = useState(null); // obligatoire, aucun pays par défaut
   const [category, setCategory] = useState(categories[0]);
   const [isHeavyManual, setIsHeavyManual] = useState(false);
   const [condition, setCondition] = useState(conditions[1]);
@@ -111,6 +122,7 @@ export default function PostListingScreen({ navigation }) {
     if (showPromo && promoPrice.trim() && Number(digits(promoPrice)) >= Number(digits(price))) {
       e.promo = 'Le prix promo doit être inférieur au prix normal.';
     }
+    if (!countryCode) e.country = "Choisis le pays où se trouve l'article.";
     if (city.trim().length < 2) e.city = 'Indique ta ville ou ton quartier.';
     if (hasWarranty === null) e.warranty = 'Indique si ton article a une garantie (oui ou non).';
     if (hasWarranty && !warrantyLabelChoice) e.warrantyDuration = 'Choisis la durée de la garantie.';
@@ -118,7 +130,7 @@ export default function PostListingScreen({ navigation }) {
       e.warrantyNote = 'Pas de numéro, email ni lien dans la garantie.';
     }
     return e;
-  }, [title, description, price, promoPrice, showPromo, city, hasWarranty, warrantyLabelChoice, warrantyNote]);
+  }, [title, description, price, promoPrice, showPromo, city, countryCode, hasWarranty, warrantyLabelChoice, warrantyNote]);
 
   const missingPhotos = Math.max(0, MIN_PHOTOS - photos.length);
   const show = (k) => (tried || (k === 'description' && description.length > 0) ? errors[k] : undefined);
@@ -247,6 +259,7 @@ export default function PostListingScreen({ navigation }) {
         description: description.trim(),
         price: Number(digits(price)),
         city: city.trim(),
+        country: countryCode,
         category,
         condition,
         delai_livraison: delaiLivraison,
@@ -320,6 +333,7 @@ export default function PostListingScreen({ navigation }) {
     setDescription('');
     setPrice('');
     setCity('');
+    setCountryCode(null);
     setPhotos([]);
     setDelaiLivraison(delais[0]);
     setShowPromo(false);
@@ -333,6 +347,7 @@ export default function PostListingScreen({ navigation }) {
     { ok: photos.length >= MIN_PHOTOS, label: `${Math.min(photos.length, MIN_PHOTOS)}/${MIN_PHOTOS} photos` },
     { ok: title.trim().length >= 3 && !errors.title, label: 'Titre' },
     { ok: !!digits(price) && !errors.price, label: 'Prix' },
+    { ok: !!countryCode, label: 'Pays' },
     { ok: city.trim().length >= 2, label: 'Ville' },
     { ok: hasWarranty !== null && (!hasWarranty || !!warrantyLabelChoice), label: 'Garantie' },
     { ok: certified, label: 'Certification' },
@@ -521,6 +536,14 @@ export default function PostListingScreen({ navigation }) {
               <Err text={show('warrantyNote')} />
             </>
           ) : null}
+
+          <Text style={styles.label}>Pays de l'article <Text style={styles.star}>*</Text></Text>
+          <Chips
+            options={POST_COUNTRIES.map((c) => c.label)}
+            value={POST_COUNTRIES.find((c) => c.code === countryCode)?.label || null}
+            onChange={(label) => setCountryCode(POST_COUNTRIES.find((c) => c.label === label)?.code || null)}
+          />
+          <Err text={show('country')} />
 
           <Text style={styles.label}>Ville, quartier <Text style={styles.star}>*</Text></Text>
           <TextInput
