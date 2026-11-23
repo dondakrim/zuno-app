@@ -11,6 +11,7 @@ import {
   Modal,
   Linking,
   AppState,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
@@ -18,6 +19,7 @@ import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 import PhoneInput from '../components/PhoneInput';
 import GradientHeader from '../components/GradientHeader';
+import { CASH_METHOD, MOBILE_METHODS, methodLabel } from '../lib/paymentMethods';
 
 const CRENEAUX = ['Matin (8h-12h)', 'Après-midi (12h-16h)', 'Soir (16h-19h)'];
 
@@ -45,6 +47,11 @@ export default function CheckoutScreen({ route, navigation }) {
   // Commande dont le paiement NITA est en cours (page de paiement ouverte).
   const [pendingOrderId, setPendingOrderId] = useState(null);
   const [verifying, setVerifying] = useState(false);
+  // Étapes : 'info' (livraison) -> 'pay' (Je paye par) -> 'recap' (récapitulatif)
+  const [step, setStep] = useState('info');
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [method, setMethod] = useState(null); // { kind: 'cash' } | { kind: 'mobile', id }
+  const [payerAccount, setPayerAccount] = useState('');
 
   const sousTotal = listing.price * quantity;
   const fraisLivraison = deliveryMethod?.price || 0;
@@ -103,21 +110,57 @@ export default function CheckoutScreen({ route, navigation }) {
     return () => sub.remove();
   }, []);
 
+  // Bouton retour du téléphone : revient à l'étape précédente.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (step === 'recap') { setStep('pay'); return true; }
+      if (step === 'pay') { setStep('info'); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [step]);
+
+  const goBackStep = () => {
+    if (step === 'recap') setStep('pay');
+    else if (step === 'pay') setStep('info');
+    else navigation.goBack();
+  };
+
+  const validateInfo = () => {
+    if (!nom.trim() || telephone.replace(/\D/g, '').length < 7 || (!skipAddress && !quartier.trim())) {
+      Alert.alert(
+        'Informations manquantes',
+        skipAddress ? 'Nom et numéro de téléphone sont obligatoires.' : 'Nom, numéro de téléphone et quartier sont obligatoires.'
+      );
+      return false;
+    }
+    if (!accepted) {
+      Alert.alert('Conditions', "Merci d'accepter les conditions avant de continuer.");
+      return false;
+    }
+    return true;
+  };
+
+  const goToPayment = () => {
+    if (validateInfo()) setStep('pay');
+  };
+
+  const chooseMethod = (m) => {
+    setMethod(m);
+    setStep('recap');
+  };
+
   const payLater = () => {
     setPendingOrderId(null);
     showSavedAlert();
   };
 
   const handleConfirm = async () => {
-    if (!nom.trim() || telephone.replace(/\D/g, '').length < 7 || (!skipAddress && !quartier.trim())) {
-      Alert.alert(
-        'Informations manquantes',
-        skipAddress ? 'Nom et numéro sont obligatoires.' : 'Nom, numéro et quartier sont obligatoires.'
-      );
-      return;
-    }
-    if (!accepted) {
-      Alert.alert('Conditions', "Merci d'accepter les conditions avant de continuer.");
+    if (!validateInfo()) { setStep('info'); return; }
+    if (!method) { setStep('pay'); return; }
+    const isMobile = method.kind === 'mobile';
+    if (isMobile && payerAccount.replace(/\D/g, '').length < 8) {
+      Alert.alert('Compte manquant', `Indique le numéro de ton compte ${methodLabel(method)}.`);
       return;
     }
 
@@ -159,7 +202,9 @@ export default function CheckoutScreen({ route, navigation }) {
         mode_livraison: deliveryMethod?.id || null,
         promo_code: promoCode,
         discount_amount: finalDiscount,
-        statut: 'en_attente_paiement',
+        statut: method.kind === 'cash' ? 'a_traiter' : 'en_attente_paiement',
+        payment_provider: method.kind === 'cash' ? 'cash' : null,
+        payer_account: isMobile ? payerAccount.trim() : null,
       })
       .select()
       .single();
@@ -206,29 +251,201 @@ export default function CheckoutScreen({ route, navigation }) {
         listing_id: listing.id,
         expediteur_id: myId,
         destinataire_id: listing.vendeur_id,
-        contenu: recap,
+        contenu: recap + (method.kind === 'cash' ? ' Paiement en espèces à la réception.' : ` Paiement par ${methodLabel(method)}.`),
       });
     }
 
-    // Ouvre la page de paiement MyNITA. En mode test, aucun vrai argent ne bouge.
+    // Espèces : rien à payer en ligne, la commande est enregistrée.
+    if (method.kind === 'cash') {
+      Alert.alert(
+        'Commande enregistrée',
+        "Tu paieras en espèces à la réception. Direction la messagerie pour suivre la suite avec le vendeur.",
+        [{ text: 'OK', onPress: goToChat }]
+      );
+      return;
+    }
+
+    // Paiement mobile (MyNITA) : une demande de paiement est créée ; l'acheteur
+    // la valide dans son appli MyNITA, rubrique « Achat en ligne ».
     const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
       'create-payment',
       { body: { orderId: order.id } }
     );
 
-    if (paymentError || (!paymentData?.url && !paymentData?.alreadyPaid)) {
+    if (paymentError || (!paymentData?.codeAchat && !paymentData?.alreadyPaid)) {
       console.error('Erreur création paiement:', paymentError, paymentData);
       Alert.alert(
         'Paiement indisponible',
-        "Impossible d'ouvrir la page de paiement pour l'instant. La commande est bien enregistrée, réessaie le paiement depuis Mes commandes."
+        "Impossible de lancer la demande de paiement pour l'instant. La commande est bien enregistrée, réessaie le paiement depuis Mes commandes."
       );
       showSavedAlert();
       return;
     }
 
     setPendingOrderId(order.id);
-    if (paymentData.url) Linking.openURL(paymentData.url);
   };
+
+  if (step === 'pay') {
+    return (
+      <View style={styles.container}>
+        <GradientHeader style={styles.header}>
+          <TouchableOpacity onPress={goBackStep} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={20} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.heading}>Je paye par</Text>
+          <View style={{ width: 36 }} />
+        </GradientHeader>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+          <Text style={styles.payTotal}>Total à payer : {total.toLocaleString('fr-FR')} FCFA</Text>
+
+          <TouchableOpacity style={styles.methodCard} onPress={() => chooseMethod({ kind: 'cash' })} activeOpacity={0.85}>
+            <View style={styles.methodIcon}><Ionicons name="cash-outline" size={22} color={colors.orange} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.methodTitle}>{CASH_METHOD.label}</Text>
+              <Text style={styles.methodHint}>{CASH_METHOD.hint}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.methodCard} onPress={() => setMobileOpen((v) => !v)} activeOpacity={0.85}>
+            <View style={styles.methodIcon}><Ionicons name="phone-portrait-outline" size={22} color={colors.orange} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.methodTitle}>Paiements mobiles</Text>
+              <Text style={styles.methodHint}>Choisis ton service de paiement</Text>
+            </View>
+            <Ionicons name={mobileOpen ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {mobileOpen &&
+            MOBILE_METHODS.map((m) => (
+              <TouchableOpacity
+                key={m.id}
+                style={[styles.subMethod, !m.enabled && styles.subMethodOff]}
+                disabled={!m.enabled}
+                onPress={() => chooseMethod({ kind: 'mobile', id: m.id })}
+                activeOpacity={0.85}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.methodTitle}>{m.label}</Text>
+                  <Text style={styles.methodHint}>{m.hint}</Text>
+                </View>
+                {m.enabled ? (
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                ) : (
+                  <View style={styles.soonTag}><Text style={styles.soonTagText}>Bientôt</Text></View>
+                )}
+              </TouchableOpacity>
+            ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (step === 'recap') {
+    const isMobile = method?.kind === 'mobile';
+    const mobileCfg = isMobile ? MOBILE_METHODS.find((m) => m.id === method.id) : null;
+    return (
+      <View style={styles.container}>
+        <GradientHeader style={styles.header}>
+          <TouchableOpacity onPress={goBackStep} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={20} color={colors.white} />
+          </TouchableOpacity>
+          <Text style={styles.heading}>Récapitulatif</Text>
+          <View style={{ width: 36 }} />
+        </GradientHeader>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>
+            {listing.title} × {quantity}
+          </Text>
+          <Text style={styles.summaryValue}>{sousTotal.toLocaleString('fr-FR')} FCFA</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>
+            {isPickup ? 'Retrait en main propre' : isNegotiated ? 'Livraison à négocier' : `Livraison (${deliveryMethod?.label})`}
+          </Text>
+          <Text style={styles.summaryValue}>{fraisLivraison.toLocaleString('fr-FR')} FCFA</Text>
+        </View>
+        {promoDiscount > 0 && (
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Code « {promoCode} »</Text>
+            <Text style={[styles.summaryValue, { color: colors.success }]}>
+              -{promoDiscount.toLocaleString('fr-FR')} FCFA
+            </Text>
+          </View>
+        )}
+        <View style={[styles.summaryRow, styles.totalRow]}>
+          <Text style={styles.totalLabel}>Total</Text>
+          <Text style={styles.totalValue}>{total.toLocaleString('fr-FR')} FCFA</Text>
+        </View>
+      </View>
+
+          <View style={styles.card}>
+            <Text style={styles.recapTitle}>Livraison</Text>
+            <Text style={styles.recapLine}>{nom.trim()} · {telephone.trim()}</Text>
+            <Text style={styles.recapLine}>
+              {isPickup ? 'Retrait en main propre' : isNegotiated ? 'Livraison à négocier avec le vendeur' : `${quartier.trim()} · ${heureLivraison}`}
+            </Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.recapTitle}>{isMobile ? `Votre compte ${methodLabel(method)}` : 'Paiement'}</Text>
+            {isMobile ? (
+              <>
+                <Text style={styles.label}>{mobileCfg?.accountLabel || 'Numéro de ton compte'}</Text>
+                <TextInput
+                  placeholder="Ex : 96 29 58 58"
+                  placeholderTextColor={colors.textMuted}
+                  value={payerAccount}
+                  onChangeText={setPayerAccount}
+                  keyboardType="phone-pad"
+                  style={styles.input}
+                />
+                <Text style={styles.methodHint}>
+                  Tu recevras la demande de paiement dans {methodLabel(method)}, rubrique « Achat en ligne ».
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.recapLine}>Espèces, à la réception de l'article.</Text>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Text style={styles.confirmButtonText}>Lancer la commande</Text>
+            )}
+          </TouchableOpacity>
+        </ScrollView>
+      <Modal visible={!!pendingOrderId} transparent animationType="fade" onRequestClose={payLater}>
+        <View style={styles.payOverlay}>
+          <View style={styles.payCard}>
+            <Text style={styles.payTitle}>Paiement en cours</Text>
+            <Text style={styles.payText}>
+              Ouvre ton appli MyNITA, va dans « Achat en ligne » et valide le paiement de {total.toLocaleString('fr-FR')} FCFA. Puis reviens ici : nous vérifions automatiquement.
+            </Text>
+            <TouchableOpacity
+              style={styles.confirmButton}
+              onPress={() => verifyPayment(true)}
+              disabled={verifying}
+            >
+              {verifying ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.confirmButtonText}>J'ai payé, vérifier</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={payLater} style={{ marginTop: spacing.md, alignItems: 'center' }}>
+              <Text style={styles.linkText}>Payer plus tard</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -358,41 +575,13 @@ export default function CheckoutScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      <Modal visible={!!pendingOrderId} transparent animationType="fade" onRequestClose={payLater}>
-        <View style={styles.payOverlay}>
-          <View style={styles.payCard}>
-            <Text style={styles.payTitle}>Paiement en cours</Text>
-            <Text style={styles.payText}>
-              Termine ton paiement sur la page NITA qui vient de s'ouvrir, puis reviens ici. Nous vérifions automatiquement.
-            </Text>
-            <TouchableOpacity
-              style={styles.confirmButton}
-              onPress={() => verifyPayment(true)}
-              disabled={verifying}
-            >
-              {verifying ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <Text style={styles.confirmButtonText}>J'ai payé, vérifier</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity onPress={payLater} style={{ marginTop: spacing.md, alignItems: 'center' }}>
-              <Text style={styles.linkText}>Payer plus tard</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+
 
       <TouchableOpacity
         style={[styles.confirmButton, !accepted && styles.confirmButtonDisabled]}
-        onPress={handleConfirm}
-        disabled={saving}
+        onPress={goToPayment}
       >
-        {saving ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <Text style={styles.confirmButtonText}>Lancer la commande</Text>
-        )}
+        <Text style={styles.confirmButtonText}>Valider mon panier</Text>
       </TouchableOpacity>
     </ScrollView>
     </View>
@@ -515,4 +704,23 @@ const styles = StyleSheet.create({
   payTitle: { fontSize: 17, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.sm },
   payText: { fontSize: 13, color: colors.textSecondary, lineHeight: 19, marginBottom: spacing.lg },
   confirmButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  payTotal: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.md },
+  methodCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2,
+  },
+  methodIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.tintOrange, alignItems: 'center', justifyContent: 'center' },
+  methodTitle: { fontSize: 15, fontWeight: '700', color: colors.textPrimary },
+  methodHint: { fontSize: 12, color: colors.textSecondary, marginTop: 2, lineHeight: 17 },
+  subMethod: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.border,
+    padding: spacing.md, marginBottom: spacing.sm, marginLeft: spacing.lg,
+  },
+  subMethodOff: { opacity: 0.55 },
+  soonTag: { backgroundColor: colors.tintOrange, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
+  soonTagText: { fontSize: 11, fontWeight: '700', color: colors.orange },
+  recapTitle: { fontSize: 14, fontWeight: '800', color: colors.textPrimary, marginBottom: spacing.xs },
+  recapLine: { fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
 });
