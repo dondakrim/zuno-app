@@ -1140,6 +1140,22 @@ function warrantyPill(l) {
   return '<span class="pill" style="background:var(--success, #1E9E5A); color:#fff;">Garantie ' + warrantyDuration(l.warranty_days) + '</span>';
 }
 
+function stockPill(l) {
+  if (typeof l.stock !== 'number') return '';
+  if (l.stock <= 0) return '<span class="pill" style="background:var(--danger); color:#fff;">Rupture de stock</span>';
+  if (l.stock <= 3) return '<span class="pill" style="background:var(--orange); color:#fff;">Stock : ' + l.stock + '</span>';
+  return '<span class="pill">Stock : ' + l.stock + '</span>';
+}
+
+async function updateStockAdmin(id, value) {
+  const v = String(value).trim();
+  const stock = v === '' ? null : Math.max(0, parseInt(v, 10) || 0);
+  const { error } = await sb.from('listings').update({ stock }).eq('id', id);
+  if (error) { alert('Erreur : ' + error.message); return; }
+  if (articlesData[id]) articlesData[id].stock = stock;
+  alert(stock === null ? 'Article unique (sans stock suivi).' : 'Stock mis à jour : ' + stock);
+}
+
 async function loadArticles() {
   const grid = document.getElementById('articles-grid');
   const search = (document.getElementById('articles-search')?.value || '').toLowerCase();
@@ -1182,6 +1198,7 @@ async function loadArticles() {
       <p class="card-sub">${Number(l.price).toLocaleString('fr-FR')} FCFA</p>
       <span class="pill">${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span>
       ${warrantyPill(l)}
+      ${stockPill(l)}
       ${isHidden ? '<span class="pill" style="background:var(--danger); color:#fff;">Masquée</span>' : ''}
       ${isBoosted ? '<span class="pill" style="background:var(--orange); color:#fff;">En vedette</span>' : ''}
       <button class="btn btn-approve voir-plus-btn" onclick="showArticleDetail('${l.id}')">Voir plus</button>
@@ -1224,6 +1241,7 @@ async function showArticleDetail(id) {
       <div class="detail-row"><span>Délai livraison</span><span>${l.delai_livraison || '—'}</span></div>
       <div class="detail-row"><span>Garantie</span><span>${esc(warrantyText(l))}</span></div>
       <div class="detail-row"><span>Statut</span><span>${l.status === 'vendu' ? 'Vendu' : l.status === 'annulee' ? 'Annulée' : 'En vente'}</span></div>
+      <div class="detail-row"><span>Stock</span><span>${typeof l.stock === 'number' ? (l.stock <= 0 ? 'Rupture de stock' : l.stock + ' disponible(s)') : 'Article unique'}</span></div>
     </div>
 
     <div class="detail-section">
@@ -1252,6 +1270,11 @@ async function showArticleDetail(id) {
         <label style="font-size:12px; color: var(--text-secondary);">Priorité :</label>
         <input type="number" value="${l.priority || 0}" style="width:70px; padding:6px; border:1px solid var(--border); border-radius:6px;"
           onchange="updatePriority('${l.id}', this.value)">
+      </div>
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <label style="font-size:12px; color: var(--text-secondary);">Stock (vide = article unique) :</label>
+        <input type="number" min="0" value="${typeof l.stock === 'number' ? l.stock : ''}" style="width:80px; padding:6px; border:1px solid var(--border); border-radius:6px;"
+          onchange="updateStockAdmin('${l.id}', this.value)">
       </div>
       <div class="actions">
         <button class="btn btn-approve" onclick="boostFromAdmin('${l.id}')">${isBoosted ? 'Prolonger 3j' : 'Mettre en avant 3j'}</button>
