@@ -13,6 +13,7 @@ import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import GradientHeader from './GradientHeader';
+import RequestsList from './RequestsList';
 
 // La localisation GPS est facultative : si le module n'existe pas dans l'appli, le bouton est simplement masqué.
 let Location = null;
@@ -148,125 +149,19 @@ function SuccessModal({ kind, onClose, onOther, onTrack }) {
 }
 
 /* ---------------------------------------------------------------- suivi */
-const COURIER_STEPS = [
-  ['nouvelle', 'Demande reçue'],
-  ['acceptee', 'Coursier confirmé'],
-  ['en_cours', 'En route'],
-  ['livree', 'Livré'],
-];
-const SEEK_STEPS = [
-  ['nouvelle', 'Demande reçue'],
-  ['en_cours', 'Recherche en cours'],
-  ['trouvee', 'Article trouvé'],
-];
-const SUPPORT_WA = '34627137449';
-
-function Timeline({ steps, status }) {
-  const canceled = status === 'annulee';
-  const idx = steps.findIndex((x) => x[0] === status);
-  return (
-    <View style={{ marginTop: 6 }}>
-      {steps.map(([code, label], i) => {
-        const done = !canceled && idx >= i;
-        const current = !canceled && idx === i;
-        const last = i === steps.length - 1;
-        return (
-          <View key={code} style={styles.tlRow}>
-            <View style={styles.tlRail}>
-              <View style={[styles.tlDot, done && { backgroundColor: current && !last ? colors.orange : colors.success }]}>
-                {done ? <Ionicons name={current && !last ? 'ellipse' : 'checkmark'} size={current && !last ? 8 : 13} color="#fff" /> : null}
-              </View>
-              {!last ? <View style={[styles.tlLine, !canceled && idx > i && { backgroundColor: colors.success }]} /> : null}
-            </View>
-            <Text style={[styles.tlText, done && { color: colors.textPrimary, fontWeight: current ? '700' : '500' }]}>{label}</Text>
-          </View>
-        );
-      })}
-      {canceled ? (
-        <View style={styles.cancelBox}><Ionicons name="close-circle" size={16} color={colors.danger} /><Text style={styles.cancelText}>Demande annulée</Text></View>
-      ) : null}
-    </View>
-  );
-}
-
 function MyRequests({ onClose }) {
-  const [rows, setRows] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
   const insets = useSafeAreaInsets();
   const top = Math.max(insets.top, Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0);
-
-  const load = useCallback(async () => {
-    try {
-      const uid = await getDeviceUserId();
-      const [a, c] = await Promise.all([
-        supabase.from('article_requests').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(30),
-        supabase.from('courier_requests').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(30),
-      ]);
-      const all = [
-        ...(a.data || []).map((r) => ({ ...r, kind: 'seek' })),
-        ...(c.data || []).map((r) => ({ ...r, kind: 'courier' })),
-      ].sort((x, y) => new Date(y.created_at) - new Date(x.created_at));
-      setRows(all);
-    } catch (e) { setRows([]); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <GradientHeader style={{ paddingTop: top + 10, paddingBottom: 18 }}>
         <View style={styles.hRow}>
           <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.hBack}><Ionicons name="arrow-back" size={20} color="#fff" /></TouchableOpacity>
-          <Text style={styles.hTitle}>Mes demandes</Text>
+          <Text style={styles.hTitle}>Mes courses et recherches</Text>
           <View style={{ width: 36 }} />
         </View>
       </GradientHeader>
-      {rows === null ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.purple} /></View>
-      ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-          {rows.length === 0 ? (
-            <View style={styles.empty}>
-              <Ionicons name="file-tray-outline" size={42} color={colors.textMuted} />
-              <Text style={styles.emptyText}>Tu n'as pas encore fait de demande.</Text>
-            </View>
-          ) : rows.map((r) => {
-            const seek = r.kind === 'seek';
-            const steps = seek ? SEEK_STEPS : COURIER_STEPS;
-            return (
-              <View key={r.kind + r.id} style={styles.card}>
-                <View style={styles.cardHead}>
-                  <View style={[styles.cardIcon, { backgroundColor: seek ? colors.tintPurple : colors.tintOrange }]}>
-                    <Ionicons name={seek ? 'search' : 'bicycle'} size={18} color={seek ? colors.purple : colors.orange} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.cardTitle} numberOfLines={2}>{seek ? r.title : `${r.pickup_address} → ${r.dropoff_address}`}</Text>
-                    <Text style={styles.cardSub}>{seek ? 'Je cherche cet article' : 'Coursier'} · {new Date(r.created_at).toLocaleDateString('fr-FR')}</Text>
-                  </View>
-                </View>
-                {!seek && r.price_quote ? (
-                  <View style={styles.priceBox}><Text style={styles.priceLabel}>Prix de la course</Text><Text style={styles.priceValue}>{r.price_quote}</Text></View>
-                ) : null}
-                <Timeline steps={steps} status={r.status} />
-                {r.admin_note ? (
-                  <View style={styles.noteBox}>
-                    <Text style={styles.noteTitle}>Message de Zuno</Text>
-                    <Text style={styles.noteText}>{r.admin_note}</Text>
-                  </View>
-                ) : null}
-                {seek && r.status === 'trouvee' ? (
-                  <TouchableOpacity style={styles.waBtn} activeOpacity={0.85}
-                    onPress={() => Linking.openURL(`https://wa.me/${SUPPORT_WA}?text=${encodeURIComponent('Bonjour Zuno, au sujet de ma demande : ' + r.title)}`)}>
-                    <Ionicons name="logo-whatsapp" size={18} color="#fff" />
-                    <Text style={styles.waBtnText}>Consulter mon WhatsApp</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+      <RequestsList />
     </View>
   );
 }

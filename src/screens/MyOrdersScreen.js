@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -15,10 +16,11 @@ import { colors, spacing, radius } from '../theme/colors';
 import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import RequestsList, { fetchMyRequests, countActive } from '../components/RequestsList';
 
 const TABS = [
   { key: 'panier', label: 'Panier', icon: 'cart-outline' },
-  { key: 'envies', label: 'Envies', icon: 'bookmark-outline' },
+  { key: 'courses', label: 'Courses', icon: 'bicycle-outline' },
   { key: 'en_cours', label: 'En cours', icon: 'time-outline' },
   { key: 'expedies', label: 'Expédiés', icon: 'airplane-outline' },
   { key: 'favoris', label: 'Boutiques', icon: 'heart-outline' },
@@ -166,7 +168,7 @@ export default function MyOrdersScreen({ navigation }) {
   const [processingOrders, setProcessingOrders] = useState([]);
   const [shippedOrders, setShippedOrders] = useState([]);
   const [favorites, setFavorites] = useState([]);
-  const [wishlist, setWishlist] = useState([]);
+  const [coursesCount, setCoursesCount] = useState(0);
   const [disputedOrderIds, setDisputedOrderIds] = useState(new Set());
 
   const loadAll = useCallback(async () => {
@@ -180,12 +182,7 @@ export default function MyOrdersScreen({ navigation }) {
       .order('created_at', { ascending: false });
     setCartItems((cart || []).filter((i) => i.listings));
 
-    const { data: wish } = await supabase
-      .from('wishlist_items')
-      .select('id, listing_id, listings(*)')
-      .eq('acheteur_id', myId)
-      .order('created_at', { ascending: false });
-    setWishlist((wish || []).filter((i) => i.listings));
+    try { setCoursesCount(countActive(await fetchMyRequests())); } catch (e) { setCoursesCount(0); }
 
     const { data: orders } = await supabase
       .from('orders')
@@ -248,11 +245,6 @@ export default function MyOrdersScreen({ navigation }) {
 
   const handleRemoveFavorite = async (id) => {
     await supabase.from('favorite_shops').delete().eq('id', id);
-    loadAll();
-  };
-
-  const handleRemoveWishlist = async (id) => {
-    await supabase.from('wishlist_items').delete().eq('id', id);
     loadAll();
   };
 
@@ -409,7 +401,7 @@ export default function MyOrdersScreen({ navigation }) {
 
   const counts = {
     panier: cartItems.length,
-    envies: wishlist.length,
+    courses: coursesCount,
     en_cours: processingOrders.length,
     expedies: shippedOrders.length,
     favoris: favorites.length,
@@ -425,33 +417,36 @@ export default function MyOrdersScreen({ navigation }) {
         <View style={{ width: 22 }} />
       </GradientHeader>
 
-      <View style={styles.tabRow}>
-        {TABS.map((t) => {
-          const active = t.key === tab;
-          return (
-            <TouchableOpacity
-              key={t.key}
-              style={[styles.tabButton, active && styles.tabButtonActive]}
-              onPress={() => setTab(t.key)}
-            >
-              <Ionicons name={t.icon} size={16} color={active ? colors.white : colors.textPrimary} />
-              <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
-                {t.label}
-              </Text>
-              {counts[t.key] > 0 ? (
-                <View style={[styles.countBadge, active && styles.countBadgeActive]}>
-                  <Text style={[styles.countText, active && styles.countTextActive]}>{counts[t.key]}</Text>
-                </View>
-              ) : null}
-            </TouchableOpacity>
-          );
-        })}
+      <View style={styles.tabWrap}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+          {TABS.map((t) => {
+            const active = t.key === tab;
+            return (
+              <TouchableOpacity
+                key={t.key}
+                style={[styles.tabButton, active && styles.tabButtonActive]}
+                onPress={() => setTab(t.key)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name={t.icon} size={17} color={active ? colors.white : colors.purple} />
+                <Text style={[styles.tabLabel, active && styles.tabLabelActive]} numberOfLines={1}>
+                  {t.label}
+                </Text>
+                {counts[t.key] > 0 ? (
+                  <View style={[styles.countBadge, active && styles.countBadgeActive]}>
+                    <Text style={[styles.countText, active && styles.countTextActive]}>{counts[t.key]}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {loading ? (
+      {loading && tab !== 'courses' ? (
         <ActivityIndicator color={colors.purple} style={{ marginTop: spacing.xl }} />
       ) : (
-        <View style={{ flex: 1, padding: spacing.lg }}>
+        <View style={{ flex: 1, padding: tab === 'courses' ? 0 : spacing.lg }}>
           {tab === 'panier' && (
             <FlatList
               data={cartItems}
@@ -495,43 +490,7 @@ export default function MyOrdersScreen({ navigation }) {
             />
           )}
 
-          {tab === 'envies' && (
-            <FlatList
-              data={wishlist}
-              keyExtractor={(item) => item.id}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>
-                  Aucun article mis de côté. Appuie sur l'icône marque-page sur une fiche produit
-                  pour l'ajouter ici.
-                </Text>
-              }
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.card}
-                  onPress={() => navigation.navigate('ProductDetail', { listing: item.listings })}
-                >
-                  <View style={styles.cardRow}>
-                    <View style={styles.thumb}>
-                      {item.listings.photo_url ? (
-                        <Image source={{ uri: item.listings.photo_url }} style={styles.thumbImage} />
-                      ) : (
-                        <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>{item.listings.title}</Text>
-                      <Text style={styles.cardSubtitle}>
-                        {Number(item.listings.price).toLocaleString('fr-FR')} FCFA
-                      </Text>
-                    </View>
-                    <TouchableOpacity onPress={() => handleRemoveWishlist(item.id)} style={{ padding: spacing.xs }}>
-                      <Ionicons name="bookmark" size={18} color={colors.orange} />
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          )}
+          {tab === 'courses' && <RequestsList onLoaded={(all) => setCoursesCount(countActive(all))} />}
 
           {tab === 'expedies' && (
             <FlatList
@@ -590,32 +549,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    paddingBottom: spacing.lg,
   },
-  headerTitle: { color: colors.white, fontSize: 16, fontWeight: '700' },
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
-  },
+  headerTitle: { color: colors.white, fontSize: 18, fontWeight: '700' },
+  tabWrap: { backgroundColor: colors.background, paddingTop: spacing.md },
+  tabRow: { paddingHorizontal: spacing.lg, gap: spacing.sm, paddingBottom: spacing.xs },
   tabButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    paddingVertical: spacing.xs,
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,
+    backgroundColor: colors.surface,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
-  tabButtonActive: { backgroundColor: colors.orange, borderColor: colors.orange },
-  tabLabel: { fontSize: 10, color: colors.textPrimary, fontWeight: '600' },
+  tabButtonActive: { backgroundColor: colors.purple, borderColor: colors.purple },
+  tabLabel: { fontSize: 13, color: colors.textPrimary, fontWeight: '700' },
   tabLabelActive: { color: colors.white },
   emptyText: { textAlign: 'center', color: colors.textMuted, fontSize: 13, marginTop: spacing.xl },
   card: {
@@ -625,6 +582,11 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
   cardRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   thumb: {
@@ -692,8 +654,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  countBadgeActive: { backgroundColor: colors.white },
+  countBadgeActive: { backgroundColor: colors.orange },
   countText: { fontSize: 9, fontWeight: '800', color: colors.white },
-  countTextActive: { color: colors.orange },
+  countTextActive: { color: colors.white },
   actionButtonTextMuted: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
 });

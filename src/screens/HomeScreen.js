@@ -589,6 +589,16 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.menuItemLabel}>Mon profil</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => { setMenuVisible(false); navigation.navigate('Moi', { screen: 'MyOrders' }); }}
+              >
+                <View style={styles.menuItemIcon}>
+                  <Ionicons name="receipt-outline" size={18} color={colors.orange} />
+                </View>
+                <Text style={styles.menuItemLabel}>Mes commandes</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
               <TouchableOpacity style={styles.menuItem} onPress={onMerchantMenu}>
                 <View style={styles.menuItemIcon}>
                   <Ionicons name="storefront-outline" size={18} color={colors.orange} />
