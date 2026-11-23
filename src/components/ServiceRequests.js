@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Image, Modal, ScrollView, Alert, Linking,
-  ActivityIndicator, StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
+  ActivityIndicator, RefreshControl, StyleSheet, KeyboardAvoidingView, Platform, StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,6 +55,7 @@ async function saveToHistory(entries) {
 export default function ServiceRequests({ navigation, defaultCountry }) {
   const [open, setOpen] = useState(null); // 'seek' | 'courier'
   const [done, setDone] = useState(null); // 'seek' | 'courier'
+  const [tracking, setTracking] = useState(false);
 
   const start = async (kind, label) => {
     const ok = await ensureAccountComplete(navigation, label);
@@ -63,6 +64,7 @@ export default function ServiceRequests({ navigation, defaultCountry }) {
   const finished = (kind) => { setOpen(null); setTimeout(() => setDone(kind), 250); };
 
   return (
+    <View>
     <View style={styles.row}>
       <TouchableOpacity style={[styles.tile, { backgroundColor: colors.tintPurple }]} activeOpacity={0.85} onPress={() => start('seek', 'envoyer une demande')}>
         <View style={[styles.tileIcon, { backgroundColor: colors.purple }]}><Ionicons name="search" size={20} color="#fff" /></View>
@@ -85,14 +87,25 @@ export default function ServiceRequests({ navigation, defaultCountry }) {
       <SuccessModal
         kind={done}
         onClose={() => setDone(null)}
+        onTrack={() => { setDone(null); setTimeout(() => setTracking(true), 250); }}
         onOther={() => { const k = done === 'seek' ? 'courier' : 'seek'; setDone(null); setTimeout(() => setOpen(k), 250); }}
       />
+
+      <Modal visible={tracking} animationType="slide" onRequestClose={() => setTracking(false)} statusBarTranslucent>
+        <SafeAreaProvider><MyRequests onClose={() => setTracking(false)} /></SafeAreaProvider>
+      </Modal>
+    </View>
+    <TouchableOpacity style={styles.trackLink} onPress={() => setTracking(true)} activeOpacity={0.7}>
+      <Ionicons name="navigate-circle-outline" size={18} color={colors.purple} />
+      <Text style={styles.trackLinkText}>Suivre mes demandes</Text>
+      <Ionicons name="chevron-forward" size={16} color={colors.purple} />
+    </TouchableOpacity>
     </View>
   );
 }
 
 /* ---------------------------------------------------------------- succès */
-function SuccessModal({ kind, onClose, onOther }) {
+function SuccessModal({ kind, onClose, onOther, onTrack }) {
   const seek = kind === 'seek';
   return (
     <Modal visible={!!kind} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -117,17 +130,144 @@ function SuccessModal({ kind, onClose, onOther }) {
               </View>
             ))}
           </View>
-          <TouchableOpacity style={styles.primaryBtn} onPress={onClose} activeOpacity={0.85}>
-            <Ionicons name="home-outline" size={18} color="#fff" />
-            <Text style={styles.primaryBtnText}>Découvrir les articles</Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={onTrack} activeOpacity={0.85}>
+            <Ionicons name="navigate-circle-outline" size={18} color="#fff" />
+            <Text style={styles.primaryBtnText}>Suivre ma demande</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={onOther} activeOpacity={0.85}>
-            <Ionicons name={seek ? 'bicycle-outline' : 'search-outline'} size={18} color={colors.purple} />
-            <Text style={styles.secondaryBtnText}>{seek ? 'Commander un coursier' : 'Je cherche un article'}</Text>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={onClose} activeOpacity={0.85}>
+            <Ionicons name="home-outline" size={18} color={colors.purple} />
+            <Text style={styles.secondaryBtnText}>Découvrir les articles</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onOther} activeOpacity={0.7} style={{ marginTop: 14 }}>
+            <Text style={styles.linkText}>{seek ? 'Commander un coursier' : 'Je cherche un article'}</Text>
           </TouchableOpacity>
         </View>
       </View>
     </Modal>
+  );
+}
+
+/* ---------------------------------------------------------------- suivi */
+const COURIER_STEPS = [
+  ['nouvelle', 'Demande reçue'],
+  ['acceptee', 'Coursier confirmé'],
+  ['en_cours', 'En route'],
+  ['livree', 'Livré'],
+];
+const SEEK_STEPS = [
+  ['nouvelle', 'Demande reçue'],
+  ['en_cours', 'Recherche en cours'],
+  ['trouvee', 'Article trouvé'],
+];
+const SUPPORT_WA = '34627137449';
+
+function Timeline({ steps, status }) {
+  const canceled = status === 'annulee';
+  const idx = steps.findIndex((x) => x[0] === status);
+  return (
+    <View style={{ marginTop: 6 }}>
+      {steps.map(([code, label], i) => {
+        const done = !canceled && idx >= i;
+        const current = !canceled && idx === i;
+        const last = i === steps.length - 1;
+        return (
+          <View key={code} style={styles.tlRow}>
+            <View style={styles.tlRail}>
+              <View style={[styles.tlDot, done && { backgroundColor: current && !last ? colors.orange : colors.success }]}>
+                {done ? <Ionicons name={current && !last ? 'ellipse' : 'checkmark'} size={current && !last ? 8 : 13} color="#fff" /> : null}
+              </View>
+              {!last ? <View style={[styles.tlLine, !canceled && idx > i && { backgroundColor: colors.success }]} /> : null}
+            </View>
+            <Text style={[styles.tlText, done && { color: colors.textPrimary, fontWeight: current ? '700' : '500' }]}>{label}</Text>
+          </View>
+        );
+      })}
+      {canceled ? (
+        <View style={styles.cancelBox}><Ionicons name="close-circle" size={16} color={colors.danger} /><Text style={styles.cancelText}>Demande annulée</Text></View>
+      ) : null}
+    </View>
+  );
+}
+
+function MyRequests({ onClose }) {
+  const [rows, setRows] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const insets = useSafeAreaInsets();
+  const top = Math.max(insets.top, Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 0);
+
+  const load = useCallback(async () => {
+    try {
+      const uid = await getDeviceUserId();
+      const [a, c] = await Promise.all([
+        supabase.from('article_requests').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(30),
+        supabase.from('courier_requests').select('*').eq('user_id', uid).order('created_at', { ascending: false }).limit(30),
+      ]);
+      const all = [
+        ...(a.data || []).map((r) => ({ ...r, kind: 'seek' })),
+        ...(c.data || []).map((r) => ({ ...r, kind: 'courier' })),
+      ].sort((x, y) => new Date(y.created_at) - new Date(x.created_at));
+      setRows(all);
+    } catch (e) { setRows([]); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <GradientHeader style={{ paddingTop: top + 10, paddingBottom: 18 }}>
+        <View style={styles.hRow}>
+          <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.hBack}><Ionicons name="arrow-back" size={20} color="#fff" /></TouchableOpacity>
+          <Text style={styles.hTitle}>Mes demandes</Text>
+          <View style={{ width: 36 }} />
+        </View>
+      </GradientHeader>
+      {rows === null ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={colors.purple} /></View>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: spacing.md, paddingBottom: 40 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+          {rows.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="file-tray-outline" size={42} color={colors.textMuted} />
+              <Text style={styles.emptyText}>Tu n'as pas encore fait de demande.</Text>
+            </View>
+          ) : rows.map((r) => {
+            const seek = r.kind === 'seek';
+            const steps = seek ? SEEK_STEPS : COURIER_STEPS;
+            return (
+              <View key={r.kind + r.id} style={styles.card}>
+                <View style={styles.cardHead}>
+                  <View style={[styles.cardIcon, { backgroundColor: seek ? colors.tintPurple : colors.tintOrange }]}>
+                    <Ionicons name={seek ? 'search' : 'bicycle'} size={18} color={seek ? colors.purple : colors.orange} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.cardTitle} numberOfLines={2}>{seek ? r.title : `${r.pickup_address} → ${r.dropoff_address}`}</Text>
+                    <Text style={styles.cardSub}>{seek ? 'Je cherche cet article' : 'Coursier'} · {new Date(r.created_at).toLocaleDateString('fr-FR')}</Text>
+                  </View>
+                </View>
+                {!seek && r.price_quote ? (
+                  <View style={styles.priceBox}><Text style={styles.priceLabel}>Prix de la course</Text><Text style={styles.priceValue}>{r.price_quote}</Text></View>
+                ) : null}
+                <Timeline steps={steps} status={r.status} />
+                {r.admin_note ? (
+                  <View style={styles.noteBox}>
+                    <Text style={styles.noteTitle}>Message de Zuno</Text>
+                    <Text style={styles.noteText}>{r.admin_note}</Text>
+                  </View>
+                ) : null}
+                {seek && r.status === 'trouvee' ? (
+                  <TouchableOpacity style={styles.waBtn} activeOpacity={0.85}
+                    onPress={() => Linking.openURL(`https://wa.me/${SUPPORT_WA}?text=${encodeURIComponent('Bonjour Zuno, au sujet de ma demande : ' + r.title)}`)}>
+                    <Ionicons name="logo-whatsapp" size={18} color="#fff" />
+                    <Text style={styles.waBtnText}>Consulter mon WhatsApp</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -509,6 +649,26 @@ function CourierForm({ onClose, onDone, defaultCountry }) {
 
 /* ---------------------------------------------------------------- styles */
 const styles = StyleSheet.create({
+  trackLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
+  trackLinkText: { color: colors.purple, fontWeight: '600', fontSize: 13 },
+  linkText: { color: colors.purple, fontWeight: '600', fontSize: 14 },
+  tlRow: { flexDirection: 'row', alignItems: 'flex-start', minHeight: 34 },
+  tlRail: { width: 24, alignItems: 'center', marginRight: 10 },
+  tlDot: { width: 20, height: 20, borderRadius: 10, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' },
+  tlLine: { width: 2, flex: 1, minHeight: 14, backgroundColor: colors.border, marginVertical: 2 },
+  tlText: { fontSize: 14, color: colors.textMuted, paddingTop: 1 },
+  cancelBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  cancelText: { color: colors.danger, fontWeight: '600', fontSize: 13 },
+  priceBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.tintOrange, borderRadius: radius.md, padding: 12, marginTop: 10 },
+  priceLabel: { color: colors.textSecondary, fontSize: 13 },
+  priceValue: { color: colors.orange, fontWeight: '800', fontSize: 16 },
+  noteBox: { backgroundColor: colors.tintPurple, borderRadius: radius.md, padding: 12, marginTop: 12 },
+  noteTitle: { color: colors.purple, fontWeight: '700', fontSize: 12, marginBottom: 3 },
+  noteText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },
+  waBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#25D366', borderRadius: radius.md, paddingVertical: 13, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  waBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  empty: { alignItems: 'center', paddingVertical: 60 },
+  emptyText: { color: colors.textMuted, marginTop: 10 },
   row: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.md },
   tile: { flex: 1, borderRadius: radius.lg, padding: spacing.md, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   tileIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },

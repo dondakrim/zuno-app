@@ -4357,44 +4357,89 @@ const SVC_ST = {
   article_requests: [['nouvelle', 'Nouvelle'], ['en_cours', 'En recherche'], ['trouvee', 'Trouvée'], ['annulee', 'Annulée']],
   courier_requests: [['nouvelle', 'Nouvelle'], ['acceptee', 'Acceptée'], ['en_cours', 'En course'], ['livree', 'Livrée'], ['annulee', 'Annulée']],
 };
-let SVC_ROWS = {};
+const SVC_COLOR = { nouvelle: ['#FFF0E3', '#B84E00'], en_cours: ['#E6F0FB', '#1A5FA8'], acceptee: ['#EEE9FF', '#2E0B8C'], trouvee: ['#E4F5EE', '#0E7A4B'], livree: ['#E4F5EE', '#0E7A4B'], annulee: ['#F3F1F6', '#6A6580'] };
+let SVC_ROWS = {}, SVC_FILTER = {}, SVC_CHOICE = {};
+(function () {
+  const st = document.createElement('style');
+  st.textContent = '.sv-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.sv-tab{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer}.sv-tab.on{background:var(--purple);border-color:var(--purple);color:#fff}'
+  + '.sv-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin:0 0 16px;overflow:hidden;box-shadow:0 1px 3px rgba(30,7,99,.05)}.sv-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap}'
+  + '.sv-route{font-family:var(--font-head);font-size:18px;font-weight:700;color:var(--text);margin:0}.sv-date{font-size:12px;color:var(--text-muted);margin:4px 0 0}.sv-badge{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:700;white-space:nowrap}'
+  + '.sv-body{padding:16px 18px}.sv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}.sv-box{background:var(--bg);border-radius:12px;padding:12px 14px}.sv-box h4{margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted)}.sv-box p{margin:2px 0;font-size:14px;color:var(--text)}'
+  + '.sv-img{max-width:140px;max-height:140px;border-radius:12px;display:block;margin:0 0 12px}.sv-edit{border-top:1px dashed var(--border);margin-top:6px;padding-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:end}'
+  + '.sv-edit label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin:0 0 5px}.sv-edit input,.sv-edit textarea,.sv-edit select{width:100%;border:1px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:14px;background:#fff}.sv-wide{grid-column:1/-1}'
+  + '.sv-steps{display:flex;gap:6px;flex-wrap:wrap}.sv-step{border:1px solid var(--border);background:#fff;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-secondary)}.sv-step.on{background:var(--purple);border-color:var(--purple);color:#fff}'
+  + '.sv-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.sv-save{background:var(--success);color:#fff;border:0;border-radius:10px;padding:10px 20px;font-weight:700;font-size:14px;cursor:pointer}.sv-save:disabled{opacity:.6}.sv-hint{font-size:12px;color:var(--text-muted)}'
+  + '.sv-toast{position:fixed;right:20px;bottom:20px;background:var(--text);color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.25)}.sv-toast.err{background:var(--danger)}';
+  document.head.appendChild(st);
+})();
+function svcToast(msg, bad) {
+  const t = document.createElement('div'); t.className = 'sv-toast' + (bad ? ' err' : ''); t.textContent = msg; document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
 async function loadSvcRequests(res, panelId) {
   const panel = document.getElementById(panelId);
-  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  if (!SVC_ROWS[res]) panel.innerHTML = '<div class="loading">Chargement…</div>';
   try { SVC_ROWS[res] = (await cFn(res, 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
-  const rows = SVC_ROWS[res];
-  if (!rows.length) { panel.innerHTML = '<div class="card"><p class="card-sub" style="margin:0">Aucune demande pour le moment.</p></div>'; return; }
-const mp = (lat, lng, txt) => 'https://www.google.com/maps/search/?api=1&query=' + (lat && lng ? lat + ',' + lng : encodeURIComponent(txt || ''));
+  renderSvc(res, panelId);
+}
+function svcFilter(res, panelId, f) { SVC_FILTER[res] = f; renderSvc(res, panelId); }
+function svcPick(res, panelId, id, st) { SVC_CHOICE[id] = st; renderSvc(res, panelId, id); }
+function renderSvc(res, panelId) {
+  const panel = document.getElementById(panelId);
+  const all = SVC_ROWS[res] || [];
+  const f = SVC_FILTER[res] || 'toutes';
+  const open = (r) => r.status !== 'livree' && r.status !== 'trouvee' && r.status !== 'annulee';
+  const rows = all.filter((r) => f === 'toutes' ? true : f === 'nouvelle' ? r.status === 'nouvelle' : f === 'cours' ? (open(r) && r.status !== 'nouvelle') : !open(r));
+  const cnt = (fn) => all.filter(fn).length;
+  const tabs = [['toutes', 'Toutes', all.length], ['nouvelle', 'Nouvelles', cnt((r) => r.status === 'nouvelle')], ['cours', 'En cours', cnt((r) => open(r) && r.status !== 'nouvelle')], ['fini', 'Terminées', cnt((r) => !open(r))]];
+  // Sauvegarde des saisies en cours avant de redessiner
+  const keep = {};
+  panel.querySelectorAll('[data-sv]').forEach((el) => { keep[el.id] = el.value; });
+  const mp = (lat, lng, txt) => 'https://www.google.com/maps/search/?api=1&query=' + (lat && lng ? lat + ',' + lng : encodeURIComponent(txt || ''));
   const tel = (n) => n ? '<a href="tel:' + esc(n) + '">' + esc(n) + '</a>' : '—';
-  panel.innerHTML = rows.map((r) => {
-    const sel = '<select id="sv-st-' + r.id + '">' + SVC_ST[res].map((s) => '<option value="' + s[0] + '"' + (r.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>').join('') + '</select>';
-    const when = new Date(r.created_at).toLocaleString('fr-FR');
-    let body;
-    if (res === 'article_requests') {
-      body = '<p class="card-title">' + esc(r.title) + ' <span class="pill">' + esc(r.status) + '</span></p>'
-        + (r.photo_url ? '<a href="' + esc(r.photo_url) + '" target="_blank" rel="noopener"><img src="' + esc(r.photo_url) + '" alt="" style="max-width:160px;max-height:160px;border-radius:10px;margin:6px 0"></a>' : '')
-        + '<p class="card-sub" style="white-space:pre-wrap">' + esc(r.description || '') + '</p>'
-        + '<p class="card-sub">Budget : ' + esc(r.budget || '—') + ' · ' + esc(r.country || '') + ' · ' + esc(r.city || '') + '</p>'
-        + '<p class="card-sub">Contact : ' + tel(r.contact_phone) + (r.user_name ? ' · ' + esc(r.user_name) : '') + ' · ' + when + '</p>';
-    } else {
-      body = '<p class="card-title">' + esc(r.pickup_address) + ' → ' + esc(r.dropoff_address) + ' <span class="pill">' + esc(r.status) + '</span></p>'
-        + '<p class="card-sub"><a href="' + esc(mp(r.pickup_lat, r.pickup_lng, r.pickup_address)) + '" target="_blank" rel="noopener">📍 Voir le départ' + (r.pickup_lat ? ' (GPS)' : '') + '</a> · <a href="' + esc(mp(r.dropoff_lat, r.dropoff_lng, r.dropoff_address)) + '" target="_blank" rel="noopener">📍 Voir l\'arrivée' + (r.dropoff_lat ? ' (GPS)' : '') + '</a></p>'
-        + '<p class="card-sub" style="white-space:pre-wrap">Colis : ' + esc(r.package_description) + ' · Quand : ' + esc(r.urgency || '') + ' · ' + esc(r.country || '') + '</p>'
-        + '<p class="card-sub">Expéditeur : ' + esc(r.contact_name || '') + ' ' + tel(r.contact_phone) + '</p>'
-        + '<p class="card-sub">Destinataire : ' + esc(r.recipient_name || '') + ' ' + tel(r.recipient_phone) + ' · ' + when + '</p>'
-        + '<label class="lbl">Prix proposé</label><input type="text" id="sv-pr-' + r.id + '" maxlength="40" value="' + esc(r.price_quote || '') + '" placeholder="Ex : 2 500 FCFA">';
-    }
-    return '<div class="card">' + body + '<label class="lbl">Statut</label>' + sel
-      + '<label class="lbl">Note interne</label><textarea id="sv-nt-' + r.id + '" rows="2" maxlength="1000" style="width:100%">' + esc(r.admin_note || '') + '</textarea>'
-      + '<div class="actions"><button type="button" class="btn btn-approve" onclick="svcSave(\'' + res + '\',\'' + panelId + '\',\'' + r.id + '\')">Enregistrer</button></div></div>';
-  }).join('');
+  const wa = (n) => n ? ' · <a href="https://wa.me/' + String(n).replace(/[^\d]/g, '') + '" target="_blank" rel="noopener">WhatsApp</a>' : '';
+  panel.innerHTML = '<div class="sv-tabs">' + tabs.map((t) => '<button type="button" class="sv-tab' + (f === t[0] ? ' on' : '') + '" onclick="svcFilter(\'' + res + '\',\'' + panelId + '\',\'' + t[0] + '\')">' + t[1] + ' (' + t[2] + ')</button>').join('') + '</div>'
+    + (rows.length ? '' : '<div class="card"><p class="card-sub" style="margin:0">Aucune demande dans cette liste.</p></div>')
+    + rows.map((r) => {
+      const col = SVC_COLOR[r.status] || SVC_COLOR.nouvelle;
+      const label = (SVC_ST[res].find((s) => s[0] === r.status) || [0, r.status])[1];
+      const when = new Date(r.created_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+      const chosen = SVC_CHOICE[r.id] || r.status;
+      let head, info;
+      if (res === 'article_requests') {
+        head = '<p class="sv-route">' + esc(r.title) + '</p><p class="sv-date">Reçue le ' + when + ' · ' + esc(r.city || '') + ' (' + esc(r.country || '') + ')</p>';
+        info = (r.photo_url ? '<a href="' + esc(r.photo_url) + '" target="_blank" rel="noopener"><img class="sv-img" src="' + esc(r.photo_url) + '" alt=""></a>' : '')
+          + '<div class="sv-grid"><div class="sv-box"><h4>Détails</h4><p style="white-space:pre-wrap">' + esc(r.description || '—') + '</p><p>Budget : <b>' + esc(r.budget || '—') + '</b></p></div>'
+          + '<div class="sv-box"><h4>Client</h4><p>' + (r.user_name ? esc(r.user_name) + '<br>' : '') + tel(r.contact_phone) + wa(r.contact_phone) + '</p></div></div>';
+      } else {
+        head = '<p class="sv-route">' + esc(r.pickup_address) + ' → ' + esc(r.dropoff_address) + '</p><p class="sv-date">Reçue le ' + when + ' · ' + esc(r.urgency || '') + ' · ' + esc(r.country || '') + '</p>';
+        info = '<div class="sv-grid">'
+          + '<div class="sv-box"><h4>Trajet</h4><p>🟢 <a href="' + esc(mp(r.pickup_lat, r.pickup_lng, r.pickup_address)) + '" target="_blank" rel="noopener">' + esc(r.pickup_address) + (r.pickup_lat ? ' (GPS)' : '') + '</a></p>'
+          + '<p>🟠 <a href="' + esc(mp(r.dropoff_lat, r.dropoff_lng, r.dropoff_address)) + '" target="_blank" rel="noopener">' + esc(r.dropoff_address) + (r.dropoff_lat ? ' (GPS)' : '') + '</a></p><p>📦 ' + esc(r.package_description) + '</p></div>'
+          + '<div class="sv-box"><h4>Expéditeur</h4><p><b>' + esc(r.contact_name || '—') + '</b></p><p>' + tel(r.contact_phone) + wa(r.contact_phone) + '</p></div>'
+          + '<div class="sv-box"><h4>Destinataire</h4><p><b>' + esc(r.recipient_name || '—') + '</b></p><p>' + tel(r.recipient_phone) + wa(r.recipient_phone) + '</p></div></div>';
+      }
+      const price = res === 'courier_requests' ? '<div><label for="sv-pr-' + r.id + '">Prix de la course</label><input data-sv type="text" id="sv-pr-' + r.id + '" maxlength="40" value="' + esc(keep['sv-pr-' + r.id] !== undefined ? keep['sv-pr-' + r.id] : (r.price_quote || '')) + '" placeholder="Ex : 2 500 FCFA"></div>' : '';
+      return '<div class="sv-card"><div class="sv-head"><div>' + head + '</div><span class="sv-badge" style="background:' + col[0] + ';color:' + col[1] + '">' + esc(label) + '</span></div>'
+        + '<div class="sv-body">' + info + '<div class="sv-edit">'
+        + '<div class="sv-wide"><label>Étape</label><div class="sv-steps">' + SVC_ST[res].map((s) => '<button type="button" class="sv-step' + (chosen === s[0] ? ' on' : '') + '" onclick="svcPick(\'' + res + '\',\'' + panelId + '\',\'' + r.id + '\',\'' + s[0] + '\')">' + s[1] + '</button>').join('') + '</div></div>'
+        + price
+        + '<div class="sv-wide"><label for="sv-nt-' + r.id + '">Message au client (reçu dans ses notifications)</label><textarea data-sv id="sv-nt-' + r.id + '" rows="2" maxlength="500" placeholder="Ex : Garde ton téléphone, le livreur est en route.">' + esc(keep['sv-nt-' + r.id] !== undefined ? keep['sv-nt-' + r.id] : (r.admin_note || '')) + '</textarea></div>'
+        + '<div class="sv-wide sv-foot"><button type="button" class="sv-save" id="sv-btn-' + r.id + '" onclick="svcSave(\'' + res + '\',\'' + panelId + '\',\'' + r.id + '\')">Enregistrer et prévenir le client</button><span class="sv-hint">Le client reçoit une notification quand l\'étape ou le message change.</span></div>'
+        + '</div></div></div>';
+    }).join('');
 }
 async function svcSave(res, panelId, id) {
+  const btn = document.getElementById('sv-btn-' + id);
   const pr = document.getElementById('sv-pr-' + id);
+  const row = (SVC_ROWS[res] || []).find((x) => x.id === id) || {};
+  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
   try {
-    await cFn(res, 'save', { id, status: document.getElementById('sv-st-' + id).value, admin_note: document.getElementById('sv-nt-' + id).value, price_quote: pr ? pr.value : undefined });
-    loadSvcRequests(res, panelId);
-  } catch (e) { alert(e.message); }
+    const out = await cFn(res, 'save', { id, status: SVC_CHOICE[id] || row.status, admin_note: document.getElementById('sv-nt-' + id).value, price_quote: pr ? pr.value : undefined });
+    delete SVC_CHOICE[id];
+    svcToast(out.notified ? 'Enregistré ✓ Client prévenu' : (out.notify_error ? 'Enregistré, mais notification non envoyée : ' + out.notify_error : 'Enregistré ✓'), !!out.notify_error);
+    await loadSvcRequests(res, panelId);
+  } catch (e) { svcToast('Erreur : ' + e.message, true); if (btn) { btn.disabled = false; btn.textContent = 'Enregistrer et prévenir le client'; } }
 }
 
 async function legalPublish(kind) {
