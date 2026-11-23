@@ -236,7 +236,12 @@ export default function CheckoutScreen({ route, navigation }) {
 
     // L'article n'est plus disponible pour d'autres acheteurs une fois
     // qu'une commande a été passée dessus.
-    await supabase.from('listings').update({ status: 'vendu' }).eq('id', listing.id);
+    // Article unique (sans stock suivi) : il passe en « vendu ». Avec un stock,
+    // c'est la base de données qui retire les exemplaires commandés.
+    const { data: fresh } = await supabase.from('listings').select('stock').eq('id', listing.id).maybeSingle();
+    if (fresh?.stock == null) {
+      await supabase.from('listings').update({ status: 'vendu' }).eq('id', listing.id);
+    }
 
     // Un premier message est envoyé automatiquement au vendeur, pour que la
     // conversation démarre avec tout le contexte de la commande déjà dedans.

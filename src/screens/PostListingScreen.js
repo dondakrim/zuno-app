@@ -94,6 +94,7 @@ export default function PostListingScreen({ navigation }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
+  const [stockInput, setStockInput] = useState('');
   const [city, setCity] = useState('');
   const [countryCode, setCountryCode] = useState(null); // obligatoire, aucun pays par défaut
   const [category, setCategory] = useState(categories[0]);
@@ -268,6 +269,7 @@ export default function PostListingScreen({ navigation }) {
         photo_url: photoUrls[0],
         photos: photoUrls,
         promo_price: showPromo && promoPrice.trim() ? Number(digits(promoPrice)) : null,
+        stock: stockInput.trim() ? Number(stockInput) : null,
         seller_certified: true,
         status: 'disponible',
         moderation_status: moderationStatus,
@@ -332,6 +334,7 @@ export default function PostListingScreen({ navigation }) {
     setTitle('');
     setDescription('');
     setPrice('');
+    setStockInput('');
     setCity('');
     setCountryCode(null);
     setPhotos([]);
@@ -496,6 +499,19 @@ export default function PostListingScreen({ navigation }) {
               <Err text={errors.promo} />
             </>
           ) : null}
+        </Card>
+
+        <Card icon="cube-outline" title="Stock">
+          <Text style={styles.label}>Nombre d'articles disponibles</Text>
+          <TextInput
+            placeholder="Laisse vide si c'est un article unique"
+            placeholderTextColor={colors.textMuted}
+            value={stockInput}
+            onChangeText={(t) => setStockInput(digits(t).slice(0, 5))}
+            keyboardType="number-pad"
+            style={styles.input}
+          />
+          <Text style={styles.counter}>Un seul article ? Laisse vide. Plusieurs exemplaires ? Indique le nombre : il baisse à chaque commande.</Text>
         </Card>
 
         <Card icon="pricetags-outline" title="Détails">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Alert, Image, FlatList, Dimensions, Modal, TextInput, Share, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AvatarGlyph } from '../components/Avatar';
 import { colors, spacing, radius } from '../theme/colors';
@@ -15,7 +15,9 @@ import { getSellerRating, getListingRating, countCompletedSales, TRUST_BADGE_THR
 const REPORT_CATEGORIES = [...Object.keys(ILLEGAL_KEYWORDS), 'AUTRE'];
 
 const screenWidth = Dimensions.get('window').width;
-const GALLERY_WIDTH = screenWidth - spacing.lg * 2;
+const GALLERY_WIDTH = screenWidth;
+const HERO_HEIGHT = 340;
+const TOP_OFFSET = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 54;
 
 export default function ProductDetailScreen({ route, navigation }) {
   const { listing } = route.params;
@@ -38,6 +40,13 @@ export default function ProductDetailScreen({ route, navigation }) {
   const [sellerStats, setSellerStats] = useState({ average: null, count: 0, completedSales: 0 });
   const [listingRating, setListingRating] = useState({ average: null, count: 0 });
   const [sellerProfile, setSellerProfile] = useState(null);
+  // Stock : vide = article unique (comportement habituel) ; un nombre = stock suivi.
+  const [stock, setStock] = useState(typeof listing.stock === 'number' ? listing.stock : null);
+  const [status, setStatus] = useState(listing.status || 'disponible');
+  const [alertOn, setAlertOn] = useState(false);
+  const [alertBusy, setAlertBusy] = useState(false);
+  const tracked = typeof stock === 'number';
+  const soldOut = tracked ? stock <= 0 : status === 'vendu';
   // Les annonces publiées avant l'ajout du carrousel n'ont qu'une seule
   // photo (photo_url) : on retombe dessus si `photos` n'existe pas.
   const gallery = listing.photos?.length ? listing.photos : listing.photo_url ? [listing.photo_url] : [];
@@ -119,6 +128,50 @@ export default function ProductDetailScreen({ route, navigation }) {
       cancelled = true;
     };
   }, [listing.id]);
+
+  // Stock et alerte « prévenez-moi » à jour à chaque ouverture de la fiche.
+  useEffect(() => {
+    let cancelled = false;
+    async function loadStock() {
+      const myId = await getDeviceUserId();
+      const [{ data: fresh }, { data: alert }] = await Promise.all([
+        supabase.from('listings').select('stock, status').eq('id', listing.id).maybeSingle(),
+        supabase.from('stock_alerts').select('listing_id').eq('listing_id', listing.id).eq('user_id', myId).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      if (fresh) {
+        setStock(typeof fresh.stock === 'number' ? fresh.stock : null);
+        setStatus(fresh.status || 'disponible');
+      }
+      setAlertOn(!!alert);
+    }
+    loadStock();
+    return () => {
+      cancelled = true;
+    };
+  }, [listing.id]);
+
+  const handleToggleAlert = async () => {
+    if (alertBusy) return;
+    const myId = await getDeviceUserId();
+    setAlertBusy(true);
+    if (alertOn) {
+      await supabase.from('stock_alerts').delete().eq('listing_id', listing.id).eq('user_id', myId);
+      setAlertOn(false);
+      setAlertBusy(false);
+      return;
+    }
+    const ok = await ensureAccountComplete(navigation, 'être prévenu(e) du retour en stock');
+    if (!ok) { setAlertBusy(false); return; }
+    const { error } = await supabase.from('stock_alerts').insert({ listing_id: listing.id, user_id: myId });
+    setAlertBusy(false);
+    if (error) {
+      Alert.alert('Oups', "Impossible d'activer l'alerte pour le moment.");
+      return;
+    }
+    setAlertOn(true);
+    Alert.alert('Alerte activée 🔔', "On te prévient dès que cet article est de nouveau disponible.");
+  };
 
   const handleToggleFavorite = async () => {
     if (!listing.vendeur_id) {
@@ -239,9 +292,13 @@ export default function ProductDetailScreen({ route, navigation }) {
   }, [listing.id, listing.category]);
 
   const handleBuy = async () => {
+    if (soldOut) {
+      Alert.alert('Indisponible', tracked ? 'Cet article est actuellement en rupture de stock.' : 'Cet article a déjà été vendu.');
+      return;
+    }
     const ok = await ensureAccountComplete(navigation, 'acheter un article');
     if (!ok) return;
-    navigation.navigate('Cart', { listing });
+    navigation.navigate('Cart', { listing: { ...listing, stock } });
   };
 
   const handleContact = () => {
@@ -290,21 +347,15 @@ export default function ProductDetailScreen({ route, navigation }) {
     Alert.alert('Signalement envoyé', 'Merci, notre équipe va vérifier cette annonce.');
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
-      <View style={styles.topRow}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowReport(true)} style={styles.reportLink}>
-          <Ionicons name="flag-outline" size={16} color={colors.textMuted} />
-          <Text style={styles.reportLinkText}>Signaler</Text>
-        </TouchableOpacity>
-      </View>
+  const warrantyText = Number(listing.warranty_days) > 0 ? `Garantie ${warrantyLabel(listing.warranty_days)}` : listing.warranty_days === 0 ? 'Sans garantie' : null;
+  const lowStock = tracked && stock > 0 && stock <= 3;
 
-      <View style={styles.image}>
-        {gallery.length > 0 ? (
-          <>
+  return (
+    <View style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 130 }}>
+        {/* ---------- Galerie plein écran ---------- */}
+        <View style={styles.hero}>
+          {gallery.length > 0 ? (
             <FlatList
               data={gallery}
               horizontal
@@ -316,155 +367,278 @@ export default function ProductDetailScreen({ route, navigation }) {
                 setActiveIndex(index);
               }}
               renderItem={({ item }) => (
-                <Image source={{ uri: item }} style={[styles.photoImage, { width: GALLERY_WIDTH }]} />
+                <Image source={{ uri: item }} style={{ width: GALLERY_WIDTH, height: HERO_HEIGHT }} resizeMode="cover" />
               )}
             />
-            {gallery.length > 1 && (
+          ) : (
+            <View style={styles.heroEmpty}><Ionicons name="image-outline" size={40} color={colors.textMuted} /></View>
+          )}
+
+          {soldOut ? (
+            <View style={styles.soldVeil} pointerEvents="none">
+              <View style={styles.soldPill}>
+                <Ionicons name="alert-circle" size={16} color="#fff" />
+                <Text style={styles.soldPillText}>{tracked ? 'Rupture de stock' : 'Vendu'}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          <View style={[styles.topBar, { top: TOP_OFFSET }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.roundBtn} hitSlop={8}>
+              <Ionicons name="arrow-back" size={20} color={colors.textPrimary} />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {soldOut && tracked ? (
+                <TouchableOpacity onPress={handleToggleAlert} style={[styles.roundBtn, alertOn && { backgroundColor: colors.orange }]} hitSlop={8}>
+                  <Ionicons name={alertOn ? 'notifications' : 'notifications-outline'} size={20} color={alertOn ? '#fff' : colors.orange} />
+                </TouchableOpacity>
+              ) : null}
+              <TouchableOpacity onPress={handleToggleWishlist} style={styles.roundBtn} hitSlop={8}>
+                <Ionicons name={isWishlisted ? 'bookmark' : 'bookmark-outline'} size={20} color={isWishlisted ? colors.orange : colors.textPrimary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleShare} style={styles.roundBtn} hitSlop={8}>
+                <Ionicons name="share-social-outline" size={20} color={colors.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {gallery.length > 1 ? (
+            <>
+              <View style={styles.counterChip}>
+                <Ionicons name="images-outline" size={13} color="#fff" />
+                <Text style={styles.counterChipText}>{activeIndex + 1}/{gallery.length}</Text>
+              </View>
               <View style={styles.dotsRow}>
                 {gallery.map((_, i) => (
                   <View key={i} style={[styles.dot, i === activeIndex && styles.dotActive]} />
                 ))}
               </View>
-            )}
-          </>
-        ) : (
-          <Ionicons name="image-outline" size={32} color={colors.textMuted} />
-        )}
-      </View>
-
-      <View style={styles.titleRow}>
-        <Text style={[styles.title, { flex: 1 }]}>{listing.title}</Text>
-        <TouchableOpacity onPress={handleToggleWishlist} style={styles.iconButton}>
-          <Ionicons
-            name={isWishlisted ? 'bookmark' : 'bookmark-outline'}
-            size={20}
-            color={isWishlisted ? colors.orange : colors.textMuted}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
-          <Ionicons name="share-social-outline" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-      </View>
-      <Text style={styles.price}>{formatPrice(listing.price)}</Text>
-
-      <View style={styles.badge}>
-        <Text style={styles.badgeText}>{listing.condition}</Text>
-      </View>
-      {Number(listing.warranty_days) > 0 ? (
-        <View style={[styles.badge, styles.heavyBadge]}>
-          <Ionicons name="shield-checkmark" size={12} color={colors.success} />
-          <Text style={styles.badgeText}> Garantie {warrantyLabel(listing.warranty_days)}</Text>
+            </>
+          ) : null}
         </View>
-      ) : listing.warranty_days === 0 ? (
-        <View style={[styles.badge, styles.heavyBadge]}>
-          <Ionicons name="shield-outline" size={12} color={colors.textMuted} />
-          <Text style={[styles.badgeText, { color: colors.textMuted }]}> Sans garantie</Text>
-        </View>
-      ) : null}
-      {Number(listing.warranty_days) > 0 && listing.warranty_note ? (
-        <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm }}>{listing.warranty_note}</Text>
-      ) : null}
-      {listing.is_heavy && (
-        <View style={[styles.badge, styles.heavyBadge]}>
-          <Ionicons name="cube-outline" size={12} color={colors.purple} />
-          <Text style={[styles.badgeText, { color: colors.purple }]}> Livraison à négocier</Text>
-        </View>
-      )}
 
-      {listing.description ? (
-        <View style={styles.presentationSection}>
-          <Text style={styles.sectionTitle}>Présentation</Text>
-          <Text style={styles.description}>{listing.description}</Text>
-        </View>
-      ) : null}
+        {/* ---------- Fiche ---------- */}
+        <View style={styles.sheet}>
+          <View style={styles.chipRow}>
+            {listing.condition ? (
+              <View style={[styles.chip, { backgroundColor: colors.successBg }]}>
+                <Text style={[styles.chipText, { color: colors.success }]}>{listing.condition}</Text>
+              </View>
+            ) : null}
+            {warrantyText ? (
+              <View style={[styles.chip, { backgroundColor: Number(listing.warranty_days) > 0 ? colors.successBg : colors.background }]}>
+                <Ionicons name={Number(listing.warranty_days) > 0 ? 'shield-checkmark' : 'shield-outline'} size={13} color={Number(listing.warranty_days) > 0 ? colors.success : colors.textMuted} />
+                <Text style={[styles.chipText, { color: Number(listing.warranty_days) > 0 ? colors.success : colors.textMuted }]}>{warrantyText}</Text>
+              </View>
+            ) : null}
+            {listing.is_heavy ? (
+              <View style={[styles.chip, { backgroundColor: colors.tintPurple }]}>
+                <Ionicons name="cube-outline" size={13} color={colors.purple} />
+                <Text style={[styles.chipText, { color: colors.purple }]}>Livraison à négocier</Text>
+              </View>
+            ) : null}
+            {tracked && stock > 0 ? (
+              <View style={[styles.chip, { backgroundColor: lowStock ? colors.tintOrange : colors.tintPurple }]}>
+                <Ionicons name="layers-outline" size={13} color={lowStock ? colors.orange : colors.purple} />
+                <Text style={[styles.chipText, { color: lowStock ? colors.orange : colors.purple }]}>
+                  {lowStock ? `Plus que ${stock} !` : `${stock} en stock`}
+                </Text>
+              </View>
+            ) : null}
+          </View>
 
-      {listing.delai_livraison && (
-        <View style={styles.deliveryInfo}>
-          <Ionicons name="bicycle-outline" size={16} color={colors.textSecondary} />
-          <Text style={styles.deliveryInfoText}>
-            Livraison estimée : {listing.delai_livraison}
-          </Text>
-        </View>
-      )}
+          <Text style={styles.title}>{listing.title}</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>{formatPrice(listing.price)}</Text>
+            {listingRating.count > 0 ? (
+              <View style={styles.ratingPill}>
+                <Ionicons name="star" size={13} color="#F5A400" />
+                <Text style={styles.ratingPillText}>{listingRating.average.toFixed(1)} ({listingRating.count})</Text>
+              </View>
+            ) : null}
+          </View>
+          {Number(listing.warranty_days) > 0 && listing.warranty_note ? (
+            <Text style={styles.warrantyNote}>{listing.warranty_note}</Text>
+          ) : null}
 
-      <View style={styles.sellerRow}>
-        <View style={styles.avatar}>
-          {seller.avatarIcon ? (
-            <View style={[styles.avatarIconWrap, { backgroundColor: seller.avatarColor }]}>
-              <AvatarGlyph icon={seller.avatarIcon} size={20} />
+          {/* Stock */}
+          {tracked && stock > 0 ? (
+            <View style={styles.stockCard}>
+              <View style={[styles.stockIcon, { backgroundColor: lowStock ? colors.tintOrange : colors.tintPurple }]}>
+                <Ionicons name="cube" size={20} color={lowStock ? colors.orange : colors.purple} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.stockLabel}>Nombre d'articles disponibles</Text>
+                {lowStock ? <Text style={styles.stockHint}>Dépêche-toi, il en reste peu !</Text> : null}
+              </View>
+              <Text style={[styles.stockNumber, lowStock && { color: colors.orange }]}>{stock}</Text>
             </View>
-          ) : seller.photo ? (
-            <Image source={{ uri: seller.photo }} style={styles.avatarImage} />
-          ) : (
-            <Text style={styles.avatarText}>{seller.initials}</Text>
+          ) : null}
+
+          {soldOut ? (
+            <View style={styles.soldBanner}>
+              <View style={styles.soldBannerHead}>
+                <Ionicons name="alert-circle" size={22} color={colors.danger} />
+                <Text style={styles.soldBannerTitle}>
+                  {tracked ? 'Article actuellement en rupture de stock' : 'Cet article a déjà été vendu'}
+                </Text>
+              </View>
+              {tracked ? (
+                <>
+                  <Text style={styles.soldBannerText}>Le vendeur va le réapprovisionner. On peut te prévenir dès son retour.</Text>
+                  <TouchableOpacity
+                    style={[styles.notifyBtn, alertOn && styles.notifyBtnOn]}
+                    onPress={handleToggleAlert}
+                    disabled={alertBusy}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name={alertOn ? 'notifications' : 'notifications-outline'} size={18} color={alertOn ? colors.success : '#fff'} />
+                    <Text style={[styles.notifyBtnText, alertOn && { color: colors.success }]}>
+                      {alertOn ? 'Alerte activée · Toucher pour annuler' : 'Prévenez-moi quand ce sera disponible'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* Infos clés */}
+          <View style={styles.infoGrid}>
+            <View style={styles.infoTile}>
+              <Ionicons name="location-outline" size={18} color={colors.purple} />
+              <Text style={styles.infoLabel}>Lieu</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>{listing.city || 'Non précisé'}</Text>
+            </View>
+            <View style={styles.infoTile}>
+              <Ionicons name="bicycle-outline" size={18} color={colors.purple} />
+              <Text style={styles.infoLabel}>Livraison</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>{listing.delai_livraison || 'À convenir'}</Text>
+            </View>
+            <View style={styles.infoTile}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={colors.purple} />
+              <Text style={styles.infoLabel}>Garantie</Text>
+              <Text style={styles.infoValue} numberOfLines={1}>{Number(listing.warranty_days) > 0 ? warrantyLabel(listing.warranty_days) : 'Aucune'}</Text>
+            </View>
+          </View>
+
+          {listing.description ? (
+            <View style={styles.block}>
+              <Text style={styles.sectionTitle}>Présentation</Text>
+              <Text style={styles.description}>{listing.description}</Text>
+            </View>
+          ) : null}
+
+          {/* Vendeur */}
+          <View style={styles.sellerCard}>
+            <View style={styles.avatar}>
+              {seller.avatarIcon ? (
+                <View style={[styles.avatarIconWrap, { backgroundColor: seller.avatarColor }]}>
+                  <AvatarGlyph icon={seller.avatarIcon} size={22} />
+                </View>
+              ) : seller.photo ? (
+                <Image source={{ uri: seller.photo }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.avatarText}>{seller.initials}</Text>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={styles.sellerNameRow}>
+                <Text style={styles.sellerName} numberOfLines={1}>{seller.name}</Text>
+                {sellerStats.completedSales >= TRUST_BADGE_THRESHOLD && (
+                  <Ionicons name="shield-checkmark" size={15} color={colors.success} />
+                )}
+              </View>
+              <Text style={styles.sellerSubMeta}>
+                {sellerStats.count > 0
+                  ? `★ ${sellerStats.average.toFixed(1)} (${sellerStats.count} avis) · ${sellerStats.completedSales} ventes`
+                  : listing.vendeur_id
+                  ? 'Pas encore de ventes'
+                  : 'Vendeur non identifié'}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleToggleFavorite} style={[styles.followBtn, isFavorite && { backgroundColor: colors.tintOrange }]}>
+              <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={18} color={isFavorite ? colors.orange : colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {!soldOut ? (
+            <TouchableOpacity style={styles.linkRow} onPress={() => setShowOfferModal(true)}>
+              <Ionicons name="pricetag-outline" size={16} color={colors.purple} />
+              <Text style={styles.linkRowText}>Faire une offre à ce prix</Text>
+            </TouchableOpacity>
+          ) : null}
+          <View style={styles.reportRow}>
+            <TouchableOpacity onPress={() => setShowReport(true)} style={styles.reportLink}>
+              <Ionicons name="flag-outline" size={14} color={colors.textMuted} />
+              <Text style={styles.reportLinkText}>Signaler l'annonce</Text>
+            </TouchableOpacity>
+            {listing.vendeur_id ? (
+              <TouchableOpacity onPress={() => setShowReportSeller(true)} style={styles.reportLink}>
+                <Ionicons name="person-remove-outline" size={14} color={colors.textMuted} />
+                <Text style={styles.reportLinkText}>Signaler le vendeur</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {similar.length > 0 && (
+            <View style={styles.similarSection}>
+              <Text style={styles.sectionTitle}>Articles similaires</Text>
+              <FlatList
+                data={similar}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ gap: spacing.sm, paddingTop: 8 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity style={styles.similarCard} onPress={() => navigation.push('ProductDetail', { listing: item })} activeOpacity={0.85}>
+                    <View style={styles.similarThumb}>
+                      {item.photo_url ? (
+                        <Image source={{ uri: item.photo_url }} style={styles.similarThumbImage} />
+                      ) : (
+                        <Ionicons name="image-outline" size={20} color={colors.textMuted} />
+                      )}
+                    </View>
+                    <Text style={styles.similarTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.similarPrice}>{formatPrice(item.price)}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            </View>
           )}
         </View>
-        <View style={{ flex: 1 }}>
-          <View style={styles.sellerNameRow}>
-            <Text style={styles.sellerName}>{seller.name}</Text>
-            {sellerStats.completedSales >= TRUST_BADGE_THRESHOLD && (
-              <Ionicons name="shield-checkmark" size={14} color={colors.success} />
-            )}
-          </View>
-          <Text style={styles.sellerMeta}>
-            {listingRating.count > 0
-              ? `★ ${listingRating.average.toFixed(1)} (${listingRating.count} avis sur cet article)`
-              : "Pas encore d'avis sur cet article"}
-          </Text>
-          <Text style={styles.sellerSubMeta}>
-            {sellerStats.count > 0
-              ? `Vendeur : ★ ${sellerStats.average.toFixed(1)} (${sellerStats.count} avis) · ${sellerStats.completedSales} ventes`
-              : listing.vendeur_id
-              ? 'Vendeur : pas encore de ventes'
-              : 'Vendeur non identifié'}
-          </Text>
-        </View>
+      </ScrollView>
+
+      {/* ---------- Barre d'actions ---------- */}
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.barIconBtn} onPress={handleContact} activeOpacity={0.85}>
+          <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.purple} />
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={handleToggleCart}
-          style={[styles.cartButton, cartItemId && styles.cartButtonActive]}
-          activeOpacity={0.8}
+          disabled={soldOut}
+          style={[styles.barIconBtn, cartItemId && { backgroundColor: colors.purple, borderColor: colors.purple }, soldOut && { opacity: 0.4 }]}
+          activeOpacity={0.85}
         >
-          <Ionicons
-            name={cartItemId ? 'cart' : 'cart-outline'}
-            size={18}
-            color={cartItemId ? '#fff' : colors.purple}
-          />
-          <Text style={[styles.cartButtonText, cartItemId && { color: '#fff' }]}>
-            {cartItemId ? 'Voir le panier' : 'Panier'}
-          </Text>
+          <Ionicons name={cartItemId ? 'cart' : 'cart-outline'} size={22} color={cartItemId ? '#fff' : colors.purple} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteButton}>
-          <Ionicons
-            name={isFavorite ? 'heart' : 'heart-outline'}
-            size={22}
-            color={isFavorite ? colors.orange : colors.textMuted}
-          />
-        </TouchableOpacity>
+        {soldOut ? (
+          tracked ? (
+            <TouchableOpacity style={[styles.buyBtn, alertOn && { backgroundColor: colors.successBg }]} onPress={handleToggleAlert} activeOpacity={0.85}>
+              <Ionicons name={alertOn ? 'notifications' : 'notifications-outline'} size={18} color={alertOn ? colors.success : '#fff'} />
+              <Text style={[styles.buyBtnText, alertOn && { color: colors.success }]}>{alertOn ? 'Alerte activée' : 'Me prévenir'}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.buyBtn, { backgroundColor: colors.border }]}>
+              <Text style={[styles.buyBtnText, { color: colors.textMuted }]}>Vendu</Text>
+            </View>
+          )
+        ) : (
+          <TouchableOpacity style={styles.buyBtn} onPress={handleBuy} activeOpacity={0.85}>
+            <Ionicons name="flash" size={18} color="#fff" />
+            <Text style={styles.buyBtnText}>Acheter · {formatPrice(listing.price)}</Text>
+          </TouchableOpacity>
+        )}
       </View>
-
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={handleContact}>
-          <Text style={styles.secondaryButtonText}>Contacter</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.primaryButton} onPress={handleBuy}>
-          <Text style={styles.primaryButtonText}>Acheter</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.offerLink}
-        onPress={() => setShowOfferModal(true)}
-      >
-        <Ionicons name="pricetag-outline" size={14} color={colors.purple} />
-        <Text style={styles.offerLinkText}>Faire une offre à ce prix</Text>
-      </TouchableOpacity>
-
-      {listing.vendeur_id ? (
-        <TouchableOpacity style={styles.offerLink} onPress={() => setShowReportSeller(true)}>
-          <Ionicons name="flag-outline" size={14} color={colors.textMuted} />
-          <Text style={[styles.offerLinkText, { color: colors.textMuted }]}>Signaler ce vendeur</Text>
-        </TouchableOpacity>
-      ) : null}
 
       <ReportUserModal
         visible={showReportSeller}
@@ -509,38 +683,6 @@ export default function ProductDetailScreen({ route, navigation }) {
         </View>
       </Modal>
 
-      {similar.length > 0 && (
-        <View style={styles.similarSection}>
-          <Text style={styles.sectionTitle}>Articles similaires</Text>
-          <FlatList
-            data={similar}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ gap: spacing.sm }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.similarCard}
-                onPress={() => navigation.push('ProductDetail', { listing: item })}
-              >
-                <View style={styles.similarThumb}>
-                  {item.photo_url ? (
-                    <Image source={{ uri: item.photo_url }} style={styles.similarThumbImage} />
-                  ) : (
-                    <Ionicons name="image-outline" size={20} color={colors.textMuted} />
-                  )}
-                </View>
-                <Text style={styles.similarTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.similarPrice}>
-                  {formatPrice(item.price)}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </View>
-      )}
 
       <Modal visible={showReport} animationType="slide" onRequestClose={() => setShowReport(false)}>
         <View style={styles.reportModalContainer}>
@@ -594,118 +736,81 @@ export default function ProductDetailScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  image: {
-    height: 220,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  photoImage: { height: '100%' },
-  dotsRow: {
-    position: 'absolute',
-    bottom: spacing.sm,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.6)',
-  },
-  dotActive: { backgroundColor: colors.white, width: 16 },
-  title: { fontSize: 18, fontWeight: '600', color: colors.textPrimary },
-  price: { fontSize: 20, fontWeight: '700', color: colors.orange, marginTop: 4, marginBottom: spacing.sm },
-  badge: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.successBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radius.pill,
-    marginBottom: spacing.md,
-  },
-  badgeText: { color: colors.success, fontSize: 12, fontWeight: '600' },
-  heavyBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, marginTop: -spacing.sm },
-  presentationSection: { marginBottom: spacing.sm },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
-  description: { fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-  deliveryInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.background,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 6,
-    marginBottom: spacing.lg,
-    alignSelf: 'flex-start',
-  },
-  deliveryInfoText: { fontSize: 12, color: colors.textSecondary, fontWeight: '600' },
-  sellerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.purple,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
+  container: { flex: 1, backgroundColor: colors.surface },
+  hero: { height: HERO_HEIGHT, backgroundColor: colors.background },
+  heroEmpty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  soldVeil: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(20,10,50,0.45)', alignItems: 'center', justifyContent: 'center' },
+  soldPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.danger, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 9 },
+  soldPillText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  topBar: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  roundBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.95)', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  counterChip: { position: 'absolute', right: 16, bottom: 44, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  counterChipText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  dotsRow: { position: 'absolute', bottom: 44, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.65)' },
+  dotActive: { backgroundColor: '#fff', width: 18 },
+
+  sheet: { marginTop: -28, backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: spacing.lg, paddingTop: spacing.lg },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  chipText: { fontSize: 12, fontWeight: '700' },
+  title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, lineHeight: 28 },
+  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  price: { fontSize: 28, fontWeight: '800', color: colors.orange },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF7E0', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  ratingPillText: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
+  warrantyNote: { color: colors.textMuted, fontSize: 12, marginTop: 6 },
+
+  stockCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.background, borderRadius: radius.lg, padding: 14, marginTop: 16 },
+  stockIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  stockLabel: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  stockHint: { fontSize: 12, color: colors.orange, marginTop: 2, fontWeight: '600' },
+  stockNumber: { fontSize: 28, fontWeight: '800', color: colors.purple },
+
+  soldBanner: { backgroundColor: '#FDECEA', borderRadius: radius.lg, padding: 16, marginTop: 16, borderWidth: 1, borderColor: '#F5C6C2' },
+  soldBannerHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  soldBannerTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: colors.danger },
+  soldBannerText: { fontSize: 13, color: colors.textSecondary, marginTop: 8, lineHeight: 19 },
+  notifyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.orange, borderRadius: radius.md, paddingVertical: 13, marginTop: 12 },
+  notifyBtnOn: { backgroundColor: colors.successBg },
+  notifyBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+
+  infoGrid: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  infoTile: { flex: 1, backgroundColor: colors.background, borderRadius: radius.lg, padding: 12, gap: 4 },
+  infoLabel: { fontSize: 11, color: colors.textMuted, fontWeight: '600', marginTop: 2 },
+  infoValue: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
+
+  block: { marginTop: 22 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: colors.textPrimary, marginBottom: 6 },
+  description: { fontSize: 15, color: colors.textSecondary, lineHeight: 23 },
+
+  sellerCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: 14, marginTop: 22, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  avatar: { width: 46, height: 46, borderRadius: 23, backgroundColor: colors.purple, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: '100%', height: '100%' },
-  avatarText: { color: colors.white, fontWeight: '600', fontSize: 13 },
+  avatarText: { color: colors.white, fontWeight: '700', fontSize: 15 },
   avatarIconWrap: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
-  sellerName: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
+  sellerName: { fontSize: 15, fontWeight: '800', color: colors.textPrimary, flexShrink: 1 },
   sellerNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sellerMeta: { fontSize: 12, color: colors.textSecondary },
-  sellerSubMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  favoriteButton: { padding: spacing.xs },
-  cartButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radius.pill || 999,
-    borderWidth: 1,
-    borderColor: colors.purple,
-    marginRight: spacing.xs,
-  },
-  cartButtonActive: { backgroundColor: colors.purple },
-  cartButtonText: { color: colors.purple, fontSize: 12, fontWeight: '700' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  iconButton: { padding: spacing.xs },
-  offerLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  offerLinkText: { fontSize: 13, color: colors.purple, fontWeight: '600' },
+  sellerSubMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  followBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+
+  linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.tintPurple, borderRadius: radius.md, paddingVertical: 13, marginTop: 14 },
+  linkRowText: { color: colors.purple, fontWeight: '700', fontSize: 14 },
+  reportRow: { flexDirection: 'row', justifyContent: 'center', gap: 22, marginTop: 14 },
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  reportLinkText: { fontSize: 12, color: colors.textMuted },
+
+  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 14, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: -3 }, elevation: 10 },
+  barIconBtn: { width: 50, height: 50, borderRadius: 16, borderWidth: 1.5, borderColor: colors.purple, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  buyBtn: { flex: 1, height: 50, borderRadius: 16, backgroundColor: colors.orange, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  buyBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+
+  similarSection: { marginTop: spacing.xl },
   offerModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
@@ -713,12 +818,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
+
   offerModalCard: {
     width: '100%',
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     padding: spacing.lg,
   },
+
   offerModalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary, marginBottom: 4 },
   offerModalSubtitle: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md },
   offerInput: {
@@ -730,6 +837,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: spacing.md,
   },
+
+  offerModalSubtitle: { fontSize: 12, color: colors.textSecondary, marginBottom: spacing.md },
+  offerInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    height: 46,
+    paddingHorizontal: spacing.md,
+    fontSize: 15,
+    marginBottom: spacing.md,
+  },
+
+  offerInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    height: 46,
+    paddingHorizontal: spacing.md,
+    fontSize: 15,
+    marginBottom: spacing.md,
+  },
+
   offerModalButtons: { flexDirection: 'row', gap: spacing.sm },
   offerModalCancel: {
     flex: 1,
@@ -739,6 +868,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
   },
+
+  offerModalCancel: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+
   offerModalCancelText: { color: colors.textPrimary, fontWeight: '600' },
   offerModalSend: {
     flex: 1,
@@ -747,6 +886,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.orange,
     alignItems: 'center',
   },
+
+  offerModalSend: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.orange,
+    alignItems: 'center',
+  },
+
   offerModalSendText: { color: colors.white, fontWeight: '700' },
   buttonRow: { flexDirection: 'row', gap: spacing.sm },
   secondaryButton: {
@@ -757,19 +905,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
-  secondaryButtonText: { color: colors.textPrimary, fontWeight: '600' },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: colors.orange,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  primaryButtonText: { color: colors.white, fontWeight: '600' },
-  similarSection: { marginTop: spacing.xl },
-  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  reportLinkText: { fontSize: 12, color: colors.textMuted },
+
   reportModalContainer: { flex: 1, backgroundColor: colors.background },
   reportModalHeader: {
     flexDirection: 'row',
@@ -782,6 +918,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+
+  reportModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+
   reportModalTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   reportLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.sm },
   reportPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
@@ -793,6 +942,37 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+
+  reportLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.sm },
+  reportPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
+  reportPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+
+  reportPillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
+  reportPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+
+  reportPill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+
   reportPillActive: { backgroundColor: colors.danger, borderColor: colors.danger },
   reportPillText: { fontSize: 11, color: colors.textPrimary },
   reportPillTextActive: { color: colors.white, fontWeight: '600' },
@@ -805,18 +985,54 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+
+  reportPillText: { fontSize: 11, color: colors.textPrimary },
+  reportPillTextActive: { color: colors.white, fontWeight: '600' },
+  reportInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+
+  reportPillTextActive: { color: colors.white, fontWeight: '600' },
+  reportInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+
+  reportInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    padding: spacing.md,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+
   reportModalFooter: {
     padding: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
+
   reportSendButton: {
     backgroundColor: colors.danger,
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
   },
+
   reportSendButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
   similarCard: {
     width: 130,
@@ -826,6 +1042,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.sm,
   },
+
+  similarCard: {
+    width: 130,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
+
   similarThumb: {
     width: '100%',
     height: 90,
@@ -836,7 +1062,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: spacing.xs,
   },
+
   similarThumbImage: { width: '100%', height: '100%' },
+
   similarTitle: { fontSize: 12, fontWeight: '600', color: colors.textPrimary },
+
   similarPrice: { fontSize: 12, color: colors.orange, fontWeight: '700', marginTop: 2 },
 });

@@ -50,7 +50,14 @@ export default function CartScreen({ route, navigation }) {
   const discount = appliedPromo?.discount || 0;
   const subtotalAfterDiscount = Math.max(subtotal - discount, 0);
 
-  const handleIncrease = () => setQuantity((q) => Math.min(q + 1, 20));
+  const maxQty = typeof listing.stock === 'number' && listing.stock > 0 ? Math.min(listing.stock, 20) : 20;
+  const handleIncrease = () => {
+    if (quantity >= maxQty && maxQty < 20) {
+      Alert.alert('Stock limité', `Il ne reste que ${maxQty} article${maxQty > 1 ? 's' : ''} disponible${maxQty > 1 ? 's' : ''}.`);
+      return;
+    }
+    setQuantity((q) => Math.min(q + 1, maxQty));
+  };
   const handleDecrease = () => setQuantity((q) => Math.max(q - 1, 1));
 
   const handleApplyPromo = async () => {
