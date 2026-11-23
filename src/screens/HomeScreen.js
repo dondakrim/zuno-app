@@ -582,7 +582,7 @@ export default function HomeScreen({ navigation }) {
                 <Text style={styles.menuItemLabel}>Messages</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} onPress={() => goToMenuItem('Moi')}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('Moi', { screen: 'ProfileHome' }); }}>
                 <View style={styles.menuItemIcon}>
                   <Ionicons name="person-outline" size={18} color={colors.orange} />
                 </View>
