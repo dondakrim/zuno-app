@@ -27,6 +27,7 @@ import { getDeviceUserId, ensureAccountComplete } from '../lib/deviceUser';
 import MasonrySection from '../components/MasonrySection';
 import GradientHeader from '../components/GradientHeader';
 import EventsSection from '../components/EventsSection';
+import ServiceRequests from '../components/ServiceRequests';
 import { useCategories, useCategoryTree } from '../lib/useCategories';
 
 // Fonds doux alternés pour les pastilles de catégories.
@@ -387,6 +388,8 @@ export default function HomeScreen({ navigation }) {
                 );
               }}
             />
+
+            <ServiceRequests navigation={navigation} defaultCountry={country?.code} />
 
             <FlatList
               ref={adListRef}

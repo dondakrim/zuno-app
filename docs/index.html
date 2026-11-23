@@ -334,7 +334,7 @@
       <button type="button" class="tab-btn" data-tab="categories"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Catégories</button>
       <button type="button" class="tab-btn" data-tab="avis"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>Avis</button>
       <button type="button" class="tab-btn" data-tab="motsbloques"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>Mots bloqués</button>
-      <button type="button" class="tab-btn" data-tab="faq"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>FAQ</button>
+      <button type="button" class="tab-btn" data-tab="faq"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>FAQ</button><button type="button" class="tab-btn" data-tab="demandes_articles"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Articles recherchés</button><button type="button" class="tab-btn" data-tab="coursiers"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17l4-8h5l3 8M9 9H7"/></svg>Coursiers</button>
       <div class="nav-label">Communauté</div>
       <button type="button" class="tab-btn" data-tab="utilisateurs"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-4 3-6 7-6s7 2 7 6"/><path d="M17 5a3 3 0 0 1 0 6M22 20c0-3-2-5-4-5.5"/></svg>Utilisateurs</button>
       <button type="button" class="tab-btn" data-tab="marchands"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/></svg>Marchands</button>
@@ -374,7 +374,7 @@
     <div class="panel" id="panel-categories"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-avis"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-motsbloques"><div class="loading">Chargement…</div></div>
-    <div class="panel" id="panel-faq"><div class="loading">Chargement…</div></div>
+    <div class="panel" id="panel-faq"><div class="loading">Chargement…</div></div><div class="panel" id="panel-demandes_articles"><div class="loading">Chargement…</div></div><div class="panel" id="panel-coursiers"><div class="loading">Chargement…</div></div>
 
     <div class="panel" id="panel-litiges"><div class="loading">Chargement…</div></div>
     <div class="panel" id="panel-moderation"><div class="loading">Chargement…</div></div>
@@ -2565,6 +2565,8 @@ const PAGE_INFO = {
   avis: ['Avis et notes', 'Tous les avis. Un avis masqué disparaît de l\'appli.'],
   motsbloques: ['Mots et numéros bloqués', 'Ce qui est refusé dans les annonces et les messages.'],
   faq: ['FAQ', "Questions fréquentes affichées dans Service clients."],
+  demandes_articles: ['Articles recherchés', "Demandes « Je cherche cet article » : trouve l'article puis contacte l'utilisateur."],
+  coursiers: ['Coursiers', 'Demandes de livraison de colis : fixe le prix, assigne un coursier, suis la course.'],
   suggestions: ['Suggestions', 'Idées et remarques envoyées par les utilisateurs.'],
   signalements: ['Signalements', 'Utilisateurs signalés depuis l’application. À traiter sous 24 h.'],
   infos: ['Infos aux utilisateurs', 'Alertes et nouveautés affichées dans Compte → Infos.'],
@@ -2611,6 +2613,8 @@ function showTab(name) {
   if (name === 'avis') loadAvis();
   if (name === 'motsbloques') loadMotsBloques();
   if (name === 'faq') loadFaq();
+  if (name === 'demandes_articles') loadSvcRequests('article_requests', 'panel-demandes_articles');
+  if (name === 'coursiers') loadSvcRequests('courier_requests', 'panel-coursiers');
   if (name === 'kyc') loadKyc();
   if (name === 'legal') loadLegal();
   if (name === 'connexions') loadConnexions();
@@ -3234,7 +3238,7 @@ const TEAM_SECTIONS = [
   ['publicites', 'Publicités'], ['boosts', 'Mises en avant'], ['promos', 'Promos'], ['campagnes', 'Campagnes'],
   ['utilisateurs', 'Utilisateurs'], ['marchands', 'Marchands'], ['demandes', 'Comptes marchands'],
   ['comptes', 'Comptes'], ['identites', "Vérification d'identité"], ['kyc', 'Identification KYC'], ['legal', 'Textes légaux'], ['connexions', 'Connexions WhatsApp'],
-  ['blog', 'Blog'], ['evenements', 'Événements'], ['categories', 'Catégories'], ['avis', 'Avis'], ['motsbloques', 'Mots bloqués'], ['faq', 'FAQ'], ['suggestions', 'Suggestions'], ['signalements', 'Signalements'], ['infos', 'Infos aux utilisateurs'],
+  ['blog', 'Blog'], ['evenements', 'Événements'], ['categories', 'Catégories'], ['avis', 'Avis'], ['motsbloques', 'Mots bloqués'], ['faq', 'FAQ'], ['demandes_articles', 'Articles recherchés'], ['coursiers', 'Coursiers'], ['suggestions', 'Suggestions'], ['signalements', 'Signalements'], ['infos', 'Infos aux utilisateurs'],
 ];
 const TEAM_PRESETS = {
   support: ['Support client', ['overview', 'commandes', 'litiges', 'paniers', 'utilisateurs', 'kyc', 'connexions']],
@@ -4347,6 +4351,49 @@ async function fqSave() {
 }
 async function fqToggle(id) { const r = FQ_ROWS.find((x) => x.id === id); if (!r) return; try { await cFn('faq', 'save', Object.assign({}, r, { active: !r.active })); loadFaq(); } catch (e) { alert(e.message); } }
 async function fqDel(id) { if (!confirm('Supprimer cette question ?')) return; try { await cFn('faq', 'delete', { id }); loadFaq(); } catch (e) { alert(e.message); } }
+
+/* ---------- Demandes d'articles & coursiers ---------- */
+const SVC_ST = {
+  article_requests: [['nouvelle', 'Nouvelle'], ['en_cours', 'En recherche'], ['trouvee', 'Trouvée'], ['annulee', 'Annulée']],
+  courier_requests: [['nouvelle', 'Nouvelle'], ['acceptee', 'Acceptée'], ['en_cours', 'En course'], ['livree', 'Livrée'], ['annulee', 'Annulée']],
+};
+let SVC_ROWS = {};
+async function loadSvcRequests(res, panelId) {
+  const panel = document.getElementById(panelId);
+  panel.innerHTML = '<div class="loading">Chargement…</div>';
+  try { SVC_ROWS[res] = (await cFn(res, 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
+  const rows = SVC_ROWS[res];
+  if (!rows.length) { panel.innerHTML = '<div class="card"><p class="card-sub" style="margin:0">Aucune demande pour le moment.</p></div>'; return; }
+  const tel = (n) => n ? '<a href="tel:' + esc(n) + '">' + esc(n) + '</a>' : '—';
+  panel.innerHTML = rows.map((r) => {
+    const sel = '<select id="sv-st-' + r.id + '">' + SVC_ST[res].map((s) => '<option value="' + s[0] + '"' + (r.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>').join('') + '</select>';
+    const when = new Date(r.created_at).toLocaleString('fr-FR');
+    let body;
+    if (res === 'article_requests') {
+      body = '<p class="card-title">' + esc(r.title) + ' <span class="pill">' + esc(r.status) + '</span></p>'
+        + (r.photo_url ? '<a href="' + esc(r.photo_url) + '" target="_blank" rel="noopener"><img src="' + esc(r.photo_url) + '" alt="" style="max-width:160px;max-height:160px;border-radius:10px;margin:6px 0"></a>' : '')
+        + '<p class="card-sub" style="white-space:pre-wrap">' + esc(r.description || '') + '</p>'
+        + '<p class="card-sub">Budget : ' + esc(r.budget || '—') + ' · ' + esc(r.country || '') + ' · ' + esc(r.city || '') + '</p>'
+        + '<p class="card-sub">Contact : ' + tel(r.contact_phone) + (r.user_name ? ' · ' + esc(r.user_name) : '') + ' · ' + when + '</p>';
+    } else {
+      body = '<p class="card-title">' + esc(r.pickup_address) + ' → ' + esc(r.dropoff_address) + ' <span class="pill">' + esc(r.status) + '</span></p>'
+        + '<p class="card-sub" style="white-space:pre-wrap">Colis : ' + esc(r.package_description) + ' · Quand : ' + esc(r.urgency || '') + ' · ' + esc(r.country || '') + '</p>'
+        + '<p class="card-sub">Demandeur : ' + esc(r.contact_name || '') + ' ' + tel(r.contact_phone) + '</p>'
+        + '<p class="card-sub">Destinataire : ' + esc(r.recipient_name || '') + ' ' + tel(r.recipient_phone) + ' · ' + when + '</p>'
+        + '<label class="lbl">Prix proposé</label><input type="text" id="sv-pr-' + r.id + '" maxlength="40" value="' + esc(r.price_quote || '') + '" placeholder="Ex : 2 500 FCFA">';
+    }
+    return '<div class="card">' + body + '<label class="lbl">Statut</label>' + sel
+      + '<label class="lbl">Note interne</label><textarea id="sv-nt-' + r.id + '" rows="2" maxlength="1000" style="width:100%">' + esc(r.admin_note || '') + '</textarea>'
+      + '<div class="actions"><button type="button" class="btn btn-approve" onclick="svcSave(\'' + res + '\',\'' + panelId + '\',\'' + r.id + '\')">Enregistrer</button></div></div>';
+  }).join('');
+}
+async function svcSave(res, panelId, id) {
+  const pr = document.getElementById('sv-pr-' + id);
+  try {
+    await cFn(res, 'save', { id, status: document.getElementById('sv-st-' + id).value, admin_note: document.getElementById('sv-nt-' + id).value, price_quote: pr ? pr.value : undefined });
+    loadSvcRequests(res, panelId);
+  } catch (e) { alert(e.message); }
+}
 
 async function legalPublish(kind) {
   try {
