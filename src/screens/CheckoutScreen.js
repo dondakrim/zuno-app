@@ -17,6 +17,7 @@ import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 import PhoneInput from '../components/PhoneInput';
+import GradientHeader from '../components/GradientHeader';
 
 const CRENEAUX = ['Matin (8h-12h)', 'Après-midi (12h-16h)', 'Soir (16h-19h)'];
 
@@ -230,13 +231,16 @@ export default function CheckoutScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: spacing.lg }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: spacing.md }}>
-        <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+    <View style={styles.container}>
+    <GradientHeader style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Ionicons name="arrow-back" size={20} color={colors.white} />
       </TouchableOpacity>
-
       <Text style={styles.heading}>Informations de livraison</Text>
-
+      <View style={{ width: 36 }} />
+    </GradientHeader>
+    <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
+      <View style={styles.card}>
       <Text style={styles.label}>Nom complet</Text>
       <TextInput
         placeholder="Ton nom"
@@ -283,6 +287,8 @@ export default function CheckoutScreen({ route, navigation }) {
           </View>
         </>
       )}
+
+      </View>
 
       <View style={styles.summaryCard}>
         <View style={styles.summaryRow}>
@@ -389,19 +395,32 @@ export default function CheckoutScreen({ route, navigation }) {
         )}
       </TouchableOpacity>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  heading: { fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginBottom: spacing.md },
+  header: {
+    paddingTop: 54,
+    paddingBottom: 26,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+  },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  heading: { fontSize: 17, fontWeight: '800', color: colors.white },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2, },
   label: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: spacing.xs },
   input: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    height: 44,
+    height: 46,
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
   },
@@ -431,11 +450,10 @@ const styles = StyleSheet.create({
   pickupNoteText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 19 },
   summaryCard: {
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -482,8 +500,8 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     backgroundColor: colors.orange,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md + 2,
     alignItems: 'center',
   },
   confirmButtonDisabled: { opacity: 0.5 },

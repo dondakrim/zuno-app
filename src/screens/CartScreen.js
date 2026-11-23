@@ -7,11 +7,14 @@ import {
   Image,
   Alert,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import GradientHeader from '../components/GradientHeader';
+import { SHOW_PICKUP } from '../lib/flags';
 
 const DELIVERY_OPTIONS = [
   {
@@ -30,6 +33,8 @@ const DELIVERY_OPTIONS = [
     price: 2000,
   },
 ];
+
+const VISIBLE_DELIVERY_OPTIONS = DELIVERY_OPTIONS.filter((o) => o.id !== 'pickup' || SHOW_PICKUP);
 
 export default function CartScreen({ route, navigation }) {
   const { listing } = route.params;
@@ -146,14 +151,15 @@ export default function CartScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+      <GradientHeader style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Panier</Text>
-        <View style={{ width: 22 }} />
-      </View>
+        <View style={{ width: 36 }} />
+      </GradientHeader>
 
+      <ScrollView>
       <View style={styles.body}>
         <View style={styles.productCard}>
           <View style={styles.thumb}>
@@ -250,7 +256,7 @@ export default function CartScreen({ route, navigation }) {
         )}
 
         {showDeliveryOptions && (
-          <View style={styles.deliverySection}>
+          <View style={[styles.card, styles.deliverySection]}>
             <Text style={styles.sectionTitle}>Mode de livraison</Text>
             {listing.is_heavy ? (
               <View style={styles.heavyDeliveryNotice}>
@@ -262,7 +268,7 @@ export default function CartScreen({ route, navigation }) {
                 </Text>
               </View>
             ) : (
-              DELIVERY_OPTIONS.map((option) => {
+              VISIBLE_DELIVERY_OPTIONS.map((option) => {
                 const active = deliveryMethod?.id === option.id;
                 return (
                   <TouchableOpacity
@@ -290,6 +296,7 @@ export default function CartScreen({ route, navigation }) {
           </View>
         )}
       </View>
+      </ScrollView>
     </View>
   );
 }
@@ -297,33 +304,33 @@ export default function CartScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: {
-    paddingTop: 50,
-    paddingBottom: spacing.md,
+    paddingTop: 54,
+    paddingBottom: 26,
     paddingHorizontal: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
   },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
-  body: { padding: spacing.lg },
+  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  card: { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.md, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2, },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: colors.white },
+  body: { padding: spacing.lg, paddingBottom: 40 },
   productCard: {
     flexDirection: 'row',
     gap: spacing.md,
     backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.lg,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
   thumb: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
+    width: 72,
+    height: 72,
+    borderRadius: radius.md,
+    backgroundColor: colors.tintOrange,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -335,7 +342,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
   quantityLabel: { fontSize: 14, fontWeight: '600', color: colors.textPrimary },
   stepper: {
@@ -352,10 +364,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.md,
   },
   subtotalLabel: { fontSize: 13, color: colors.textSecondary },
   subtotalValue: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
@@ -366,7 +376,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    height: 42,
+    height: 44,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
   },
@@ -390,22 +400,24 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', gap: spacing.sm },
   secondaryButton: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.orange,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    backgroundColor: colors.surface,
   },
-  secondaryButtonText: { color: colors.textPrimary, fontWeight: '600' },
+  secondaryButtonText: { color: colors.orange, fontWeight: '700' },
   primaryButton: {
     flex: 1,
     backgroundColor: colors.orange,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2,
   },
-  primaryButtonText: { color: colors.white, fontWeight: '600' },
-  deliverySection: { marginTop: spacing.sm },
+  primaryButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  deliverySection: { marginTop: spacing.xs },
   heavyDeliveryNotice: {
     flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.surface,
     borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md,
@@ -416,14 +428,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
     backgroundColor: colors.surface,
   },
-  deliveryOptionActive: { borderColor: colors.orange, borderWidth: 2 },
+  deliveryOptionActive: { borderColor: colors.orange, backgroundColor: colors.tintOrange },
   radioOuter: {
     width: 18,
     height: 18,
@@ -438,8 +450,8 @@ const styles = StyleSheet.create({
   deliveryOptionPrice: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
   payButton: {
     backgroundColor: colors.orange,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md + 2,
     alignItems: 'center',
     marginTop: spacing.sm,
   },
