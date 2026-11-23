@@ -520,7 +520,7 @@
         <input type="color" id="ad-color" value="#2E0B8C" style="height:40px; padding:4px; margin-bottom:10px;">
         <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Où l’afficher</label>
         <select id="ad-placement" style="width:100%; padding:11px 12px; border:1px solid #D9D6E6; border-radius:10px; margin-bottom:10px;">
-          <option value="tous">Accueil et Tendances</option><option value="accueil">Accueil seulement</option><option value="tendances">Tendances seulement</option>
+          <option value="tous">Accueil et Tendances</option><option value="accueil">Accueil seulement</option><option value="tendances">Tendances seulement</option><option value="marchand">Demande de compte marchand</option>
         </select>
         <label style="display:block; font-size:12px; color: var(--text-secondary); margin-bottom:4px;">Cibler les utilisateurs intéressés par</label>
         <select id="ad-target" style="width:100%; padding:11px 12px; border:1px solid #D9D6E6; border-radius:10px; margin-bottom:10px;">
@@ -790,7 +790,7 @@ async function loadAds() {
       <p class="card-title">${ad.title || '(image sans titre)'}</p>
       ${ad.subtitle ? '<p class="card-sub">' + ad.subtitle + '</p>' : ''}
       <span class="pill">${ad.active ? 'Active' : 'Désactivée'}</span>
-      <span class="pill">${{tous:'Accueil + Tendances',accueil:'Accueil',tendances:'Tendances'}[ad.placement] || 'Accueil + Tendances'}</span>
+      <span class="pill">${{tous:'Accueil + Tendances',accueil:'Accueil',tendances:'Tendances',marchand:'Demande de compte marchand'}[ad.placement] || 'Accueil + Tendances'}</span>
       <span class="pill">${ad.target_category ? 'Cible : ' + ad.target_category : 'Tout le monde'}</span>
       <div class="actions">
         <button class="btn btn-approve" onclick="toggleAd('${ad.id}', ${!ad.active})">${ad.active ? 'Désactiver' : 'Activer'}</button>
