@@ -4364,6 +4364,7 @@ async function loadSvcRequests(res, panelId) {
   try { SVC_ROWS[res] = (await cFn(res, 'list')).rows || []; } catch (e) { ctErr(panel, e); return; }
   const rows = SVC_ROWS[res];
   if (!rows.length) { panel.innerHTML = '<div class="card"><p class="card-sub" style="margin:0">Aucune demande pour le moment.</p></div>'; return; }
+const mp = (lat, lng, txt) => 'https://www.google.com/maps/search/?api=1&query=' + (lat && lng ? lat + ',' + lng : encodeURIComponent(txt || ''));
   const tel = (n) => n ? '<a href="tel:' + esc(n) + '">' + esc(n) + '</a>' : '—';
   panel.innerHTML = rows.map((r) => {
     const sel = '<select id="sv-st-' + r.id + '">' + SVC_ST[res].map((s) => '<option value="' + s[0] + '"' + (r.status === s[0] ? ' selected' : '') + '>' + s[1] + '</option>').join('') + '</select>';
@@ -4377,8 +4378,9 @@ async function loadSvcRequests(res, panelId) {
         + '<p class="card-sub">Contact : ' + tel(r.contact_phone) + (r.user_name ? ' · ' + esc(r.user_name) : '') + ' · ' + when + '</p>';
     } else {
       body = '<p class="card-title">' + esc(r.pickup_address) + ' → ' + esc(r.dropoff_address) + ' <span class="pill">' + esc(r.status) + '</span></p>'
+        + '<p class="card-sub"><a href="' + esc(mp(r.pickup_lat, r.pickup_lng, r.pickup_address)) + '" target="_blank" rel="noopener">📍 Voir le départ' + (r.pickup_lat ? ' (GPS)' : '') + '</a> · <a href="' + esc(mp(r.dropoff_lat, r.dropoff_lng, r.dropoff_address)) + '" target="_blank" rel="noopener">📍 Voir l\'arrivée' + (r.dropoff_lat ? ' (GPS)' : '') + '</a></p>'
         + '<p class="card-sub" style="white-space:pre-wrap">Colis : ' + esc(r.package_description) + ' · Quand : ' + esc(r.urgency || '') + ' · ' + esc(r.country || '') + '</p>'
-        + '<p class="card-sub">Demandeur : ' + esc(r.contact_name || '') + ' ' + tel(r.contact_phone) + '</p>'
+        + '<p class="card-sub">Expéditeur : ' + esc(r.contact_name || '') + ' ' + tel(r.contact_phone) + '</p>'
         + '<p class="card-sub">Destinataire : ' + esc(r.recipient_name || '') + ' ' + tel(r.recipient_phone) + ' · ' + when + '</p>'
         + '<label class="lbl">Prix proposé</label><input type="text" id="sv-pr-' + r.id + '" maxlength="40" value="' + esc(r.price_quote || '') + '" placeholder="Ex : 2 500 FCFA">';
     }
