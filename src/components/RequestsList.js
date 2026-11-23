@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../theme/colors';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
+import ReceiptModal, { buildCourierReceipt, fmtDateTime } from './ReceiptModal';
 
 const COURIER_STEPS = [
   ['nouvelle', 'Demande reçue'],
@@ -118,6 +119,7 @@ function RateCourier({ request, onDone }) {
 export default function RequestsList({ onLoaded }) {
   const [rows, setRows] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [receipt, setReceipt] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -151,11 +153,17 @@ export default function RequestsList({ onLoaded }) {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{seek ? r.title : `${r.pickup_address} → ${r.dropoff_address}`}</Text>
-                <Text style={styles.cardSub}>{seek ? 'Je cherche cet article' : 'Coursier'} · {new Date(r.created_at).toLocaleDateString('fr-FR')}</Text>
+                <Text style={styles.cardSub}>{seek ? 'Je cherche cet article' : 'Coursier'} · {fmtDateTime(r.created_at)}</Text>
               </View>
             </View>
             {!seek && r.price_quote ? (
               <View style={styles.priceBox}><Text style={styles.priceLabel}>Prix de la course</Text><Text style={styles.priceValue}>{r.price_quote}</Text></View>
+            ) : null}
+            {!seek && ['acceptee', 'en_cours', 'livree'].includes(r.status) ? (
+              <TouchableOpacity style={styles.receiptBtn} activeOpacity={0.85} onPress={() => setReceipt(buildCourierReceipt(r))}>
+                <Ionicons name="receipt-outline" size={16} color={colors.purple} />
+                <Text style={styles.receiptBtnText}>Voir le reçu</Text>
+              </TouchableOpacity>
             ) : null}
             <Timeline steps={steps} status={r.status} />
             {r.admin_note ? (
@@ -185,6 +193,7 @@ export default function RequestsList({ onLoaded }) {
           </View>
         );
       })}
+      <ReceiptModal visible={!!receipt} receipt={receipt} onClose={() => setReceipt(null)} />
     </ScrollView>
   );
 }
@@ -202,6 +211,8 @@ const styles = StyleSheet.create({
   tlText: { fontSize: 14, color: colors.textMuted, paddingTop: 1 },
   cancelBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   cancelText: { color: colors.danger, fontWeight: '600', fontSize: 13 },
+  receiptBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tintPurple, borderRadius: radius.md, paddingVertical: 10, marginTop: 12 },
+  receiptBtnText: { color: colors.purple, fontWeight: '700', fontSize: 13 },
   priceBox: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.tintOrange, borderRadius: radius.md, padding: 12, marginTop: 12 },
   priceLabel: { color: colors.textSecondary, fontSize: 13 },
   priceValue: { color: colors.orange, fontWeight: '800', fontSize: 16 },

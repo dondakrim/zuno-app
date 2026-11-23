@@ -17,6 +17,7 @@ import GradientHeader from '../components/GradientHeader';
 import { supabase } from '../lib/supabase';
 import { getDeviceUserId } from '../lib/deviceUser';
 import RequestsList, { fetchMyRequests, countActive } from '../components/RequestsList';
+import ReceiptModal, { buildOrderReceipt, fmtDateTime } from '../components/ReceiptModal';
 
 const TABS = [
   { key: 'panier', label: 'Panier', icon: 'cart-outline' },
@@ -168,6 +169,8 @@ export default function MyOrdersScreen({ navigation }) {
   const [processingOrders, setProcessingOrders] = useState([]);
   const [shippedOrders, setShippedOrders] = useState([]);
   const [favorites, setFavorites] = useState([]);
+  const [sellerNames, setSellerNames] = useState({});
+  const [receipt, setReceipt] = useState(null);
   const [coursesCount, setCoursesCount] = useState(0);
   const [disputedOrderIds, setDisputedOrderIds] = useState(new Set());
 
@@ -191,6 +194,14 @@ export default function MyOrdersScreen({ navigation }) {
       .order('created_at', { ascending: false });
 
     const all = orders || [];
+    // Noms des vendeurs, pour le reçu.
+    const sellerIds = [...new Set(all.map((o) => o.listings?.vendeur_id).filter(Boolean))];
+    if (sellerIds.length > 0) {
+      const { data: sp } = await supabase.from('public_profiles').select('id, nom, boutique_nom').in('id', sellerIds);
+      const map = {};
+      (sp || []).forEach((p) => { map[p.id] = p.boutique_nom || p.nom; });
+      setSellerNames(map);
+    }
     setProcessingOrders(
       all.filter((o) =>
         ['a_traiter', 'pris_en_charge', 'annulee'].includes(o.deliveries?.[0]?.statut_livraison)
@@ -351,7 +362,7 @@ export default function MyOrdersScreen({ navigation }) {
           </View>
         </View>
 
-        <Text style={styles.dateText}>Commandé le {formatDate(order.created_at)}</Text>
+        <Text style={styles.dateText}>Commandé le {fmtDateTime(order.created_at)}</Text>
 
         <OrderTracker status={delivery?.statut_livraison || 'a_traiter'} pickup={order.mode_livraison === 'pickup'} />
 
@@ -362,6 +373,17 @@ export default function MyOrdersScreen({ navigation }) {
               <Text style={styles.disputeBadgeText}>Litige en cours</Text>
             </View>
           </View>
+        )}
+
+        {delivery?.statut_livraison !== 'annulee' && (
+          <TouchableOpacity
+            style={styles.receiptBtn}
+            activeOpacity={0.85}
+            onPress={() => setReceipt(buildOrderReceipt(order, sellerNames[order.listings?.vendeur_id]))}
+          >
+            <Ionicons name="receipt-outline" size={16} color={colors.purple} />
+            <Text style={styles.receiptBtnText}>Voir le reçu</Text>
+          </TouchableOpacity>
         )}
 
         {showActions && (
@@ -535,6 +557,7 @@ export default function MyOrdersScreen({ navigation }) {
           )}
         </View>
       )}
+      <ReceiptModal visible={!!receipt} receipt={receipt} onClose={() => setReceipt(null)} />
     </View>
   );
 }
@@ -643,6 +666,8 @@ const styles = StyleSheet.create({
   },
   actionButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   actionButtonText: { fontSize: 12, color: colors.danger, fontWeight: '600' },
+  receiptBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.tintPurple, borderRadius: radius.md, paddingVertical: 10, marginTop: spacing.md },
+  receiptBtnText: { color: colors.purple, fontWeight: '700', fontSize: 13 },
   dateText: { fontSize: 11, color: colors.textMuted, marginTop: spacing.sm },
   actionButtonTextPurple: { fontSize: 12, color: colors.purple, fontWeight: '600' },
   countBadge: {
